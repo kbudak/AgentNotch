@@ -1,0 +1,139 @@
+<UserControl x:Class="AgentNotch.App.UI.PermissionPromptView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="False">
+
+    <!-- DataContext: PromptViewModel (Kind = Permission) -->
+    <Border Background="{StaticResource CardBgBrush}" CornerRadius="10" Padding="14,12">
+        <StackPanel>
+
+            <!-- Header -->
+            <TextBlock Text="● Permission Request"
+                       FontSize="11" FontWeight="SemiBold"
+                       Foreground="{StaticResource AccentAmberBrush}"/>
+
+            <!-- Tool line: "⚠ Edit src\auth\middleware.ts" -->
+            <TextBlock Margin="0,6,0,0" FontSize="13" FontWeight="SemiBold"
+                       Foreground="{StaticResource AccentAmberBrush}"
+                       TextTrimming="CharacterEllipsis">
+                <Run Text="⚠ "/><Run Text="{Binding Title, Mode=OneWay, FallbackValue=''}"/>
+            </TextBlock>
+
+            <!-- Subtitle: "project · permission_mode" -->
+            <TextBlock Text="{Binding Subtitle, FallbackValue=''}"
+                       Margin="0,2,0,0" FontSize="11"
+                       Foreground="{StaticResource TextTertiaryBrush}"
+                       TextTrimming="CharacterEllipsis"
+                       Visibility="{Binding Subtitle, Converter={StaticResource StringToVisibility}}"/>
+
+            <!-- Diff (Edit / Write) -->
+            <Border Margin="0,10,0,0" Background="{StaticResource CodeBgBrush}" CornerRadius="6" Padding="4"
+                    Visibility="{Binding DiffLines, Converter={StaticResource CollectionToVisibility}}">
+                <ScrollViewer MaxHeight="260" Focusable="False"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding DiffLines}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border x:Name="lineBg" Background="Transparent" Padding="2,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Width="30" Text="{Binding OldNo}"
+                                                   FontFamily="{StaticResource MonoFontFamily}" FontSize="12"
+                                                   Foreground="{StaticResource DiffGutterBrush}"
+                                                   TextAlignment="Right" Margin="0,0,6,0"/>
+                                        <TextBlock Width="30" Text="{Binding NewNo}"
+                                                   FontFamily="{StaticResource MonoFontFamily}" FontSize="12"
+                                                   Foreground="{StaticResource DiffGutterBrush}"
+                                                   TextAlignment="Right" Margin="0,0,10,0"/>
+                                        <TextBlock x:Name="lineText" Text="{Binding Text}"
+                                                   FontFamily="{StaticResource MonoFontFamily}" FontSize="12"
+                                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding Kind}" Value="add">
+                                        <Setter TargetName="lineBg" Property="Background" Value="{StaticResource DiffAddBgBrush}"/>
+                                        <Setter TargetName="lineText" Property="Foreground" Value="{StaticResource AccentGreenBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="del">
+                                        <Setter TargetName="lineBg" Property="Background" Value="{StaticResource DiffDelBgBrush}"/>
+                                        <Setter TargetName="lineText" Property="Foreground" Value="{StaticResource AccentRedBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="gap">
+                                        <Setter TargetName="lineText" Property="Foreground" Value="{StaticResource TextTertiaryBrush}"/>
+                                        <Setter TargetName="lineText" Property="FontStyle" Value="Italic"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Diff stats: "+3 -1" -->
+            <StackPanel Orientation="Horizontal" Margin="2,4,0,0"
+                        Visibility="{Binding DiffStats, Converter={StaticResource StringToVisibility}}">
+                <TextBlock Text="{Binding DiffAdded, FallbackValue=''}"
+                           FontFamily="{StaticResource MonoFontFamily}" FontSize="11"
+                           Foreground="{StaticResource AccentGreenBrush}"/>
+                <TextBlock Text="{Binding DiffRemoved, FallbackValue=''}"
+                           Margin="6,0,0,0"
+                           FontFamily="{StaticResource MonoFontFamily}" FontSize="11"
+                           Foreground="{StaticResource AccentRedBrush}"/>
+            </StackPanel>
+
+            <!-- Bash command -->
+            <Border Margin="0,10,0,0" Background="{StaticResource CodeBgBrush}" CornerRadius="6" Padding="10,8"
+                    Visibility="{Binding CommandText, Converter={StaticResource StringToVisibility}}">
+                <ScrollViewer MaxHeight="120" Focusable="False"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <TextBlock Text="{Binding CommandText, FallbackValue=''}"
+                               FontFamily="{StaticResource MonoFontFamily}" FontSize="12"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               TextWrapping="Wrap"/>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Generic fallback (compact tool input JSON) -->
+            <Border Margin="0,10,0,0" Background="{StaticResource CodeBgBrush}" CornerRadius="6" Padding="10,8"
+                    Visibility="{Binding GenericJson, Converter={StaticResource StringToVisibility}}">
+                <ScrollViewer MaxHeight="140" Focusable="False"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <TextBlock Text="{Binding GenericJson, FallbackValue=''}"
+                               FontFamily="{StaticResource MonoFontFamily}" FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="Wrap"/>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Actions -->
+            <Grid Margin="0,12,0,0">
+                <Button Style="{StaticResource GhostButtonStyle}"
+                        HorizontalAlignment="Left" VerticalAlignment="Center"
+                        Click="OnPass" FontSize="11"
+                        Content="decide in terminal"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Style="{StaticResource DenyButtonStyle}" Click="OnDeny" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Deny" FontSize="12" VerticalAlignment="Center"/>
+                            <Border Style="{StaticResource KbdChipBorderStyle}" Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource KbdChipTextStyle}" Text="Ctrl+N"/>
+                            </Border>
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource AllowButtonStyle}" Click="OnAllow">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Allow" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <Border Style="{StaticResource KbdChipOnLightBorderStyle}" Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource KbdChipOnLightTextStyle}" Text="Ctrl+Y"/>
+                            </Border>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+        </StackPanel>
+    </Border>
+</UserControl>

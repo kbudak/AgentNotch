@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
+    <!-- WinForms only for NotifyIcon (tray icon); UI is WPF. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>AgentNotch</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- UseWindowsForms rewrites implicit usings: it injects System.Windows.Forms
+         (ambiguous with WPF types) and drops System.IO. Undo both. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AgentNotch.Protocol\AgentNotch.Protocol.csproj" />
+    <!-- Build-order only: the helper is a separate exe copied next to the app. -->
+    <ProjectReference Include="..\AgentNotch.HookHelper\AgentNotch.HookHelper.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Assets\app.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Co-locate the hook helper under <out>\helper so the installer can register its path. -->
+  <Target Name="CopyHookHelper" AfterTargets="Build">
+    <ItemGroup>
+      <HelperFiles Include="..\AgentNotch.HookHelper\bin\$(Configuration)\net8.0\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(HelperFiles)" DestinationFiles="@(HelperFiles->'$(OutDir)helper\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyHookHelperPublish" AfterTargets="Publish">
+    <!-- A RID on the App (e.g. -r win-x64) flows to the helper and moves its output
+         under net8.0\<rid>\ — resolve whichever layout exists, and fail loudly if
+         neither does (a silent empty glob once shipped a publish with no helper). -->
+    <PropertyGroup>
+      <HelperOutBase>..\AgentNotch.HookHelper\bin\$(Configuration)\net8.0</HelperOutBase>
+      <HelperOutDir>$(HelperOutBase)</HelperOutDir>
+      <HelperOutDir Condition="'$(RuntimeIdentifier)' != '' and Exists('$(HelperOutBase)\$(RuntimeIdentifier)\agentnotch-hook.exe')">$(HelperOutBase)\$(RuntimeIdentifier)</HelperOutDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <HelperPubFiles Include="$(HelperOutDir)\**\*.*" Exclude="$(HelperOutDir)\publish\**" />
+    </ItemGroup>
+    <Error Condition="!Exists('$(HelperOutDir)\agentnotch-hook.exe')"
+           Text="Hook helper output not found at $(HelperOutDir) — build AgentNotch.HookHelper first." />
+    <Copy SourceFiles="@(HelperPubFiles)" DestinationFiles="@(HelperPubFiles->'$(PublishDir)helper\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

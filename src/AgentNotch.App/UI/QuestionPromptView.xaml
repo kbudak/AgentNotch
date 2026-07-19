@@ -1,0 +1,86 @@
+<UserControl x:Class="AgentNotch.App.UI.QuestionPromptView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="False">
+
+    <!-- DataContext: PromptViewModel (Kind = Question) -->
+    <Border Background="{StaticResource CardBgBrush}" CornerRadius="10" Padding="14,12">
+        <StackPanel>
+
+            <!-- Header -->
+            <TextBlock Text="💬 Claude asks"
+                       FontSize="11" FontWeight="SemiBold"
+                       Foreground="{StaticResource AccentTealBrush}"/>
+
+            <!-- Question header + text -->
+            <TextBlock Text="{Binding Header, FallbackValue=''}"
+                       Margin="0,6,0,0" FontSize="13" FontWeight="SemiBold"
+                       Foreground="{StaticResource TextPrimaryBrush}"
+                       TextWrapping="Wrap"
+                       Visibility="{Binding Header, Converter={StaticResource StringToVisibility}}"/>
+            <TextBlock Text="{Binding QuestionText, FallbackValue=''}"
+                       Margin="0,4,0,0" FontSize="12.5"
+                       Foreground="{StaticResource TextPrimaryBrush}"
+                       TextWrapping="Wrap"
+                       Visibility="{Binding QuestionText, Converter={StaticResource StringToVisibility}}"/>
+
+            <!-- Subtitle: "project · permission_mode" -->
+            <TextBlock Text="{Binding Subtitle, FallbackValue=''}"
+                       Margin="0,3,0,0" FontSize="11"
+                       Foreground="{StaticResource TextTertiaryBrush}"
+                       TextTrimming="CharacterEllipsis"
+                       Visibility="{Binding Subtitle, Converter={StaticResource StringToVisibility}}"/>
+
+            <!-- Options -->
+            <ItemsControl ItemsSource="{Binding Options}" Margin="0,10,0,0" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Style="{StaticResource OptionButtonStyle}" Click="OnOption" Margin="0,0,0,6">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Style="{StaticResource KbdChipBorderStyle}"
+                                        VerticalAlignment="Top" Margin="0,2,0,0"
+                                        Visibility="{Binding HotkeyText, Converter={StaticResource StringToVisibility}}">
+                                    <TextBlock Style="{StaticResource KbdChipTextStyle}"
+                                               Text="{Binding HotkeyText}"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                    <TextBlock Text="{Binding Label}" FontSize="12.5"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding Description}" FontSize="11"
+                                               Margin="0,2,0,0"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap"
+                                               Visibility="{Binding Description, Converter={StaticResource StringToVisibility}}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Multi-select note (MVP: first pick resolves) -->
+            <TextBlock Text="multiple selections allowed — your first pick is sent"
+                       FontSize="10" Margin="2,0,0,0"
+                       Foreground="{StaticResource TextTertiaryBrush}"
+                       Visibility="{Binding MultiSelect, Converter={StaticResource BoolToVis}}"/>
+
+            <!-- Pass back to terminal -->
+            <Button Style="{StaticResource GhostButtonStyle}"
+                    HorizontalAlignment="Left" Margin="0,6,0,0"
+                    Click="OnPass">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="answer in terminal" FontSize="11" VerticalAlignment="Center"/>
+                    <Border Style="{StaticResource KbdChipBorderStyle}" Margin="6,0,0,0">
+                        <TextBlock Style="{StaticResource KbdChipTextStyle}" Text="Ctrl+N"/>
+                    </Border>
+                </StackPanel>
+            </Button>
+
+        </StackPanel>
+    </Border>
+</UserControl>

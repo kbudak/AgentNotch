@@ -1,0 +1,271 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ui="clr-namespace:AgentNotch.App.UI">
+
+    <!-- ===================== Fonts ===================== -->
+    <FontFamily x:Key="UiFontFamily">Segoe UI</FontFamily>
+    <FontFamily x:Key="MonoFontFamily">Cascadia Mono, Consolas, Courier New</FontFamily>
+
+    <!-- ===================== Palette (VibeIsland dark) ===================== -->
+    <SolidColorBrush x:Key="PanelBgBrush" Color="#F70B0B0E"/>
+    <SolidColorBrush x:Key="PanelBorderBrush" Color="#14FFFFFF"/>
+    <SolidColorBrush x:Key="CardBgBrush" Color="#FF131316"/>
+    <SolidColorBrush x:Key="CardHoverBrush" Color="#FF1D1D22"/>
+    <SolidColorBrush x:Key="CodeBgBrush" Color="#FF0F0F12"/>
+
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFF4F4F5"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF9CA3AF"/>
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#FF6B7280"/>
+
+    <SolidColorBrush x:Key="AccentAmberBrush" Color="#FFF59E0B"/>
+    <SolidColorBrush x:Key="AccentTealBrush" Color="#FF2DD4BF"/>
+    <SolidColorBrush x:Key="AccentGreenBrush" Color="#FF4ADE80"/>
+    <SolidColorBrush x:Key="AccentRedBrush" Color="#FFF87171"/>
+
+    <SolidColorBrush x:Key="DiffAddBgBrush" Color="#1F4ADE80"/>
+    <SolidColorBrush x:Key="DiffDelBgBrush" Color="#1FF87171"/>
+    <SolidColorBrush x:Key="DiffGutterBrush" Color="#FF6B7280"/>
+
+    <SolidColorBrush x:Key="BtnDenyBgBrush" Color="#FF26262B"/>
+    <SolidColorBrush x:Key="BtnDenyHoverBrush" Color="#FF2E2E34"/>
+    <SolidColorBrush x:Key="BtnDenyPressedBrush" Color="#FF35353C"/>
+    <SolidColorBrush x:Key="BtnAllowBgBrush" Color="#FFFAFAFA"/>
+    <SolidColorBrush x:Key="BtnAllowHoverBrush" Color="#FFECECEC"/>
+    <SolidColorBrush x:Key="BtnAllowPressedBrush" Color="#FFDBDBDB"/>
+    <SolidColorBrush x:Key="BtnAllowFgBrush" Color="#FF0A0A0A"/>
+
+    <SolidColorBrush x:Key="KbdBgBrush" Color="#12FFFFFF"/>
+    <SolidColorBrush x:Key="KbdBorderBrush" Color="#1FFFFFFF"/>
+    <SolidColorBrush x:Key="KbdOnLightBgBrush" Color="#14000000"/>
+    <SolidColorBrush x:Key="KbdOnLightBorderBrush" Color="#26000000"/>
+    <SolidColorBrush x:Key="KbdOnLightFgBrush" Color="#FF3F3F46"/>
+
+    <SolidColorBrush x:Key="OptionBgBrush" Color="#FF18181B"/>
+    <SolidColorBrush x:Key="OptionHoverBrush" Color="#FF27272A"/>
+    <SolidColorBrush x:Key="OptionPressedBrush" Color="#FF2F2F33"/>
+
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#33FFFFFF"/>
+
+    <!-- ===================== Converters ===================== -->
+    <ui:NullToVisibilityConverter x:Key="NullToVisibility"/>
+    <ui:StringToVisibilityConverter x:Key="StringToVisibility"/>
+    <ui:CollectionToVisibilityConverter x:Key="CollectionToVisibility"/>
+    <ui:GreaterThanOneToVisibilityConverter x:Key="GreaterThanOneToVisibility"/>
+    <ui:SessionStateConverter x:Key="SessionState"/>
+    <ui:SessionTitleConverter x:Key="SessionTitle"/>
+    <ui:SessionSubtitleConverter x:Key="SessionSubtitle"/>
+    <ui:SessionTokensConverter x:Key="SessionTokens"/>
+    <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+    <!-- ===================== Keyboard chips ===================== -->
+    <Style x:Key="KbdChipBorderStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{StaticResource KbdBgBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource KbdBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="5,1"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="KbdChipTextStyle" TargetType="{x:Type TextBlock}">
+        <Setter Property="FontFamily" Value="{StaticResource MonoFontFamily}"/>
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+    </Style>
+
+    <Style x:Key="KbdChipOnLightBorderStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{StaticResource KbdOnLightBgBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource KbdOnLightBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="5,1"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="KbdChipOnLightTextStyle" TargetType="{x:Type TextBlock}">
+        <Setter Property="FontFamily" Value="{StaticResource MonoFontFamily}"/>
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="Foreground" Value="{StaticResource KbdOnLightFgBrush}"/>
+    </Style>
+
+    <!-- ===================== Buttons ===================== -->
+    <Style x:Key="DenyButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="Padding" Value="14,7"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="bd" Background="{StaticResource BtnDenyBgBrush}" CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{StaticResource BtnDenyHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{StaticResource BtnDenyPressedBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="AllowButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="{StaticResource BtnAllowFgBrush}"/>
+        <Setter Property="Padding" Value="14,7"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="bd" Background="{StaticResource BtnAllowBgBrush}" CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{StaticResource BtnAllowHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{StaticResource BtnAllowPressedBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="OptionButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="bd" Background="{StaticResource OptionBgBrush}" CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{StaticResource OptionHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{StaticResource OptionPressedBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="GhostButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="{StaticResource TextTertiaryBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border Background="Transparent" Padding="4,2">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ===================== Slim dark scrollbars ===================== -->
+    <Style x:Key="ScrollPageButtonStyle" TargetType="{x:Type RepeatButton}">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type RepeatButton}">
+                    <Rectangle Fill="Transparent"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ScrollThumbStyle" TargetType="{x:Type Thumb}">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Thumb}">
+                    <Border Background="{StaticResource ScrollThumbBrush}" CornerRadius="3" Margin="1"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <ControlTemplate x:Key="VerticalScrollBarTemplate" TargetType="{x:Type ScrollBar}">
+        <Grid Background="Transparent" Width="8">
+            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                <Track.DecreaseRepeatButton>
+                    <RepeatButton Style="{StaticResource ScrollPageButtonStyle}"
+                                  Command="{x:Static ScrollBar.PageUpCommand}"/>
+                </Track.DecreaseRepeatButton>
+                <Track.IncreaseRepeatButton>
+                    <RepeatButton Style="{StaticResource ScrollPageButtonStyle}"
+                                  Command="{x:Static ScrollBar.PageDownCommand}"/>
+                </Track.IncreaseRepeatButton>
+                <Track.Thumb>
+                    <Thumb Style="{StaticResource ScrollThumbStyle}"/>
+                </Track.Thumb>
+            </Track>
+        </Grid>
+    </ControlTemplate>
+
+    <ControlTemplate x:Key="HorizontalScrollBarTemplate" TargetType="{x:Type ScrollBar}">
+        <Grid Background="Transparent" Height="8">
+            <Track x:Name="PART_Track" IsDirectionReversed="False" Orientation="Horizontal">
+                <Track.DecreaseRepeatButton>
+                    <RepeatButton Style="{StaticResource ScrollPageButtonStyle}"
+                                  Command="{x:Static ScrollBar.PageLeftCommand}"/>
+                </Track.DecreaseRepeatButton>
+                <Track.IncreaseRepeatButton>
+                    <RepeatButton Style="{StaticResource ScrollPageButtonStyle}"
+                                  Command="{x:Static ScrollBar.PageRightCommand}"/>
+                </Track.IncreaseRepeatButton>
+                <Track.Thumb>
+                    <Thumb Style="{StaticResource ScrollThumbStyle}"/>
+                </Track.Thumb>
+            </Track>
+        </Grid>
+    </ControlTemplate>
+
+    <Style TargetType="{x:Type ScrollBar}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Width" Value="8"/>
+        <Setter Property="MinWidth" Value="8"/>
+        <Setter Property="Template" Value="{StaticResource VerticalScrollBarTemplate}"/>
+        <Style.Triggers>
+            <Trigger Property="Orientation" Value="Horizontal">
+                <Setter Property="Width" Value="Auto"/>
+                <Setter Property="MinWidth" Value="0"/>
+                <Setter Property="Height" Value="8"/>
+                <Setter Property="MinHeight" Value="8"/>
+                <Setter Property="Template" Value="{StaticResource HorizontalScrollBarTemplate}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+</ResourceDictionary>

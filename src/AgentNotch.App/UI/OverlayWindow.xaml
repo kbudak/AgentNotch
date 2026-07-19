@@ -1,0 +1,187 @@
+<Window x:Class="AgentNotch.App.UI.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:AgentNotch.App.UI"
+        Title="AgentNotch"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Focusable="False"
+        SizeToContent="WidthAndHeight"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        FontFamily="{StaticResource UiFontFamily}"
+        FontSize="12.5"
+        Foreground="{StaticResource TextPrimaryBrush}">
+
+    <!-- Outer margin leaves room for the drop shadow; top stays 0 so the panel is flush with the bezel. -->
+    <Grid Margin="28,0,28,32">
+
+        <!-- Shadow layer: same shape, effect applied here so text above stays crisp. -->
+        <Border Background="{StaticResource PanelBgBrush}"
+                CornerRadius="0,0,18,18">
+            <Border.Effect>
+                <DropShadowEffect Color="#FF000000" Opacity="0.4" BlurRadius="24" ShadowDepth="8" Direction="270"/>
+            </Border.Effect>
+        </Border>
+
+        <!-- Notch panel -->
+        <Border Background="{StaticResource PanelBgBrush}"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="1,0,1,1"
+                CornerRadius="0,0,18,18"
+                Padding="8,0,8,8">
+            <StackPanel>
+
+                <!-- ============ Collapsed pill (always visible) ============ -->
+                <Grid Height="34" MinWidth="240">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+                        <Ellipse Width="8" Height="8" VerticalAlignment="Center">
+                            <Ellipse.Style>
+                                <Style TargetType="{x:Type Ellipse}">
+                                    <Setter Property="Fill" Value="{StaticResource TextTertiaryBrush}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding StateKind, FallbackValue=idle}" Value="working">
+                                            <Setter Property="Fill" Value="{StaticResource AccentGreenBrush}"/>
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="PillPulseWorking">
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                         From="1" To="0.35" Duration="0:0:0.8"
+                                                                         AutoReverse="True" RepeatBehavior="Forever"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="PillPulseWorking"/>
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StateKind, FallbackValue=idle}" Value="needsyou">
+                                            <Setter Property="Fill" Value="{StaticResource AccentAmberBrush}"/>
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="PillPulseNeedsYou">
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                         From="1" To="0.35" Duration="0:0:0.8"
+                                                                         AutoReverse="True" RepeatBehavior="Forever"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="PillPulseNeedsYou"/>
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StateKind, FallbackValue=idle}" Value="prompt">
+                                            <Setter Property="Fill" Value="{StaticResource AccentAmberBrush}"/>
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="PillPulsePrompt">
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                         From="1" To="0.35" Duration="0:0:0.6"
+                                                                         AutoReverse="True" RepeatBehavior="Forever"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="PillPulsePrompt"/>
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        <TextBlock Text="{Binding CollapsedText, FallbackValue=idle}"
+                                   Margin="10,0,0,0" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                    <TextBlock Text="✦" HorizontalAlignment="Right" VerticalAlignment="Center"
+                               Margin="0,0,14,0" FontSize="11"
+                               Foreground="{StaticResource TextTertiaryBrush}"/>
+                </Grid>
+
+                <!-- ============ Expanded content ============ -->
+                <StackPanel x:Name="ExpandedSection" Width="560">
+                    <StackPanel.Style>
+                        <Style TargetType="{x:Type StackPanel}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Setter Property="Opacity" Value="0"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsExpanded, FallbackValue=False}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                 To="1" Duration="0:0:0.18">
+                                                    <DoubleAnimation.EasingFunction>
+                                                        <CubicEase EasingMode="EaseOut"/>
+                                                    </DoubleAnimation.EasingFunction>
+                                                </DoubleAnimation>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                 To="0" Duration="0:0:0.12"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.ExitActions>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+
+                    <!-- Prompt card (permission / question by Kind) + queue badge -->
+                    <StackPanel Margin="4,6,4,0"
+                                Visibility="{Binding ActivePrompt, Converter={StaticResource NullToVisibility}}">
+                        <Border HorizontalAlignment="Right" Margin="0,0,2,4"
+                                Background="{StaticResource KbdBgBrush}"
+                                BorderBrush="{StaticResource KbdBorderBrush}"
+                                BorderThickness="1" CornerRadius="4" Padding="6,2"
+                                Visibility="{Binding QueueCount, Converter={StaticResource GreaterThanOneToVisibility}}">
+                            <TextBlock Text="{Binding QueueBadgeText, FallbackValue=''}"
+                                       FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        </Border>
+                        <ContentControl Content="{Binding ActivePrompt}" Focusable="False" IsTabStop="False">
+                            <ContentControl.Style>
+                                <Style TargetType="{x:Type ContentControl}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ActivePrompt.Kind}" Value="Permission">
+                                            <Setter Property="ContentTemplate">
+                                                <Setter.Value>
+                                                    <DataTemplate>
+                                                        <ui:PermissionPromptView/>
+                                                    </DataTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding ActivePrompt.Kind}" Value="Question">
+                                            <Setter Property="ContentTemplate">
+                                                <Setter.Value>
+                                                    <DataTemplate>
+                                                        <ui:QuestionPromptView/>
+                                                    </DataTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ContentControl.Style>
+                        </ContentControl>
+                    </StackPanel>
+
+                    <!-- Sessions list (always shown while expanded) -->
+                    <ui:SessionsView Margin="4,6,4,2"/>
+                </StackPanel>
+
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

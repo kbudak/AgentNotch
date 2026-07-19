@@ -1,0 +1,122 @@
+<UserControl x:Class="AgentNotch.App.UI.SessionsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="False">
+
+    <!-- DataContext: MainViewModel (inherited from OverlayWindow) -->
+    <StackPanel>
+
+        <!-- Empty state -->
+        <TextBlock Text="No active agents — waiting."
+                   FontSize="11" Margin="6,4,6,4"
+                   Foreground="{StaticResource TextTertiaryBrush}">
+            <TextBlock.Style>
+                <Style TargetType="{x:Type TextBlock}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Sessions.Count, FallbackValue=0}" Value="0">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+
+        <!-- Session rows -->
+        <ItemsControl ItemsSource="{Binding Sessions}" Focusable="False">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border x:Name="Row" Background="Transparent" CornerRadius="8"
+                            Padding="10,7" Margin="0,2,0,0" Cursor="Hand"
+                            MouseLeftButtonUp="OnSessionRowClick">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Status dot -->
+                            <Ellipse Grid.Column="0" Width="7" Height="7"
+                                     VerticalAlignment="Center" Margin="2,0,10,0"
+                                     Tag="{Binding Converter={StaticResource SessionState}}">
+                                <Ellipse.Style>
+                                    <Style TargetType="{x:Type Ellipse}">
+                                        <Setter Property="Fill" Value="{StaticResource TextTertiaryBrush}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}"
+                                                         Value="working">
+                                                <Setter Property="Fill" Value="{StaticResource AccentGreenBrush}"/>
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="RowPulse">
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="1" To="0.35" Duration="0:0:0.8"
+                                                                             AutoReverse="True" RepeatBehavior="Forever"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="RowPulse"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}"
+                                                         Value="needsyou">
+                                                <Setter Property="Fill" Value="{StaticResource AccentAmberBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+
+                            <!-- Title + subtitle -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Converter={StaticResource SessionTitle}}"
+                                           FontSize="13"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding Converter={StaticResource SessionSubtitle}}"
+                                           FontSize="11" Margin="0,1,0,0"
+                                           FontFamily="{StaticResource MonoFontFamily}"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis">
+                                    <TextBlock.Style>
+                                        <Style TargetType="{x:Type TextBlock}">
+                                            <Style.Triggers>
+                                                <Trigger Property="Text" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+
+                            <!-- Token spend -->
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding Converter={StaticResource SessionTokens}}"
+                                       FontSize="11" Margin="8,0,0,0"
+                                       FontFamily="{StaticResource MonoFontFamily}"
+                                       Foreground="{StaticResource TextTertiaryBrush}"
+                                       VerticalAlignment="Center"/>
+
+                            <!-- Jump glyph (revealed on hover) -->
+                            <TextBlock Grid.Column="3" x:Name="JumpGlyph" Text="↗"
+                                       FontSize="12" Margin="8,0,2,0" Opacity="0"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <DataTemplate.Triggers>
+                        <Trigger SourceName="Row" Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Row" Property="Background" Value="{StaticResource CardHoverBrush}"/>
+                            <Setter TargetName="JumpGlyph" Property="Opacity" Value="1"/>
+                        </Trigger>
+                    </DataTemplate.Triggers>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+    </StackPanel>
+</UserControl>
