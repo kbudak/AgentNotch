@@ -6,12 +6,12 @@
         WindowStyle="None"
         ResizeMode="NoResize"
         AllowsTransparency="True"
-        Background="Transparent"
+        Background="{x:Null}"
         Topmost="True"
         ShowInTaskbar="False"
         ShowActivated="False"
         Focusable="False"
-        SizeToContent="WidthAndHeight"
+        Width="640" Height="800"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display"
@@ -19,8 +19,11 @@
         FontSize="12.5"
         Foreground="{StaticResource TextPrimaryBrush}">
 
-    <!-- Outer margin leaves room for the drop shadow; top stays 0 so the panel is flush with the bezel. -->
-    <Grid Margin="28,0,28,32">
+    <!-- Fixed-size fully transparent window: the HWND never resizes, so the
+         expand/collapse animation happens purely in composition (no per-frame
+         window resizing = no jank). Null background keeps empty areas
+         click-through and hover-transparent; only the panel is interactive. -->
+    <Grid Margin="28,0,28,32" HorizontalAlignment="Center" VerticalAlignment="Top">
 
         <!-- Shadow layer: same shape, effect applied here so text above stays crisp. -->
         <Border Background="{StaticResource PanelBgBrush}"
@@ -30,8 +33,10 @@
             </Border.Effect>
         </Border>
 
-        <!-- Notch panel -->
-        <Border Background="{StaticResource PanelBgBrush}"
+        <!-- Notch panel — Width is animated from code-behind (280 pill ⇄ 576 open). -->
+        <Border x:Name="NotchPanel"
+                Width="280"
+                Background="{StaticResource PanelBgBrush}"
                 BorderBrush="{StaticResource PanelBorderBrush}"
                 BorderThickness="1,0,1,1"
                 CornerRadius="0,0,18,18"
@@ -97,6 +102,7 @@
                         </Ellipse>
                         <TextBlock Text="{Binding CollapsedText, FallbackValue=idle}"
                                    Margin="10,0,0,0" FontSize="12" VerticalAlignment="Center"
+                                   MaxWidth="200" TextTrimming="CharacterEllipsis"
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
                     </StackPanel>
                     <TextBlock Text="✦" HorizontalAlignment="Right" VerticalAlignment="Center"
@@ -105,68 +111,17 @@
                 </Grid>
 
                 <!-- ============ Expanded content ============ -->
-                <!-- Expand = slide-down + fade-in; collapse = retract-up + fade-out.
-                     The height animates via LayoutTransform.ScaleY (SizeToContent follows
-                     each frame), and Visibility is driven by the storyboards so the exit
-                     animation is actually visible before the panel collapses. To= (no From)
-                     keeps quick hover-in/out reversals smooth from the current value. -->
-                <StackPanel x:Name="ExpandedSection" Width="560">
-                    <StackPanel.LayoutTransform>
-                        <ScaleTransform ScaleY="0"/>
-                    </StackPanel.LayoutTransform>
-                    <StackPanel.Style>
-                        <Style TargetType="{x:Type StackPanel}">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Setter Property="Opacity" Value="0"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsExpanded, FallbackValue=False}" Value="True">
-                                    <DataTrigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="Visibility">
-                                                    <DiscreteObjectKeyFrame KeyTime="0:0:0" Value="{x:Static Visibility.Visible}"/>
-                                                </ObjectAnimationUsingKeyFrames>
-                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                 To="1" Duration="0:0:0.16">
-                                                    <DoubleAnimation.EasingFunction>
-                                                        <CubicEase EasingMode="EaseOut"/>
-                                                    </DoubleAnimation.EasingFunction>
-                                                </DoubleAnimation>
-                                                <DoubleAnimation Storyboard.TargetProperty="(FrameworkElement.LayoutTransform).(ScaleTransform.ScaleY)"
-                                                                 To="1" Duration="0:0:0.22">
-                                                    <DoubleAnimation.EasingFunction>
-                                                        <CubicEase EasingMode="EaseOut"/>
-                                                    </DoubleAnimation.EasingFunction>
-                                                </DoubleAnimation>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </DataTrigger.EnterActions>
-                                    <DataTrigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                 To="0" Duration="0:0:0.14">
-                                                    <DoubleAnimation.EasingFunction>
-                                                        <CubicEase EasingMode="EaseIn"/>
-                                                    </DoubleAnimation.EasingFunction>
-                                                </DoubleAnimation>
-                                                <DoubleAnimation Storyboard.TargetProperty="(FrameworkElement.LayoutTransform).(ScaleTransform.ScaleY)"
-                                                                 To="0" Duration="0:0:0.18">
-                                                    <DoubleAnimation.EasingFunction>
-                                                        <CubicEase EasingMode="EaseIn"/>
-                                                    </DoubleAnimation.EasingFunction>
-                                                </DoubleAnimation>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="Visibility">
-                                                    <DiscreteObjectKeyFrame KeyTime="0:0:0" Value="{x:Static Visibility.Visible}"/>
-                                                    <DiscreteObjectKeyFrame KeyTime="0:0:0.19" Value="{x:Static Visibility.Collapsed}"/>
-                                                </ObjectAnimationUsingKeyFrames>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </DataTrigger.ExitActions>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
+                <!-- Curtain reveal: RevealHost's Height is animated from code-behind
+                     (0 ⇄ content height) while ClipToBounds hides the rest — the content
+                     itself never scales or squashes; it slides down a touch and fades.
+                     Content height changes while open (prompt card swaps) are morphed. -->
+                <Grid x:Name="RevealHost" ClipToBounds="True" Height="0">
+                    <StackPanel x:Name="ExpandedContent" Width="560"
+                                VerticalAlignment="Top" HorizontalAlignment="Center"
+                                Opacity="0">
+                        <StackPanel.RenderTransform>
+                            <TranslateTransform x:Name="ContentSlide" Y="-14"/>
+                        </StackPanel.RenderTransform>
 
                     <!-- Prompt card (permission / question by Kind) + queue badge -->
                     <StackPanel Margin="4,6,4,0"
@@ -207,9 +162,10 @@
                         </ContentControl>
                     </StackPanel>
 
-                    <!-- Sessions list (always shown while expanded) -->
-                    <ui:SessionsView Margin="4,6,4,2"/>
-                </StackPanel>
+                        <!-- Sessions list (always shown while expanded) -->
+                        <ui:SessionsView Margin="4,6,4,2"/>
+                    </StackPanel>
+                </Grid>
 
             </StackPanel>
         </Border>
