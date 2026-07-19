@@ -242,39 +242,35 @@ public partial class App : Application
 
         if (shotBase is null) return; // interactive demo: leave it on screen
 
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1400) };
-        int step = 0;
-        timer.Tick += (_, _) =>
+        // Deterministic: the physical cursor must not create hover state mid-run.
+        _overlay!.IsHitTestVisible = false;
+
+        RunShotSequenceAsync(shotBase);
+    }
+
+    private async void RunShotSequenceAsync(string shotBase)
+    {
+        try
         {
-            try
-            {
-                step++;
-                switch (step)
-                {
-                    case 1:
-                        SaveShot(_overlay!, shotBase + "-1-permission.png");
-                        _vm!.AllowActive(); // → question becomes active
-                        break;
-                    case 2:
-                        SaveShot(_overlay!, shotBase + "-2-question.png");
-                        _vm!.ChooseOption(0); // → queue empty, collapses
-                        _vm!.SetHover(false); // neutralize a stray cursor parked over the window
-                        break;
-                    case 3:
-                        SaveShot(_overlay!, shotBase + "-3-collapsed.png");
-                        timer.Stop();
-                        Shutdown();
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLog.Write("demo shot failed: " + ex);
-                timer.Stop();
-                Shutdown();
-            }
-        };
-        timer.Start();
+            await Task.Delay(1400);
+            SaveShot(_overlay!, shotBase + "-1-permission.png");
+            _vm!.AllowActive(); // → question becomes active
+
+            await Task.Delay(1400);
+            SaveShot(_overlay!, shotBase + "-2-question.png");
+            _vm!.ChooseOption(0); // → queue empty → collapse starts immediately
+
+            await Task.Delay(90); // mid-retract (exit anim: 180ms scale / 140ms fade)
+            SaveShot(_overlay!, shotBase + "-3-collapsing.png");
+
+            await Task.Delay(900);
+            SaveShot(_overlay!, shotBase + "-4-collapsed.png");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("demo shot failed: " + ex);
+        }
+        Shutdown();
     }
 
     private static HookRequest DemoRequest(string mode, object hookEvent) => new(

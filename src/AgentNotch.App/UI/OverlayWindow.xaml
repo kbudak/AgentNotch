@@ -105,19 +105,35 @@
                 </Grid>
 
                 <!-- ============ Expanded content ============ -->
+                <!-- Expand = slide-down + fade-in; collapse = retract-up + fade-out.
+                     The height animates via LayoutTransform.ScaleY (SizeToContent follows
+                     each frame), and Visibility is driven by the storyboards so the exit
+                     animation is actually visible before the panel collapses. To= (no From)
+                     keeps quick hover-in/out reversals smooth from the current value. -->
                 <StackPanel x:Name="ExpandedSection" Width="560">
+                    <StackPanel.LayoutTransform>
+                        <ScaleTransform ScaleY="0"/>
+                    </StackPanel.LayoutTransform>
                     <StackPanel.Style>
                         <Style TargetType="{x:Type StackPanel}">
                             <Setter Property="Visibility" Value="Collapsed"/>
                             <Setter Property="Opacity" Value="0"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsExpanded, FallbackValue=False}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
                                     <DataTrigger.EnterActions>
                                         <BeginStoryboard>
                                             <Storyboard>
+                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="Visibility">
+                                                    <DiscreteObjectKeyFrame KeyTime="0:0:0" Value="{x:Static Visibility.Visible}"/>
+                                                </ObjectAnimationUsingKeyFrames>
                                                 <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                 To="1" Duration="0:0:0.18">
+                                                                 To="1" Duration="0:0:0.16">
+                                                    <DoubleAnimation.EasingFunction>
+                                                        <CubicEase EasingMode="EaseOut"/>
+                                                    </DoubleAnimation.EasingFunction>
+                                                </DoubleAnimation>
+                                                <DoubleAnimation Storyboard.TargetProperty="(FrameworkElement.LayoutTransform).(ScaleTransform.ScaleY)"
+                                                                 To="1" Duration="0:0:0.22">
                                                     <DoubleAnimation.EasingFunction>
                                                         <CubicEase EasingMode="EaseOut"/>
                                                     </DoubleAnimation.EasingFunction>
@@ -129,7 +145,21 @@
                                         <BeginStoryboard>
                                             <Storyboard>
                                                 <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                 To="0" Duration="0:0:0.12"/>
+                                                                 To="0" Duration="0:0:0.14">
+                                                    <DoubleAnimation.EasingFunction>
+                                                        <CubicEase EasingMode="EaseIn"/>
+                                                    </DoubleAnimation.EasingFunction>
+                                                </DoubleAnimation>
+                                                <DoubleAnimation Storyboard.TargetProperty="(FrameworkElement.LayoutTransform).(ScaleTransform.ScaleY)"
+                                                                 To="0" Duration="0:0:0.18">
+                                                    <DoubleAnimation.EasingFunction>
+                                                        <CubicEase EasingMode="EaseIn"/>
+                                                    </DoubleAnimation.EasingFunction>
+                                                </DoubleAnimation>
+                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="Visibility">
+                                                    <DiscreteObjectKeyFrame KeyTime="0:0:0" Value="{x:Static Visibility.Visible}"/>
+                                                    <DiscreteObjectKeyFrame KeyTime="0:0:0.19" Value="{x:Static Visibility.Collapsed}"/>
+                                                </ObjectAnimationUsingKeyFrames>
                                             </Storyboard>
                                         </BeginStoryboard>
                                     </DataTrigger.ExitActions>
