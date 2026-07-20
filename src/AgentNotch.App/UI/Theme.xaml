@@ -22,6 +22,15 @@
     <SolidColorBrush x:Key="AccentGreenBrush" Color="#FF4ADE80"/>
     <SolidColorBrush x:Key="AccentRedBrush" Color="#FFF87171"/>
 
+    <!-- ===================== Status palette =====================
+         The notch reads as "shape = which agent, colour = what state".
+         One distinct colour per state, warm = wants you, cool = doesn't. -->
+    <SolidColorBrush x:Key="StatusWorkingBrush"  Color="#FF4ADE80"/> <!-- green  · running now      -->
+    <SolidColorBrush x:Key="StatusNeedsYouBrush" Color="#FFF59E0B"/> <!-- amber  · waiting on you   -->
+    <SolidColorBrush x:Key="StatusFinishedBrush" Color="#FF60A5FA"/> <!-- blue   · finished, calm   -->
+    <SolidColorBrush x:Key="StatusPromptBrush"   Color="#FFFB923C"/> <!-- orange · approval blocking-->
+    <SolidColorBrush x:Key="StatusIdleBrush"     Color="#FF6B7280"/> <!-- grey   · nothing running  -->
+
     <SolidColorBrush x:Key="DiffAddBgBrush" Color="#1F4ADE80"/>
     <SolidColorBrush x:Key="DiffDelBgBrush" Color="#1FF87171"/>
     <SolidColorBrush x:Key="DiffGutterBrush" Color="#FF6B7280"/>
@@ -55,6 +64,10 @@
     <ui:SessionTitleConverter x:Key="SessionTitle"/>
     <ui:SessionSubtitleConverter x:Key="SessionSubtitle"/>
     <ui:SessionTokensConverter x:Key="SessionTokens"/>
+    <ui:SessionAgentIconConverter x:Key="SessionAgentIcon"/>
+    <ui:SessionStatusBrushConverter x:Key="SessionStatusBrush"/>
+    <ui:AgentIconConverter x:Key="AgentIcon"/>
+    <ui:StateKindBrushConverter x:Key="StateKindBrush"/>
     <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
     <!-- ===================== Keyboard chips ===================== -->

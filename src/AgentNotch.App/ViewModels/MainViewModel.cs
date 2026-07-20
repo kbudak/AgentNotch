@@ -69,6 +69,25 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Agent whose mark the collapsed pill shows ("" when idle). Picked to match
+    /// <see cref="StateKind"/>, so the pill's shape and colour always describe the
+    /// same session: an open prompt is always Claude's (only Claude Code hooks in),
+    /// otherwise the agent behind the state being reported.
+    /// </summary>
+    public string LeadAgent
+    {
+        get
+        {
+            if (_queue.Count > 0) return "claude";
+            foreach (var s in Sessions)
+                if (s.Status == SessionStatus.NeedsYou) return s.Agent;
+            foreach (var s in Sessions)
+                if (s.Status == SessionStatus.Working) return s.Agent;
+            return Sessions.Count > 0 ? Sessions[0].Agent : "";
+        }
+    }
+
     /// <summary>"idle" | "working" | "needsyou" | "prompt" — drives the pill dot.</summary>
     public string StateKind
     {
@@ -133,6 +152,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
         Raise(nameof(CollapsedText));
         Raise(nameof(StateKind));
+        Raise(nameof(LeadAgent));
     }
 
     // ---------------------------------------------------------------- hover
@@ -237,6 +257,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Raise(nameof(IsExpanded));
         Raise(nameof(CollapsedText));
         Raise(nameof(StateKind));
+        Raise(nameof(LeadAgent));
     }
 
     private void Raise(string name)
