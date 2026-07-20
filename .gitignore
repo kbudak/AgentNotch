@@ -3,3 +3,8 @@ obj/
 *.user
 publish/
 TestResults/
+
+# Editor / harness state, not project source
+.vs/
+.claude/
+.idea/
