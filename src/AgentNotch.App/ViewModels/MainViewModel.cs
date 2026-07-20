@@ -4,6 +4,7 @@ using System.Windows.Threading;
 using AgentNotch.App.Diagnostics;
 using AgentNotch.App.Ipc;
 using AgentNotch.App.Sessions;
+using AgentNotch.App.Usage;
 using AgentNotch.Protocol;
 
 namespace AgentNotch.App.ViewModels;
@@ -18,6 +19,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 {
     private readonly List<PromptViewModel> _queue = new();
     private readonly DispatcherTimer _collapseTimer;
+    private readonly DispatcherTimer _toastTimer;
     private bool _hover;      // pointer is currently over the notch
     private bool _hoverHeld;  // expansion held by hover (kept through the collapse delay)
 
@@ -25,11 +27,28 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         _collapseTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _collapseTimer.Tick += OnCollapseTick;
+        _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(2400) };
+        _toastTimer.Tick += OnToastTick;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<AgentSession> Sessions { get; } = new();
+
+    /// <summary>Plan rate-limit windows ("5h 20% · 2h14m") shown above the sessions.</summary>
+    public ObservableCollection<UsageWindow> Usage { get; } = new();
+
+    /// <summary>
+    /// Short-lived confirmation after you resolve a prompt ("✓ Allowed",
+    /// "✓ Production", "✕ Denied") — the notch reports what it sent back so you
+    /// never have to switch to the terminal to check. Null when nothing to show.
+    /// </summary>
+    public string? ToastText { get; private set; }
+
+    /// <summary>"ok" | "deny" — colours the confirmation.</summary>
+    public string ToastKind { get; private set; } = "ok";
+
+    public bool HasToast => ToastText is { Length: > 0 };
 
     /// <summary>Head of the FIFO prompt queue; null when nothing is pending.</summary>
     public PromptViewModel? ActivePrompt => _queue.Count > 0 ? _queue[0] : null;
@@ -137,6 +156,44 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Replaces the rate-limit windows shown in the header (UI thread).</summary>
+    public void UpdateUsage(IReadOnlyList<UsageWindow> windows)
+    {
+        try
+        {
+            Usage.Clear();
+            if (windows is not null)
+                foreach (var w in windows)
+                    Usage.Add(w);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("UpdateUsage: " + ex.Message);
+        }
+        Raise(nameof(Usage));
+    }
+
+    /// <summary>Flashes a confirmation in the notch for a couple of seconds.</summary>
+    private void ShowToast(string text, string kind)
+    {
+        ToastText = text;
+        ToastKind = kind;
+        Raise(nameof(ToastText));
+        Raise(nameof(ToastKind));
+        Raise(nameof(HasToast));
+
+        _toastTimer.Stop();
+        _toastTimer.Start();
+    }
+
+    private void OnToastTick(object? sender, EventArgs e)
+    {
+        _toastTimer.Stop();
+        ToastText = null;
+        Raise(nameof(ToastText));
+        Raise(nameof(HasToast));
+    }
+
     public void UpdateSessions(IReadOnlyList<AgentSession> sessions)
     {
         try
@@ -194,6 +251,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var prompt = ActivePrompt;
         if (prompt is null || prompt.Kind != PromptKind.Permission) return;
         Resolve(prompt, new DecisionBody { Behavior = "allow" }, "allow");
+        ShowToast("✓  Allowed — " + ShortTitle(prompt), "ok");
     }
 
     public void DenyActive()
@@ -201,6 +259,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var prompt = ActivePrompt;
         if (prompt is null || prompt.Kind != PromptKind.Permission) return;
         Resolve(prompt, new DecisionBody { Behavior = "deny", Message = "Denied from AgentNotch" }, "deny");
+        ShowToast("✕  Denied — " + ShortTitle(prompt), "deny");
     }
 
     public void PassActive()
@@ -208,6 +267,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var prompt = ActivePrompt;
         if (prompt is null) return;
         Resolve(prompt, new DecisionBody { Behavior = "pass" }, "pass");
+        ShowToast("→  Handed back to the terminal", "ok");
+    }
+
+    /// <summary>Prompt title trimmed to fit the confirmation pill.</summary>
+    private static string ShortTitle(PromptViewModel prompt)
+    {
+        var title = prompt.Title ?? "";
+        return title.Length <= 34 ? title : title[..34] + "…";
     }
 
     public void ChooseOption(int index)
@@ -226,6 +293,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             },
         };
         Resolve(prompt, body, $"answer #{index + 1}");
+        ShowToast("✓  " + option.Label, "ok");
     }
 
     private void Resolve(PromptViewModel prompt, DecisionBody body, string what)

@@ -36,6 +36,16 @@ public sealed class AgentSession
     /// <summary>Model name when the source reports one (e.g. "GPT-5.2", "Gemini").</summary>
     public string? Model { get; set; }
 
+    /// <summary>
+    /// Where the session actually runs, spelled for humans: "Cursor", "VS Code",
+    /// "Antigravity", "Windows Terminal", "PowerShell", "Claude"… Shown as a chip
+    /// on the row. Null when it could not be resolved.
+    /// </summary>
+    public string? HostLabel { get; set; }
+
+    /// <summary>When the session began (UTC) — drives the "27m" age chip. Default = unknown.</summary>
+    public DateTime StartedUtc { get; set; }
+
     public string Cwd { get; set; } = "";
 
     /// <summary>Last segment of <see cref="Cwd"/> ("session" when the cwd is unknown).</summary>

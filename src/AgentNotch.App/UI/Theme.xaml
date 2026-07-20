@@ -68,7 +68,29 @@
     <ui:SessionStatusBrushConverter x:Key="SessionStatusBrush"/>
     <ui:AgentIconConverter x:Key="AgentIcon"/>
     <ui:StateKindBrushConverter x:Key="StateKindBrush"/>
+    <ui:SessionBrandConverter x:Key="SessionBrand"/>
+    <ui:SessionHostConverter x:Key="SessionHost"/>
+    <ui:SessionAgeConverter x:Key="SessionAge"/>
+    <ui:UsageSeverityBrushConverter x:Key="UsageSeverityBrush"/>
+    <ui:ToastBrushConverter x:Key="ToastBrush"/>
+    <ui:BoolToCollapsedConverter x:Key="BoolToCollapsed"/>
     <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+    <!-- Chip on a session row: which agent, and which app it runs in. -->
+    <Style x:Key="RowChipStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{StaticResource KbdBgBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource KbdBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="6,1"/>
+        <Setter Property="Margin" Value="4,0,0,0"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="RowChipTextStyle" TargetType="{x:Type TextBlock}">
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+    </Style>
 
     <!-- ===================== Keyboard chips ===================== -->
     <Style x:Key="KbdChipBorderStyle" TargetType="{x:Type Border}">

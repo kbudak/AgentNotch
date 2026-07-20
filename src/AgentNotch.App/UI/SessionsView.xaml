@@ -104,15 +104,62 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
+                                <!-- Finished sessions advertise that the row is clickable. -->
+                                <TextBlock Text="Done — click to jump" FontSize="10" Margin="0,2,0,0"
+                                           Foreground="{StaticResource StatusFinishedBrush}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="{x:Type TextBlock}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Converter={StaticResource SessionState}}"
+                                                             Value="finished">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                             </StackPanel>
 
-                            <!-- Token spend -->
-                            <TextBlock Grid.Column="2"
-                                       Text="{Binding Converter={StaticResource SessionTokens}}"
-                                       FontSize="11" Margin="8,0,0,0"
-                                       FontFamily="{StaticResource MonoFontFamily}"
-                                       Foreground="{StaticResource TextTertiaryBrush}"
-                                       VerticalAlignment="Center"/>
+                            <!-- Where it runs: brand chip + host app chip + age -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                        VerticalAlignment="Center" Margin="8,0,0,0">
+                                <TextBlock Text="{Binding Converter={StaticResource SessionTokens}}"
+                                           FontSize="10" Margin="0,0,2,0"
+                                           FontFamily="{StaticResource MonoFontFamily}"
+                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           VerticalAlignment="Center"/>
+                                <Border>
+                                    <Border.Style>
+                                        <Style TargetType="{x:Type Border}" BasedOn="{StaticResource RowChipStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Converter={StaticResource SessionBrand}}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding Converter={StaticResource SessionBrand}}"
+                                               Style="{StaticResource RowChipTextStyle}"/>
+                                </Border>
+                                <Border>
+                                    <Border.Style>
+                                        <Style TargetType="{x:Type Border}" BasedOn="{StaticResource RowChipStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Converter={StaticResource SessionHost}}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding Converter={StaticResource SessionHost}}"
+                                               Style="{StaticResource RowChipTextStyle}"/>
+                                </Border>
+                                <TextBlock Text="{Binding Converter={StaticResource SessionAge}}"
+                                           FontSize="10" Margin="6,0,0,0"
+                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
 
                             <!-- Jump glyph (revealed on hover) -->
                             <TextBlock Grid.Column="3" x:Name="JumpGlyph" Text="↗"

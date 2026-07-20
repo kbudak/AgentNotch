@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -290,6 +291,7 @@ public static class CodexTail
             CurrentTarget = null,
             LastMessage = summary,
             TokensSpent = 0,
+            StartedUtc = StartedFromName(path, mtimeUtc),
             LastActivityUtc = mtimeUtc,
         };
     }
@@ -342,6 +344,37 @@ public static class CodexTail
     /// <summary>Fallback session id: file name stripped of its rollout-date prefix.</summary>
     internal static string FileId(string path)
         => RolloutPrefix.Replace(Path.GetFileNameWithoutExtension(path), "", 1);
+
+    private static readonly Regex RolloutStamp =
+        new(@"rollout-(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Session start time, taken from the rollout file name
+    /// (rollout-2026-07-18T17-04-32-&lt;id&gt;.jsonl, local time), falling back to the
+    /// file's creation time and finally to its mtime.
+    /// </summary>
+    internal static DateTime StartedFromName(string path, DateTime fallbackUtc)
+    {
+        var m = RolloutStamp.Match(Path.GetFileName(path));
+        if (m.Success)
+        {
+            try
+            {
+                var local = new DateTime(
+                    int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture),
+                    int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture),
+                    int.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture),
+                    int.Parse(m.Groups[4].Value, CultureInfo.InvariantCulture),
+                    int.Parse(m.Groups[5].Value, CultureInfo.InvariantCulture),
+                    int.Parse(m.Groups[6].Value, CultureInfo.InvariantCulture),
+                    DateTimeKind.Local);
+                return local.ToUniversalTime();
+            }
+            catch { /* out-of-range parts — fall through */ }
+        }
+        try { return File.GetCreationTimeUtc(path); }
+        catch { return fallbackUtc; }
+    }
 
     /// <summary>Whitespace-collapsed, capped at <paramref name="max"/> chars (JS .slice semantics).</summary>
     private static string Squash(string text, int max)

@@ -406,12 +406,15 @@ public static class TranscriptTail
             {
                 if (!transcripts.TryGetValue(reg.SessionId, out var file)) continue;
 
-                DateTime mtimeUtc;
+                DateTime mtimeUtc, startedUtc;
                 try
                 {
                     var info = new FileInfo(file);
                     if (!info.Exists) continue;
                     mtimeUtc = info.LastWriteTimeUtc;
+                    // The transcript is created when the session starts — its age is
+                    // how long this agent has been on the task.
+                    startedUtc = info.CreationTimeUtc;
                 }
                 catch { continue; }
 
@@ -441,6 +444,7 @@ public static class TranscriptTail
                     Cwd = cwd,
                     ProjectName = ProjectNameOf(cwd),
                     Entrypoint = reg.Entrypoint,
+                    StartedUtc = startedUtc,
                     Pid = reg.Pid,
                     Status = status,
                     CurrentTool = tool,

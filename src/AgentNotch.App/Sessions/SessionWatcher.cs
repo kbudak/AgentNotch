@@ -161,11 +161,22 @@ public sealed class SessionWatcher : IDisposable
 
         foreach (var session in claude)
         {
-            if (session.Pid > 0 && session.Entrypoint != "claude-desktop")
+            if (session.Entrypoint == "claude-desktop")
             {
-                try { session.Host = Interop.ProcessTree.HostAppOf(session.Pid); }
-                catch (Exception ex) { AppLog.Write("SessionWatcher: host detect: " + ex.Message); }
+                // Not just "Claude" — that would collide with the brand chip and
+                // get deduped away, hiding where the session actually runs.
+                session.HostLabel = "Claude Desktop";
+                continue;
             }
+            if (session.Pid <= 0) continue;
+            try
+            {
+                // Host = an app we can jump to (editors only); HostLabel also names
+                // terminals, so a plain CLI session still says where it runs.
+                session.Host = Interop.ProcessTree.HostAppOf(session.Pid);
+                session.HostLabel = Interop.ProcessTree.HostLabelOf(session.Pid);
+            }
+            catch (Exception ex) { AppLog.Write("SessionWatcher: host detect: " + ex.Message); }
         }
 
         try
@@ -178,10 +189,12 @@ public sealed class SessionWatcher : IDisposable
                 // editor by walking the running Codex process up to its host window
                 // app — the Codex extension is a child of Cursor.exe / Code.exe.
                 var codexHost = Interop.ProcessTree.HostOfRunningProcess("codex", "chatgpt");
-                if (codexHost is not null)
-                    foreach (var session in codex)
-                        if (session.Host == "vscode")
-                            session.Host = codexHost;
+                var codexLabel = Interop.ProcessTree.HostLabelOfRunningProcess("codex", "chatgpt");
+                foreach (var session in codex)
+                {
+                    if (session.Host == "vscode" && codexHost is not null) session.Host = codexHost;
+                    session.HostLabel ??= codexLabel;
+                }
                 merged.AddRange(codex);
             }
         }

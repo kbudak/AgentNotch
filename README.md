@@ -9,8 +9,13 @@ but for Windows.
 ## How it works (and how it deliberately doesn't)
 
 No screen reading. No OCR. No pixel scraping. No process injection. No kernel
-driver, no service, no admin. Everything is local; the only I/O channel is a
-localhost named pipe.
+driver, no service, no admin.
+
+Everything runs locally over a localhost named pipe, with exactly **one**
+outbound request: the plan's rate-limit windows (the `5h` / `7d` numbers in the
+header) come from Anthropic's own usage endpoint, called with the OAuth token
+Claude Code already stored in `~\.claude\.credentials.json` — the same data
+`/usage` shows you. Nothing else leaves the machine, and no telemetry is sent.
 
 Integration is two-sided:
 
@@ -30,7 +35,25 @@ Integration is two-sided:
    `%USERPROFILE%\.claude\projects\**\*.jsonl` transcripts and the
    `%USERPROFILE%\.claude\sessions\*.json` registry to show every live
    session: status (working / needs you / finished), current tool and target,
-   and cumulative token spend.
+   cumulative token spend, which app it runs in, and how long it has been going.
+
+## Reading the notch
+
+Shape says **which agent**, colour says **what state**:
+
+| | |
+|---|---|
+| ✳ sunburst | Claude |
+| ⬡ hex knot | Codex |
+| ✦ sparkle | Antigravity (Gemini) |
+| 🟢 green | working right now |
+| 🟠 amber | waiting on you |
+| 🔵 blue | finished — click the row to jump there |
+| 🟧 orange | an approval is open in the notch |
+
+Each row also carries chips for the agent and the app hosting it ("Claude ·
+Windows Terminal", "Codex · Cursor"), plus its age. Resolving a prompt flashes a
+confirmation of what was sent back (`✓ Allowed`, `✓ Production`, `✕ Denied`).
 
 ### The permission critical path
 

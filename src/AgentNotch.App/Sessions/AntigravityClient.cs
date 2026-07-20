@@ -394,6 +394,7 @@ public sealed class AntigravityClient : IDisposable
     private static readonly string[] CwdKeys = { "cwd", "workspacePath", "projectPath", "repositoryPath" };
     // Real trajectories carry no top-level cwd — it's a file:// URI on the workspace.
     private static readonly string[] WorkspaceUriKeys = { "workspaceFolderAbsoluteUri", "gitRootAbsoluteUri" };
+    private static readonly string[] CreatedKeys = { "createdTime", "createdAt", "creationTime" };
     private static readonly string[] IdKeys = { "trajectoryId", "trajectory_id", "id" };
     private static readonly string[] SecondsKeys = { "seconds", "_seconds" };
 
@@ -459,9 +460,11 @@ public sealed class AntigravityClient : IDisposable
                     Agent = "antigravity",
                     Host = "antigravity",
                     Model = FirstString(t, "model") ?? "Gemini",
+                    HostLabel = "Antigravity",
                     Cwd = cwd ?? "",
                     ProjectName = ProjectNameOf(cwd),
                     Entrypoint = "",
+                    StartedUtc = CoerceTimestamp(FirstTruthy(t, CreatedKeys), updatedAtUtc),
                     Pid = 0,
                     Status = status,
                     LastMessage = summary ?? status switch

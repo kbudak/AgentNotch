@@ -71,6 +71,7 @@ internal static class StatusBrushes
     public static Brush Finished => Lookup("StatusFinishedBrush", 0x60, 0xA5, 0xFA);
     public static Brush Prompt => Lookup("StatusPromptBrush", 0xFB, 0x92, 0x3C);
     public static Brush Idle => Lookup("StatusIdleBrush", 0x6B, 0x72, 0x80);
+    public static Brush Danger => Lookup("AccentRedBrush", 0xF8, 0x71, 0x71);
 
     public static Brush Of(SessionStatus status) => status switch
     {
@@ -190,17 +191,10 @@ public sealed class SessionTitleConverter : IValueConverter
     {
         try
         {
+            // Agent and host are chips on the right now, so the title is just the
+            // project — the thing you actually scan for.
             if (value is AgentSession s)
-            {
-                var agent = string.IsNullOrWhiteSpace(s.Agent) ? "claude" : s.Agent;
-                var host = s.Host;
-                var label = !string.IsNullOrWhiteSpace(host) &&
-                            !string.Equals(host, agent, StringComparison.OrdinalIgnoreCase)
-                    ? $"{agent} · {host}"
-                    : agent;
-                var name = s.ProjectName;
-                return string.IsNullOrWhiteSpace(name) ? label : $"{label} — {name}";
-            }
+                return string.IsNullOrWhiteSpace(s.ProjectName) ? "session" : s.ProjectName;
         }
         catch { /* fall through */ }
         return "claude";
@@ -310,6 +304,118 @@ public sealed class StateKindBrushConverter : IValueConverter
             "prompt" => StatusBrushes.Prompt,
             _ => StatusBrushes.Idle,
         };
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>AgentSession → brand chip text: "Claude" | "Codex" | "Gemini".</summary>
+public sealed class SessionBrandConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        try
+        {
+            if (value is AgentSession s)
+                return s.Agent?.Trim().ToLowerInvariant() switch
+                {
+                    "codex" => "Codex",
+                    "antigravity" => "Antigravity",
+                    "claude" => "Claude",
+                    _ => s.Agent ?? "",
+                };
+        }
+        catch { /* fall through */ }
+        return "";
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>AgentSession → where it runs ("Cursor", "Windows Terminal", …).</summary>
+public sealed class SessionHostConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        try
+        {
+            if (value is AgentSession s)
+            {
+                var host = s.HostLabel;
+                if (string.IsNullOrWhiteSpace(host)) return "";
+                // Antigravity hosts its own agent — one chip, not two identical ones.
+                var brand = s.Agent?.Trim();
+                return string.Equals(host, brand, StringComparison.OrdinalIgnoreCase) ? "" : host;
+            }
+        }
+        catch { /* fall through */ }
+        return "";
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>AgentSession → how long it has been running: "27m", "3h", "2d".</summary>
+public sealed class SessionAgeConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        try
+        {
+            if (value is AgentSession s && s.StartedUtc != default)
+            {
+                var age = DateTime.UtcNow - s.StartedUtc;
+                if (age < TimeSpan.Zero) age = TimeSpan.Zero;
+                if (age.TotalMinutes < 1) return "now";
+                if (age.TotalMinutes < 60) return $"{(int)age.TotalMinutes}m";
+                if (age.TotalHours < 24) return $"{(int)age.TotalHours}h";
+                return $"{(int)age.TotalDays}d";
+            }
+        }
+        catch { /* fall through */ }
+        return "";
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>Usage percentage → green under half, amber past 70%, red past 90%.</summary>
+public sealed class UsageSeverityBrushConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        try
+        {
+            var pct = System.Convert.ToDouble(value, CultureInfo.InvariantCulture);
+            if (pct >= 90) return StatusBrushes.Danger;
+            if (pct >= 70) return StatusBrushes.NeedsYou;
+            return StatusBrushes.Working;
+        }
+        catch { return StatusBrushes.Idle; }
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>Toast kind ("ok" | "deny") → its colour.</summary>
+public sealed class ToastBrushConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => (value as string) == "deny" ? StatusBrushes.Danger : StatusBrushes.Working;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>True → Collapsed (hides the normal pill content while a toast shows).</summary>
+public sealed class BoolToCollapsedConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? Visibility.Collapsed : Visibility.Visible;
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => Binding.DoNothing;

@@ -5,6 +5,7 @@ using AgentNotch.App.Integration;
 using AgentNotch.App.Ipc;
 using AgentNotch.App.Sessions;
 using AgentNotch.App.UI;
+using AgentNotch.App.Usage;
 using AgentNotch.App.ViewModels;
 using AgentNotch.Protocol;
 using WinForms = System.Windows.Forms;
@@ -18,6 +19,7 @@ public partial class App : Application
     private PipeServer? _pipe;
     private SessionWatcher? _watcher;
     private OverlayWindow? _overlay;
+    private ClaudeUsageClient? _usage;
     private MainViewModel? _vm;
     private HotkeyManager? _hotkeys;
     private WinForms.NotifyIcon? _tray;
@@ -91,8 +93,19 @@ public partial class App : Application
         _pipe.Start(_cts.Token);
 
         _watcher = new SessionWatcher();
-        _watcher.SessionsChanged += list => Dispatcher.BeginInvoke(DispatcherPriority.Background, () => _vm!.UpdateSessions(list));
+        _watcher.SessionsChanged += list => Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+        {
+            _vm!.UpdateSessions(list);
+            // Piggyback on the session poll: refresh limits (throttled internally)
+            // and publish whatever snapshot the client currently holds.
+            _usage?.RefreshIfDue();
+            _vm.UpdateUsage(_usage?.Windows ?? Array.Empty<UsageWindow>());
+        });
         _watcher.Start();
+
+        _usage = new ClaudeUsageClient();
+        _usage.RefreshIfDue();
+        _vm.UpdateUsage(_usage.Windows); // seed from the persisted snapshot
 
         CreateTray();
         AppLog.Write($"started (auto={_autoBehavior ?? "off"}, helper={ResolveHelperPath() ?? "NOT FOUND"})");
@@ -193,12 +206,19 @@ public partial class App : Application
             if (args[i] == "--shot")
                 shotBase = args[i + 1];
 
+        var now = DateTime.UtcNow;
         _vm!.UpdateSessions(new[]
         {
-            new Sessions.AgentSession { SessionId = "s1", Cwd = @"C:\work\api", ProjectName = "api", Entrypoint = "cli", Pid = 1111, Status = Sessions.SessionStatus.NeedsYou, CurrentTool = "Bash", CurrentTarget = "npm run deploy", LastMessage = "Which deployment target?", TokensSpent = 48_200, LastActivityUtc = DateTime.UtcNow },
-            new Sessions.AgentSession { SessionId = "s2", Agent = "codex", Model = "GPT-5.2", Cwd = @"C:\work\shop", ProjectName = "shop", Status = Sessions.SessionStatus.Working, CurrentTool = "exec_command", LastMessage = "Running exec_command", LastActivityUtc = DateTime.UtcNow },
-            new Sessions.AgentSession { SessionId = "s3", Host = "cursor", Cwd = @"C:\work\web", ProjectName = "web", Entrypoint = "claude-vscode", Pid = 2222, Status = Sessions.SessionStatus.Working, CurrentTool = "Edit", CurrentTarget = @"src\db\schema.prisma", TokensSpent = 1_240_000, LastActivityUtc = DateTime.UtcNow },
-            new Sessions.AgentSession { SessionId = "s4", Agent = "antigravity", Model = "Gemini", Cwd = @"C:\work\bot", ProjectName = "bot", Status = Sessions.SessionStatus.Finished, LastMessage = "Task complete.", LastActivityUtc = DateTime.UtcNow },
+            new Sessions.AgentSession { SessionId = "s1", Cwd = @"C:\work\api", ProjectName = "api", Entrypoint = "cli", Pid = 1111, HostLabel = "Windows Terminal", Status = Sessions.SessionStatus.NeedsYou, CurrentTool = "Bash", CurrentTarget = "npm run deploy", LastMessage = "Which deployment target?", TokensSpent = 48_200, StartedUtc = now.AddMinutes(-27), LastActivityUtc = now },
+            new Sessions.AgentSession { SessionId = "s2", Agent = "codex", Model = "GPT-5.2", Cwd = @"C:\work\shop", ProjectName = "shop", HostLabel = "Cursor", Status = Sessions.SessionStatus.Working, CurrentTool = "exec_command", LastMessage = "Running exec_command", StartedUtc = now.AddHours(-1), LastActivityUtc = now },
+            new Sessions.AgentSession { SessionId = "s3", Host = "cursor", HostLabel = "Cursor", Cwd = @"C:\work\web", ProjectName = "web", Entrypoint = "claude-vscode", Pid = 2222, Status = Sessions.SessionStatus.Working, CurrentTool = "Edit", CurrentTarget = @"src\db\schema.prisma", TokensSpent = 1_240_000, StartedUtc = now.AddMinutes(-9), LastActivityUtc = now },
+            new Sessions.AgentSession { SessionId = "s4", Agent = "antigravity", Model = "Gemini", HostLabel = "Antigravity", Cwd = @"C:\work\bot", ProjectName = "bot", Status = Sessions.SessionStatus.Finished, LastMessage = "Task complete.", StartedUtc = now.AddHours(-5), LastActivityUtc = now },
+        });
+
+        _vm.UpdateUsage(new[]
+        {
+            new UsageWindow("5h", 20, now.AddHours(2).AddMinutes(14)),
+            new UsageWindow("7d", 4, now.AddDays(6).AddHours(14)),
         });
 
         _vm.AddHookRequest(DemoRequest(Proto.ModePermissionRequest, new
@@ -261,10 +281,10 @@ public partial class App : Application
             SaveShot(_overlay!, shotBase + "-2-question.png");
             _vm!.ChooseOption(0); // → queue empty → collapse starts immediately
 
-            await Task.Delay(90); // mid-retract (exit anim: 180ms scale / 140ms fade)
-            SaveShot(_overlay!, shotBase + "-3-collapsing.png");
+            await Task.Delay(700); // the answer confirmation is showing by now
+            SaveShot(_overlay!, shotBase + "-3-toast.png");
 
-            await Task.Delay(900);
+            await Task.Delay(2200); // toast expired -> normal collapsed pill
             SaveShot(_overlay!, shotBase + "-4-collapsed.png");
         }
         catch (Exception ex)
@@ -306,6 +326,7 @@ public partial class App : Application
             _hotkeys?.Dispose();
             _pipe?.Dispose();
             _watcher?.Dispose();
+            _usage?.Dispose();
             if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); }
             _instanceMutex?.Dispose();
         }

@@ -169,6 +169,38 @@ public static class ProcessTree
         return null;
     }
 
+    /// <summary>
+    /// Display name of the app hosting the first running process named one of
+    /// <paramref name="processNames"/> — the chip text for hostless (file-derived)
+    /// sessions such as Codex rollouts.
+    /// </summary>
+    public static string? HostLabelOfRunningProcess(params string[] processNames)
+    {
+        try
+        {
+            if (processNames is not { Length: > 0 }) return null;
+            var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var n in processNames)
+                if (!string.IsNullOrWhiteSpace(n)) wanted.Add(TrimExe(n));
+
+            foreach (var p in Process.GetProcesses())
+            {
+                int pid; string name;
+                try { name = p.ProcessName; pid = p.Id; }
+                catch { p.Dispose(); continue; }
+                p.Dispose();
+
+                if (wanted.Contains(name) && HostLabelOf(pid) is { } label)
+                    return label;
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("proctree: HostLabelOfRunningProcess failed: " + ex.Message);
+        }
+        return null;
+    }
+
     private static string? ResolveHost(int pid)
     {
         var processes = SnapshotProcesses();
@@ -194,6 +226,100 @@ public static class ProcessTree
         if (name.Equals("Code", StringComparison.OrdinalIgnoreCase)) return "vscode";
         return null;
     }
+
+    // ------------------------------------------------------------ HostLabelOf ----
+
+    /// <summary>
+    /// Editors AND terminals, mapped to the name a human would use. Wider than
+    /// <see cref="HostOfExe"/> — which only knows the apps we can jump to — because
+    /// the row chip should still say "Windows Terminal" for a plain CLI session.
+    /// </summary>
+    private static readonly Dictionary<string, string> HostLabels = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Cursor"] = "Cursor",
+        ["Antigravity"] = "Antigravity",
+        ["Code"] = "VS Code",
+        ["Code - Insiders"] = "VS Code",
+        ["windsurf"] = "Windsurf",
+        ["devenv"] = "Visual Studio",
+        ["WindowsTerminal"] = "Windows Terminal",
+        ["wt"] = "Windows Terminal",
+        ["powershell"] = "PowerShell",
+        ["pwsh"] = "PowerShell",
+        ["cmd"] = "Command Prompt",
+        ["conhost"] = "Console",
+        ["OpenConsole"] = "Windows Terminal",
+        ["alacritty"] = "Alacritty",
+        ["wezterm"] = "WezTerm",
+        ["wezterm-gui"] = "WezTerm",
+        ["Hyper"] = "Hyper",
+        ["Tabby"] = "Tabby",
+        ["mintty"] = "Git Bash",
+        ["bash"] = "Git Bash",
+        ["warp"] = "Warp",
+        ["claude"] = "Claude",
+    };
+
+    /// <summary>
+    /// Human-readable name of the nearest app hosting <paramref name="pid"/>
+    /// (editor or terminal), or null when nothing recognizable is in the chain.
+    /// Cached with the same 30s per-pid policy as <see cref="HostAppOf"/>.
+    /// </summary>
+    public static string? HostLabelOf(int pid)
+    {
+        try
+        {
+            if (pid <= 0) return null;
+
+            long now = Environment.TickCount64;
+            lock (LabelGate)
+            {
+                if (LabelCache.TryGetValue(pid, out var hit) && now - hit.AtMs <= HostTtlMs)
+                    return hit.Label;
+            }
+
+            string? label = null;
+            var processes = SnapshotProcesses();
+            if (processes.Count > 0)
+            {
+                var seen = new HashSet<int>();
+                int cur = pid;
+                for (int depth = 0; depth < MaxDepth; depth++)
+                {
+                    if (cur <= 0 || !seen.Add(cur)) break;
+                    if (!processes.TryGetValue(cur, out var entry)) break;
+                    if (HostLabels.TryGetValue(TrimExe(entry.ExeFile), out var found))
+                    {
+                        label = found;
+                        break;
+                    }
+                    cur = entry.ParentPid;
+                }
+            }
+
+            lock (LabelGate)
+            {
+                if (LabelCache.Count >= 256)
+                {
+                    foreach (var stale in LabelCache
+                                 .Where(kv => now - kv.Value.AtMs > HostTtlMs)
+                                 .Select(kv => kv.Key)
+                                 .ToList())
+                        LabelCache.Remove(stale);
+                }
+                LabelCache[pid] = (now, label);
+            }
+            return label;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("proctree: HostLabelOf failed: " + ex.Message);
+            return null;
+        }
+    }
+
+    private static readonly object LabelGate = new();
+    private static readonly Dictionary<int, (long AtMs, string? Label)> LabelCache = new();
 
     // ------------------------------------------- private interop (Toolhelp) ----
     // Toolhelp32 gives pid + parent pid + exe name in one pass. Kept private

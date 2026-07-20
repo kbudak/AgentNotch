@@ -45,7 +45,16 @@
 
                 <!-- ============ Collapsed pill (always visible) ============ -->
                 <Grid Height="34" MinWidth="240">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+
+                    <!-- Confirmation of what the notch just sent back; replaces the
+                         normal pill content for a couple of seconds. -->
+                    <TextBlock Text="{Binding ToastText}" FontSize="12.5" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{Binding ToastKind, Converter={StaticResource ToastBrush}}"
+                               Visibility="{Binding HasToast, Converter={StaticResource BoolToVis}}"/>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0"
+                                Visibility="{Binding HasToast, Converter={StaticResource BoolToCollapsed}}">
                         <!-- Lead agent's mark: shape = which agent is driving the current
                              state, fill = that state's colour. Idle falls back to a grey dot. -->
                         <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"
@@ -119,6 +128,9 @@
                                     <DataTrigger Binding="{Binding Sessions.Count, FallbackValue=0}" Value="0">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                     </DataTrigger>
+                                    <DataTrigger Binding="{Binding HasToast}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
@@ -140,6 +152,34 @@
                         <StackPanel.RenderTransform>
                             <TranslateTransform x:Name="ContentSlide" Y="-14"/>
                         </StackPanel.RenderTransform>
+
+                    <!-- Plan limits: "✦ 5h 20% 2h14m │ 7d 4% 6d14h" -->
+                    <ItemsControl ItemsSource="{Binding Usage}" Focusable="False"
+                                  Margin="8,6,4,0"
+                                  Visibility="{Binding Usage, Converter={StaticResource CollectionToVisibility}}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
+                                    <TextBlock Text="{Binding Label}" FontSize="11"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding PercentText}" FontSize="11" Margin="5,0,0,0"
+                                               FontFamily="{StaticResource MonoFontFamily}"
+                                               Foreground="{Binding UsedPct, Converter={StaticResource UsageSeverityBrush}}"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ResetText}" FontSize="11" Margin="5,0,0,0"
+                                               FontFamily="{StaticResource MonoFontFamily}"
+                                               Foreground="{StaticResource TextTertiaryBrush}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
                     <!-- Prompt card (permission / question by Kind) + queue badge -->
                     <StackPanel Margin="4,6,4,0"
