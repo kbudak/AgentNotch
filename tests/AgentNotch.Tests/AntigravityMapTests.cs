@@ -360,4 +360,98 @@ public sealed class AntigravityMapTests
             new[] { "From title", "From description", "From last message" },
             sessions.Select(s => s.LastMessage).ToArray());
     }
+
+    // ---------- real live-server shape (regression: notch showed nothing) ----------
+
+    /// <summary>
+    /// The exact wire shape observed from GetAllCascadeTrajectories: trajectories
+    /// live in the OBJECT map "trajectorySummaries", statuses are CASCADE_RUN_STATUS_*,
+    /// the cwd is a file:// workspace URI, and timestamps carry nanosecond precision.
+    /// </summary>
+    private static JsonElement RealResponse() => Json(new
+    {
+        trajectorySummaries = new Dictionary<string, object>
+        {
+            ["511c97c1-54df-4814-976a-0b408e61183c"] = new
+            {
+                summary = "projeyi analiz et ve rapor et",
+                stepCount = 32,
+                lastModifiedTime = "2026-07-20T11:58:40.935930200Z",
+                trajectoryId = "8357b464-36db-4ea3-8f5d-8c4b082aa870",
+                status = "CASCADE_RUN_STATUS_RUNNING",
+                workspaces = new object[]
+                {
+                    new { workspaceFolderAbsoluteUri = "file:///c:/Users/kaan_/Desktop/Projects/belediyem" },
+                },
+            },
+            ["07879285-cc7e-40f3-b679-5ff9cf5c6f50"] = new
+            {
+                summary = "burada admin atamalari",
+                lastModifiedTime = "2026-07-20T11:57:00Z",
+                trajectoryId = "abc",
+                status = "CASCADE_RUN_STATUS_IDLE",
+                workspaces = new object[]
+                {
+                    new { workspaceFolderAbsoluteUri = "file:///c:/Users/kaan_/Desktop/Projects/belediyem" },
+                },
+            },
+        },
+    });
+
+    [Fact]
+    public void ObjectMapContainer_IsParsed()
+    {
+        var sessions = AntigravityClient.MapTrajectories(RealResponse(), Now);
+        Assert.Equal(2, sessions.Count); // both within 10 min of Now
+    }
+
+    [Fact]
+    public void CascadeStatuses_MapRunningToWorking_AndIdleToFinished()
+    {
+        var sessions = AntigravityClient.MapTrajectories(RealResponse(), Now);
+        var running = sessions.Single(s => s.SessionId == "antigravity:8357b464-36db-4ea3-8f5d-8c4b082aa870");
+        var idle = sessions.Single(s => s.SessionId == "antigravity:abc");
+        Assert.Equal(SessionStatus.Working, running.Status);
+        Assert.Equal(SessionStatus.Finished, idle.Status);
+    }
+
+    [Fact]
+    public void WorkspaceFileUri_BecomesCwdAndProjectName()
+    {
+        var s = AntigravityClient.MapTrajectories(RealResponse(), Now)
+            .Single(x => x.SessionId == "antigravity:8357b464-36db-4ea3-8f5d-8c4b082aa870");
+        Assert.Equal(@"c:\Users\kaan_\Desktop\Projects\belediyem", s.Cwd);
+        Assert.Equal("belediyem", s.ProjectName);
+        Assert.Equal("antigravity", s.Host);
+        Assert.Equal("Gemini", s.Model); // response carries no model
+    }
+
+    [Fact]
+    public void NanosecondIsoTimestamp_IsCoerced()
+    {
+        var s = AntigravityClient.MapTrajectories(RealResponse(), Now)
+            .Single(x => x.SessionId == "antigravity:8357b464-36db-4ea3-8f5d-8c4b082aa870");
+        Assert.Equal(new DateTime(2026, 7, 20, 11, 58, 40, DateTimeKind.Utc), s.LastActivityUtc,
+            TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public void MetadataWorkspaceUris_AreUsedWhenNoDirectWorkspace()
+    {
+        var response = Json(new
+        {
+            trajectorySummaries = new Dictionary<string, object>
+            {
+                ["x"] = new
+                {
+                    status = "CASCADE_RUN_STATUS_RUNNING",
+                    trajectoryMetadata = new { workspaceUris = new[] { "file:///d:/code/api" } },
+                },
+            },
+        });
+
+        var s = Assert.Single(AntigravityClient.MapTrajectories(response, Now));
+        Assert.Equal(@"d:\code\api", s.Cwd);
+        Assert.Equal("api", s.ProjectName);
+    }
 }

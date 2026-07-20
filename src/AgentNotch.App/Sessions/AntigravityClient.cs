@@ -383,16 +383,23 @@ public sealed class AntigravityClient : IDisposable
 
     // ---------- pure mapping (unit-tested) ----------
 
-    private static readonly string[] ArrayKeys = { "trajectories", "cascadeTrajectories", "summaries", "items" };
+    // The live server returns {"trajectorySummaries": {"<guid>": {trajectory}, ...}}
+    // — an OBJECT map, not an array — so the container search accepts both and the
+    // trajectory list is the map's values. Other keys are kept for forward-compat.
+    private static readonly string[] ContainerKeys =
+        { "trajectorySummaries", "trajectories", "cascadeTrajectories", "summaries", "items" };
     private static readonly string[] StatusKeys = { "status", "state", "executionStatus", "executorStatus" };
     private static readonly string[] SummaryKeys = { "summary", "title", "description", "lastAgentMessage" };
     private static readonly string[] TimeKeys = { "lastModifiedTime", "updatedAt", "updateTime", "modifiedAt", "createdAt" };
     private static readonly string[] CwdKeys = { "cwd", "workspacePath", "projectPath", "repositoryPath" };
+    // Real trajectories carry no top-level cwd — it's a file:// URI on the workspace.
+    private static readonly string[] WorkspaceUriKeys = { "workspaceFolderAbsoluteUri", "gitRootAbsoluteUri" };
     private static readonly string[] IdKeys = { "trajectoryId", "trajectory_id", "id" };
     private static readonly string[] SecondsKeys = { "seconds", "_seconds" };
 
     private static readonly Regex NeedsYouStatus = new(
-        "waiting.*(user|input|approval)|needs.*(user|input)|blocked|pending.*approval",
+        "waiting.*(user|input|approval)|needs.*(user|input)|blocked|" +
+        "pending.*(approval|user|input)|awaiting|user_action|user_input|require",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex WorkingStatus = new(
@@ -425,12 +432,10 @@ public sealed class AntigravityClient : IDisposable
         var tasks = new List<AgentSession>();
         try
         {
-            if (FirstArray(response, 0) is not { } items) return tasks;
+            if (FirstContainer(response, 0) is not { } container) return tasks;
 
-            foreach (var t in items.EnumerateArray())
+            foreach (var t in EnumerateItems(container))
             {
-                if (t.ValueKind != JsonValueKind.Object) continue;
-
                 var rawStatus = (FirstString(t, StatusKeys) ?? "").ToLowerInvariant();
                 var summary = CollapseExcerpt(FirstString(t, SummaryKeys), 100);
 
@@ -444,7 +449,7 @@ public sealed class AntigravityClient : IDisposable
                 var updatedAtUtc = CoerceTimestamp(FirstTruthy(t, TimeKeys), nowUtc);
                 if (status != SessionStatus.Working && nowUtc - updatedAtUtc > TaskKeep) continue;
 
-                var cwd = FirstString(t, CwdKeys);
+                var cwd = ExtractCwd(t);
                 var id = FirstIdString(t) ??
                          (cwd ?? "agent") + ":" + ToEpochMs(updatedAtUtc).ToString(CultureInfo.InvariantCulture);
 
@@ -478,24 +483,84 @@ public sealed class AntigravityClient : IDisposable
     }
 
     /// <summary>
-    /// First array in the response: direct, under one of the known keys, or nested
-    /// at most 3 objects deep (matching the JS collector's search).
+    /// The trajectory container in the response: an array or an object-map, found
+    /// directly, under a known key, or nested at most 3 objects deep. The live
+    /// server nests trajectories under the object-map key "trajectorySummaries".
     /// </summary>
-    private static JsonElement? FirstArray(JsonElement value, int depth)
+    private static JsonElement? FirstContainer(JsonElement value, int depth)
     {
         if (depth > 3) return null;
         if (value.ValueKind == JsonValueKind.Array) return value;
         if (value.ValueKind != JsonValueKind.Object) return null;
 
-        foreach (var key in ArrayKeys)
-            if (value.TryGetProperty(key, out var named) && named.ValueKind == JsonValueKind.Array)
+        foreach (var key in ContainerKeys)
+            if (value.TryGetProperty(key, out var named) &&
+                named.ValueKind is JsonValueKind.Array or JsonValueKind.Object)
                 return named;
 
         foreach (var property in value.EnumerateObject())
-            if (FirstArray(property.Value, depth + 1) is { } found)
+            if (FirstContainer(property.Value, depth + 1) is { } found)
                 return found;
 
         return null;
+    }
+
+    /// <summary>Object trajectories in a container — array elements or object-map values.</summary>
+    private static IEnumerable<JsonElement> EnumerateItems(JsonElement container)
+    {
+        if (container.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var element in container.EnumerateArray())
+                if (element.ValueKind == JsonValueKind.Object)
+                    yield return element;
+        }
+        else if (container.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in container.EnumerateObject())
+                if (property.Value.ValueKind == JsonValueKind.Object)
+                    yield return property.Value;
+        }
+    }
+
+    /// <summary>
+    /// Working directory of a trajectory: a direct cwd-style key, else the first
+    /// workspace's file:// URI (workspaces[].workspaceFolderAbsoluteUri, or
+    /// trajectoryMetadata.workspaceUris[0]), decoded to a local path.
+    /// </summary>
+    private static string? ExtractCwd(JsonElement t)
+    {
+        if (FirstString(t, CwdKeys) is { } direct) return NormalizePathUri(direct);
+
+        if (t.TryGetProperty("workspaces", out var workspaces) &&
+            workspaces.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var ws in workspaces.EnumerateArray())
+                if (ws.ValueKind == JsonValueKind.Object && FirstString(ws, WorkspaceUriKeys) is { } uri)
+                    return NormalizePathUri(uri);
+        }
+
+        if (t.TryGetProperty("trajectoryMetadata", out var meta) &&
+            meta.ValueKind == JsonValueKind.Object &&
+            meta.TryGetProperty("workspaceUris", out var uris) &&
+            uris.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var u in uris.EnumerateArray())
+                if (u.ValueKind == JsonValueKind.String && u.GetString() is { Length: > 0 } s)
+                    return NormalizePathUri(s);
+        }
+
+        return null;
+    }
+
+    /// <summary>"file:///c:/Users/..." → "c:\Users\..."; non-URI values pass through.</summary>
+    private static string NormalizePathUri(string value)
+    {
+        if (value.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+        {
+            try { return new Uri(value).LocalPath.Replace('/', '\\'); }
+            catch { /* malformed — fall through */ }
+        }
+        return value;
     }
 
     /// <summary>Does the summary end in (or contain) a question/approval ask? Includes Turkish.</summary>
