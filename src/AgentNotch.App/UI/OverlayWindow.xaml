@@ -105,9 +105,27 @@
                                    MaxWidth="200" TextTrimming="CharacterEllipsis"
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
                     </StackPanel>
-                    <TextBlock Text="✦" HorizontalAlignment="Right" VerticalAlignment="Center"
-                               Margin="0,0,14,0" FontSize="11"
-                               Foreground="{StaticResource TextTertiaryBrush}"/>
+                    <!-- Active agent count (replaces the old ✦ glyph); hidden when idle.
+                         Bound to Sessions.Count (not the collection itself) so the
+                         ObservableCollection's Count change notifications re-evaluate it. -->
+                    <Border HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Margin="0,0,12,0" Padding="7,1"
+                            Background="{StaticResource KbdBgBrush}"
+                            BorderBrush="{StaticResource KbdBorderBrush}"
+                            BorderThickness="1" CornerRadius="9">
+                        <Border.Style>
+                            <Style TargetType="{x:Type Border}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Sessions.Count, FallbackValue=0}" Value="0">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding Sessions.Count, FallbackValue=0}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                    </Border>
                 </Grid>
 
                 <!-- ============ Expanded content ============ -->

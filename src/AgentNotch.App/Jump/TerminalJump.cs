@@ -24,6 +24,14 @@ namespace AgentNotch.App.Jump;
 ///  * "claude-vscode"  — visible "Code"/"Cursor" window whose title contains
 ///                       the session cwd's folder name; else any such window.
 ///
+/// Non-claude agents carry no pid, so they are matched purely by window:
+///  * codex       — an editor (Cursor/Code/Antigravity) window titled for the
+///                  project, else the Codex/ChatGPT desktop app, else a
+///                  terminal window titled for the project.
+///  * antigravity — a visible Antigravity window (project title preferred).
+/// A claude session with a known Host targets that host app's window first and
+/// only then falls back to the entrypoint strategy above.
+///
 /// Never throws — every failure is logged and reported as false.
 /// </summary>
 public static class TerminalJump
@@ -38,6 +46,20 @@ public static class TerminalJump
                 AppLog.Write("jump: null session");
                 return false;
             }
+
+            switch (session.Agent)
+            {
+                case "codex":
+                    return FocusCodex(session);
+                case "antigravity":
+                    return FocusAntigravity(session);
+            }
+
+            // claude (and unknown agents): a session known to live inside a
+            // host app IS that app's window — try it first; on failure fall
+            // back to the entrypoint-based strategy unchanged.
+            if (session.Host is { Length: > 0 } host && FocusHostApp(host, session))
+                return true;
 
             switch (session.Entrypoint)
             {
@@ -175,23 +197,135 @@ public static class TerminalJump
             name.Equals("Code", StringComparison.OrdinalIgnoreCase) ||
             name.Equals("Cursor", StringComparison.OrdinalIgnoreCase);
 
-        string folder = session.ProjectName;
-        if (string.IsNullOrEmpty(folder) && !string.IsNullOrEmpty(session.Cwd))
-            folder = Path.GetFileName(session.Cwd.TrimEnd('\\', '/'));
-
-        IntPtr hwnd = IntPtr.Zero;
-        if (!string.IsNullOrEmpty(folder))
-            hwnd = FindProcessWindow(IsEditor,
-                title => title.Contains(folder, StringComparison.OrdinalIgnoreCase));
-        if (hwnd == IntPtr.Zero)
-            hwnd = FindProcessWindow(IsEditor, titleMatches: null);
-
+        string folder = FolderOf(session);
+        IntPtr hwnd = FindProcessWindowPreferTitle(IsEditor, folder);
         if (hwnd == IntPtr.Zero)
         {
             AppLog.Write($"jump: no visible Code/Cursor window (folder='{folder}')");
             return false;
         }
         return Activate(hwnd);
+    }
+
+    // ------------------------------------------------- codex / antigravity ----
+
+    /// <summary>
+    /// Codex sessions have no pid, so match purely by window: (1) an editor
+    /// (Cursor / Code / Antigravity) window titled for the project — Codex
+    /// usually runs as an IDE extension or in an integrated terminal; (2) the
+    /// Codex / ChatGPT desktop app; (3) a terminal window titled for the project.
+    /// </summary>
+    private static bool FocusCodex(AgentSession session)
+    {
+        static bool IsEditorHost(string name) =>
+            name.Equals("Cursor", StringComparison.OrdinalIgnoreCase) ||
+            name.Equals("Code", StringComparison.OrdinalIgnoreCase) ||
+            name.Equals("Antigravity", StringComparison.OrdinalIgnoreCase);
+
+        static bool IsCodexApp(string name) =>
+            name.Equals("Codex", StringComparison.OrdinalIgnoreCase) ||
+            name.Equals("ChatGPT", StringComparison.OrdinalIgnoreCase);
+
+        string folder = FolderOf(session);
+
+        IntPtr hwnd = IntPtr.Zero;
+        if (!string.IsNullOrEmpty(folder))
+            hwnd = FindProcessWindow(IsEditorHost,
+                title => title.Contains(folder, StringComparison.OrdinalIgnoreCase));
+
+        if (hwnd == IntPtr.Zero)
+            hwnd = FindProcessWindow(IsCodexApp, titleMatches: null);
+
+        if (hwnd == IntPtr.Zero && !string.IsNullOrEmpty(folder))
+            hwnd = FindProcessWindow(IsTerminalProcess,
+                title => title.Contains(folder, StringComparison.OrdinalIgnoreCase));
+
+        if (hwnd == IntPtr.Zero)
+        {
+            AppLog.Write($"jump: no window found for codex session (folder='{folder}')");
+            return false;
+        }
+        return Activate(hwnd);
+    }
+
+    /// <summary>Visible Antigravity window, preferring one titled for the project.</summary>
+    private static bool FocusAntigravity(AgentSession session)
+    {
+        static bool IsAntigravity(string name) =>
+            name.Equals("Antigravity", StringComparison.OrdinalIgnoreCase);
+
+        string folder = FolderOf(session);
+        IntPtr hwnd = FindProcessWindowPreferTitle(IsAntigravity, folder);
+        if (hwnd == IntPtr.Zero)
+        {
+            AppLog.Write($"jump: no visible Antigravity window (folder='{folder}')");
+            return false;
+        }
+        return Activate(hwnd);
+    }
+
+    /// <summary>
+    /// Window of the app hosting the session ("cursor" | "antigravity" |
+    /// "vscode"), preferring one titled for the project. False when the host is
+    /// unknown or no window was activated — the caller then falls back to the
+    /// entrypoint-based strategy.
+    /// </summary>
+    private static bool FocusHostApp(string host, AgentSession session)
+    {
+        string? process = host.ToLowerInvariant() switch
+        {
+            "cursor" => "Cursor",
+            "antigravity" => "Antigravity",
+            "vscode" => "Code",
+            _ => null,
+        };
+        if (process is null)
+        {
+            AppLog.Write($"jump: unknown host '{host}'");
+            return false;
+        }
+
+        IntPtr hwnd = FindProcessWindowPreferTitle(
+            name => name.Equals(process, StringComparison.OrdinalIgnoreCase),
+            FolderOf(session));
+        if (hwnd == IntPtr.Zero)
+        {
+            AppLog.Write($"jump: no visible {process} window for host '{host}'");
+            return false;
+        }
+        return Activate(hwnd);
+    }
+
+    private static bool IsTerminalProcess(string name) =>
+        name.Equals("WindowsTerminal", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("powershell", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("pwsh", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("cmd", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("alacritty", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("wezterm", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Project folder used for title matching (ProjectName, else last cwd segment).</summary>
+    private static string FolderOf(AgentSession session)
+    {
+        string folder = session.ProjectName;
+        if (string.IsNullOrEmpty(folder) && !string.IsNullOrEmpty(session.Cwd))
+            folder = Path.GetFileName(session.Cwd.TrimEnd('\\', '/'));
+        return folder;
+    }
+
+    /// <summary>
+    /// Window of a matching process whose title contains <paramref name="folder"/>;
+    /// else any visible window of that process.
+    /// </summary>
+    private static IntPtr FindProcessWindowPreferTitle(Func<string, bool> processMatches, string folder)
+    {
+        IntPtr hwnd = IntPtr.Zero;
+        if (!string.IsNullOrEmpty(folder))
+            hwnd = FindProcessWindow(processMatches,
+                title => title.Contains(folder, StringComparison.OrdinalIgnoreCase));
+        if (hwnd == IntPtr.Zero)
+            hwnd = FindProcessWindow(processMatches, titleMatches: null);
+        return hwnd;
     }
 
     /// <summary>

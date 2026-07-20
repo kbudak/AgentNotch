@@ -14,22 +14,37 @@ public enum SessionStatus
 }
 
 /// <summary>
-/// One live Claude Code session: a registry entry (sessions\pid.json) joined with
-/// its transcript (projects\...\sessionId.jsonl). Immutable snapshot value —
-/// SessionWatcher builds a fresh list on every change.
+/// One live agent session from any supported tool. For Claude Code this is a
+/// registry entry (sessions\pid.json) joined with its transcript; for Codex a
+/// rollout file; for Antigravity a cascade trajectory. Immutable snapshot
+/// value — SessionWatcher builds a fresh list on every change.
 /// </summary>
 public sealed class AgentSession
 {
     public string SessionId { get; set; } = "";
+
+    /// <summary>Which agent produced this session: "claude" | "codex" | "antigravity".</summary>
+    public string Agent { get; set; } = "claude";
+
+    /// <summary>
+    /// App hosting the session when it isn't a plain terminal: "cursor" |
+    /// "antigravity" | "vscode" | null. Drives the row label ("claude · cursor")
+    /// and which window the jump targets.
+    /// </summary>
+    public string? Host { get; set; }
+
+    /// <summary>Model name when the source reports one (e.g. "GPT-5.2", "Gemini").</summary>
+    public string? Model { get; set; }
 
     public string Cwd { get; set; } = "";
 
     /// <summary>Last segment of <see cref="Cwd"/> ("session" when the cwd is unknown).</summary>
     public string ProjectName { get; set; } = "";
 
-    /// <summary>"cli" | "claude-desktop" | "claude-vscode".</summary>
+    /// <summary>"cli" | "claude-desktop" | "claude-vscode" (claude only; "" otherwise).</summary>
     public string Entrypoint { get; set; } = "";
 
+    /// <summary>Owning process id when known; 0 for file/RPC-derived sessions (codex, antigravity).</summary>
     public int Pid { get; set; }
 
     public SessionStatus Status { get; set; }

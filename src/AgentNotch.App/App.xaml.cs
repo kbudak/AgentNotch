@@ -196,8 +196,9 @@ public partial class App : Application
         _vm!.UpdateSessions(new[]
         {
             new Sessions.AgentSession { SessionId = "s1", Cwd = @"C:\work\api", ProjectName = "api", Entrypoint = "cli", Pid = 1111, Status = Sessions.SessionStatus.NeedsYou, CurrentTool = "Bash", CurrentTarget = "npm run deploy", LastMessage = "Which deployment target?", TokensSpent = 48_200, LastActivityUtc = DateTime.UtcNow },
-            new Sessions.AgentSession { SessionId = "s2", Cwd = @"C:\work\web", ProjectName = "web", Entrypoint = "cli", Pid = 2222, Status = Sessions.SessionStatus.Working, CurrentTool = "Edit", CurrentTarget = @"src\db\schema.prisma", LastMessage = "Analyzing the slow queries.", TokensSpent = 1_240_000, LastActivityUtc = DateTime.UtcNow },
-            new Sessions.AgentSession { SessionId = "s3", Cwd = @"C:\work\bot", ProjectName = "bot", Entrypoint = "claude-vscode", Pid = 3333, Status = Sessions.SessionStatus.Finished, LastMessage = "Done — 3 files changed.", TokensSpent = 210_500, LastActivityUtc = DateTime.UtcNow },
+            new Sessions.AgentSession { SessionId = "s2", Agent = "codex", Model = "GPT-5.2", Cwd = @"C:\work\shop", ProjectName = "shop", Status = Sessions.SessionStatus.Working, CurrentTool = "exec_command", LastMessage = "Running exec_command", LastActivityUtc = DateTime.UtcNow },
+            new Sessions.AgentSession { SessionId = "s3", Host = "cursor", Cwd = @"C:\work\web", ProjectName = "web", Entrypoint = "claude-vscode", Pid = 2222, Status = Sessions.SessionStatus.Working, CurrentTool = "Edit", CurrentTarget = @"src\db\schema.prisma", TokensSpent = 1_240_000, LastActivityUtc = DateTime.UtcNow },
+            new Sessions.AgentSession { SessionId = "s4", Agent = "antigravity", Model = "Gemini", Cwd = @"C:\work\bot", ProjectName = "bot", Status = Sessions.SessionStatus.Finished, LastMessage = "Task complete.", LastActivityUtc = DateTime.UtcNow },
         });
 
         _vm.AddHookRequest(DemoRequest(Proto.ModePermissionRequest, new

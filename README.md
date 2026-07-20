@@ -96,5 +96,14 @@ phase and would require signing + Program Files).
 - [x] Phase 2 — live activity: session watcher, multiple sessions, token spend
 - [x] Phase 3 — rich prompts: diff rendering, AskUserQuestion option buttons, queue
 - [x] Phase 4 (basic) — terminal jump (console/parent-chain → HWND → foreground)
-- [ ] Phase 5 — multi-agent adapters (Codex / Gemini CLI behind `IAgentAdapter`)
+- [x] Phase 5 — multi-agent sources:
+  - **Codex** — `%USERPROFILE%\.codex\sessions\**\rollout-*.jsonl` tail parsing
+    (task lifecycle, pending approval calls, final answers); rows gated on a
+    running Codex/ChatGPT process; jump targets the hosting editor or terminal.
+  - **Antigravity** — local `language_server` RPC (`GetAllCascadeTrajectories`;
+    CSRF token from its logs, ports from the TCP table); jump targets the
+    Antigravity window.
+  - **Cursor / VS Code / Antigravity as hosts** — Claude Code sessions running
+    inside an editor are labeled with their host ("claude · cursor — web") via
+    parent-process detection, and jump focuses that editor's window.
 - [ ] Phase 6 — `uiAccess` signing, sounds, settings UI

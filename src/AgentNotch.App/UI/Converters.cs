@@ -94,7 +94,7 @@ public sealed class SessionStateConverter : IValueConverter
         => Binding.DoNothing;
 }
 
-/// <summary>AgentSession → "claude — {ProjectName}".</summary>
+/// <summary>AgentSession → "codex — api" / "claude · cursor — web" (agent, optional host, project).</summary>
 public sealed class SessionTitleConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -103,8 +103,14 @@ public sealed class SessionTitleConverter : IValueConverter
         {
             if (value is AgentSession s)
             {
+                var agent = string.IsNullOrWhiteSpace(s.Agent) ? "claude" : s.Agent;
+                var host = s.Host;
+                var label = !string.IsNullOrWhiteSpace(host) &&
+                            !string.Equals(host, agent, StringComparison.OrdinalIgnoreCase)
+                    ? $"{agent} · {host}"
+                    : agent;
                 var name = s.ProjectName;
-                return string.IsNullOrWhiteSpace(name) ? "claude" : $"claude — {name}";
+                return string.IsNullOrWhiteSpace(name) ? label : $"{label} — {name}";
             }
         }
         catch { /* fall through */ }
@@ -139,14 +145,18 @@ public sealed class SessionSubtitleConverter : IValueConverter
         => Binding.DoNothing;
 }
 
-/// <summary>AgentSession → short-form cumulative token spend ("48.2k").</summary>
+/// <summary>AgentSession → token spend ("48.2k"), or the model name when spend is unknown (codex/antigravity).</summary>
 public sealed class SessionTokensConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         try
         {
-            if (value is AgentSession s) return TokenFormat.Short(s.TokensSpent);
+            if (value is AgentSession s)
+            {
+                var spend = TokenFormat.Short(s.TokensSpent);
+                return spend.Length > 0 ? spend : s.Model ?? "";
+            }
         }
         catch { /* fall through */ }
         return "";
