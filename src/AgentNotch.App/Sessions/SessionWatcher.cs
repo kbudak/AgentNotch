@@ -174,19 +174,14 @@ public sealed class SessionWatcher : IDisposable
             if (Interop.ProcessTree.AnyRunning("codex", "chatgpt", "codex-code-mode-host"))
             {
                 var codex = CodexTail.Collect(_codexDir, now);
-                // "vscode" from the rollout only means "some VS Code fork" — pin it
-                // down when exactly one candidate host is actually running.
-                bool code = Interop.ProcessTree.AnyRunning("Code");
-                bool cursor = Interop.ProcessTree.AnyRunning("Cursor");
-                bool anti = Interop.ProcessTree.AnyRunning("Antigravity");
-                foreach (var session in codex)
-                {
-                    if (session.Host == "vscode")
-                    {
-                        if (cursor && !code && !anti) session.Host = "cursor";
-                        else if (anti && !code && !cursor) session.Host = "antigravity";
-                    }
-                }
+                // A rollout only says "vscode" (some VS Code fork). Pin down the real
+                // editor by walking the running Codex process up to its host window
+                // app — the Codex extension is a child of Cursor.exe / Code.exe.
+                var codexHost = Interop.ProcessTree.HostOfRunningProcess("codex", "chatgpt");
+                if (codexHost is not null)
+                    foreach (var session in codex)
+                        if (session.Host == "vscode")
+                            session.Host = codexHost;
                 merged.AddRange(codex);
             }
         }

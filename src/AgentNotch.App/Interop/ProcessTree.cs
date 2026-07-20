@@ -135,6 +135,40 @@ public static class ProcessTree
         }
     }
 
+    /// <summary>
+    /// Host editor of the first running process named one of <paramref name="processNames"/>,
+    /// resolved by walking its parent chain (<see cref="HostAppOf"/>). Used to tell
+    /// which editor a hostless (file-derived) Codex session actually runs in — the
+    /// Codex extension process is a child of its host editor (e.g. Cursor.exe).
+    /// Null when none are running or none resolve to a known host.
+    /// </summary>
+    public static string? HostOfRunningProcess(params string[] processNames)
+    {
+        try
+        {
+            if (processNames is not { Length: > 0 }) return null;
+            var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var n in processNames)
+                if (!string.IsNullOrWhiteSpace(n)) wanted.Add(TrimExe(n));
+
+            foreach (var p in Process.GetProcesses())
+            {
+                int pid; string name;
+                try { name = p.ProcessName; pid = p.Id; }
+                catch { p.Dispose(); continue; }
+                p.Dispose();
+
+                if (wanted.Contains(name) && HostAppOf(pid) is { } host)
+                    return host;
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("proctree: HostOfRunningProcess failed: " + ex.Message);
+        }
+        return null;
+    }
+
     private static string? ResolveHost(int pid)
     {
         var processes = SnapshotProcesses();
