@@ -14,15 +14,19 @@ namespace AgentNotch.App.UI;
 public static class AgentIcons
 {
     /// <summary>
-    /// The agent's face: a soft squircle with two eyes. Even-odd fill turns the
-    /// eyes into holes, so the panel shows through them and the body alone
-    /// carries the status colour.
+    /// The Claude Code invader: pixel-art creature on a 12x8 grid (2 units per
+    /// cell) — head with two square eyes, arms out to both sides, four legs.
+    /// Even-odd fill turns the eyes into holes, so the panel shows through them
+    /// and the body alone carries the status colour.
     /// </summary>
     public static readonly Geometry Claude = Frozen(
-        "M9,2.6 L15,2.6 A6.4,6.4 0 0 1 21.4,9 L21.4,15 A6.4,6.4 0 0 1 15,21.4 " +
-        "L9,21.4 A6.4,6.4 0 0 1 2.6,15 L2.6,9 A6.4,6.4 0 0 1 9,2.6Z " +
-        "M6.2,11.6 A2.5,2.5 0 1 0 11.2,11.6 A2.5,2.5 0 1 0 6.2,11.6Z " +
-        "M12.8,11.6 A2.5,2.5 0 1 0 17.8,11.6 A2.5,2.5 0 1 0 12.8,11.6Z");
+        // head top → right arm → down the right side → four legs (right to left)
+        "M4,4 L20,4 L20,8 L24,8 L24,12 L20,12 L20,20 " +
+        "L18,20 L18,16 L16,16 L16,20 L14,20 L14,16 L10,16 L10,20 " +
+        "L8,20 L8,16 L6,16 L6,20 L4,20 " +
+        // up the left side → left arm → back to the head
+        "L4,12 L0,12 L0,8 L4,8Z " +
+        "M6,6 L8,6 L8,8 L6,8Z M16,6 L18,6 L18,8 L16,8Z");
 
     /// <summary>OpenAI-style hex knot: a hexagonal ring around a solid core
     /// (even-odd fill turns the inner hexagon into the hole, the core back into ink).</summary>
