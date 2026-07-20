@@ -66,6 +66,19 @@ public sealed class SessionParsingTests : IDisposable
             },
         });
 
+    /// <summary>An assistant tool_use whose input is spelled out by the caller.</summary>
+    private static string AssistantToolUseInput(string tool, object input) =>
+        JsonSerializer.Serialize(new
+        {
+            type = "assistant",
+            message = new
+            {
+                role = "assistant",
+                content = new object[] { new { type = "tool_use", id = "t1", name = tool, input } },
+                stop_reason = "tool_use",
+            },
+        });
+
     private static string UserToolResult() =>
         JsonSerializer.Serialize(new
         {
@@ -287,9 +300,73 @@ public sealed class SessionParsingTests : IDisposable
         Assert.Equal("projA", s.ProjectName);
         Assert.Equal("cli", s.Entrypoint);
         Assert.Equal("Bash", s.CurrentTool);
-        Assert.Equal("npm test", s.CurrentTarget);
+        // The row shows a readable phrase, never the raw command.
+        Assert.Equal("Running npm test", s.CurrentTarget);
         Assert.Equal(160L, s.TokensSpent);
         Assert.Equal("ok", s.LastMessage);
+    }
+
+    // ---------- activity phrasing (rows must never show raw arguments) ----------
+
+    /// <summary>Runs a transcript whose last tool_use has the given input, returns the row's activity text.</summary>
+    private string ActivityFor(string tool, object input, [System.Runtime.CompilerServices.CallerMemberName] string name = "")
+    {
+        var home = Path.Combine(_dir, "act-" + name);
+        WriteRegistry(home, 4242, "s1", Path.Combine(_dir, "repos", "projA"), status: "busy",
+            statusUpdatedAtMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        WriteTranscript(home, "s1", AssistantToolUseInput(tool, input), UserToolResult());
+
+        var list = TranscriptTail.BuildSnapshot(
+            home, new Dictionary<string, TranscriptTail.SpendState>(), _ => true, DateTime.UtcNow);
+        return Assert.Single(list).CurrentTarget ?? "";
+    }
+
+    [Fact]
+    public void Activity_FileTools_ShowVerbAndFileNameOnly()
+    {
+        Assert.Equal("Editing middleware.ts",
+            ActivityFor("Edit", new { file_path = @"C:\work\api\src\auth\middleware.ts" }));
+        Assert.Equal("Writing notes.md",
+            ActivityFor("Write", new { file_path = "/home/k/docs/notes.md" }));
+        Assert.Equal("Reading schema.prisma",
+            ActivityFor("Read", new { file_path = @"C:\work\db\schema.prisma" }));
+    }
+
+    [Fact]
+    public void Activity_Bash_PrefersTheHumanDescription()
+    {
+        Assert.Equal("List project directory contents",
+            ActivityFor("PowerShell", new
+            {
+                command = "Get-ChildItem -Force \"C:\\work\" | Select-Object Name, Length",
+                description = "List project directory contents",
+            }));
+    }
+
+    [Fact]
+    public void Activity_ShortCommand_IsShownInFull()
+        => Assert.Equal("Running git status", ActivityFor("Bash", new { command = "git status" }));
+
+    [Fact]
+    public void Activity_ScriptedOneLiner_CollapsesToTheProgram()
+        => Assert.Equal("Running npm…", ActivityFor("Bash", new
+        {
+            command = "npm run build -- --configuration production --verbose --no-cache",
+        }));
+
+    [Fact]
+    public void Activity_UnreadableOneLiner_SaysNothingSpecific()
+        => Assert.Equal("Running a command", ActivityFor("PowerShell", new
+        {
+            command = "try{Get-Process AgentNotch -EA Stop|Stop-Process -Force}catch{}; Start-Sleep -m 900",
+        }));
+
+    [Fact]
+    public void Activity_SearchAndDelegation_ReadAsPhrases()
+    {
+        Assert.Equal("Searching TODO", ActivityFor("Grep", new { pattern = "TODO" }));
+        Assert.Equal("Running a subagent", ActivityFor("Task", new { description = "x" }));
+        Assert.Equal("Searching the web", ActivityFor("WebSearch", new { query = "wpf path geometry" }));
     }
 
     [Fact]

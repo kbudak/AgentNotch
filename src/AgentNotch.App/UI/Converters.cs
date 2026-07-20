@@ -241,10 +241,10 @@ public sealed class SessionSubtitleConverter : IValueConverter
         {
             if (value is AgentSession s)
             {
-                string tool = s.CurrentTool ?? "";
-                string target = s.CurrentTarget ?? "";
-                if (tool.Length > 0)
-                    return target.Length > 0 ? $"{tool}({target})" : tool;
+                // CurrentTarget already reads as a phrase ("Writing middleware.ts");
+                // only bare tool names need dressing up.
+                if (s.CurrentTarget is { Length: > 0 } activity) return activity;
+                if (s.CurrentTool is { Length: > 0 } tool) return ToolPhrase.Of(tool);
                 return s.LastMessage ?? "";
             }
         }
@@ -335,6 +335,22 @@ public sealed class StateKindBrushConverter : IValueConverter
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => Binding.DoNothing;
+}
+
+/// <summary>Bare tool names other agents report → something a human would say.</summary>
+internal static class ToolPhrase
+{
+    public static string Of(string tool) => tool switch
+    {
+        "exec_command" or "shell" or "local_shell" => "Running a command",
+        "apply_patch" or "edit_file" or "str_replace" => "Editing files",
+        "read_file" or "view" => "Reading a file",
+        "search" or "grep" or "ripgrep" => "Searching the code",
+        "web_search" or "browser" => "Searching the web",
+        "update_plan" or "todo" => "Updating the plan",
+        "request_user_input" => "Asking you a question",
+        _ => tool,
+    };
 }
 
 /// <summary>AgentSession → brand chip text: "Claude" | "Codex" | "Gemini".</summary>

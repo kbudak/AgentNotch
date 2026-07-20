@@ -209,9 +209,9 @@ public partial class App : Application
         var now = DateTime.UtcNow;
         _vm!.UpdateSessions(new[]
         {
-            new Sessions.AgentSession { SessionId = "s1", Cwd = @"C:\work\api", ProjectName = "api", Entrypoint = "cli", Pid = 1111, HostLabel = "Windows Terminal", Status = Sessions.SessionStatus.NeedsYou, CurrentTool = "Bash", CurrentTarget = "npm run deploy", LastMessage = "Which deployment target?", TokensSpent = 48_200, StartedUtc = now.AddMinutes(-27), LastActivityUtc = now },
+            new Sessions.AgentSession { SessionId = "s1", Cwd = @"C:\work\api", ProjectName = "api", Entrypoint = "cli", Pid = 1111, HostLabel = "Windows Terminal", Status = Sessions.SessionStatus.NeedsYou, CurrentTool = "Bash", CurrentTarget = "Deploy the API to staging", LastMessage = "Which deployment target?", TokensSpent = 48_200, StartedUtc = now.AddMinutes(-27), LastActivityUtc = now },
             new Sessions.AgentSession { SessionId = "s2", Agent = "codex", Model = "GPT-5.2", Cwd = @"C:\work\shop", ProjectName = "shop", HostLabel = "Cursor", Status = Sessions.SessionStatus.Working, CurrentTool = "exec_command", LastMessage = "Running exec_command", StartedUtc = now.AddHours(-1), LastActivityUtc = now },
-            new Sessions.AgentSession { SessionId = "s3", Host = "cursor", HostLabel = "Cursor", Cwd = @"C:\work\web", ProjectName = "web", Entrypoint = "claude-vscode", Pid = 2222, Status = Sessions.SessionStatus.Working, CurrentTool = "Edit", CurrentTarget = @"src\db\schema.prisma", TokensSpent = 1_240_000, StartedUtc = now.AddMinutes(-9), LastActivityUtc = now },
+            new Sessions.AgentSession { SessionId = "s3", Host = "cursor", HostLabel = "Cursor", Cwd = @"C:\work\web", ProjectName = "web", Entrypoint = "claude-vscode", Pid = 2222, Status = Sessions.SessionStatus.Working, CurrentTool = "Edit", CurrentTarget = "Editing schema.prisma", TokensSpent = 1_240_000, StartedUtc = now.AddMinutes(-9), LastActivityUtc = now },
             new Sessions.AgentSession { SessionId = "s4", Agent = "antigravity", Model = "Gemini", HostLabel = "Antigravity", Cwd = @"C:\work\bot", ProjectName = "bot", Status = Sessions.SessionStatus.Finished, LastMessage = "Task complete.", StartedUtc = now.AddHours(-5), LastActivityUtc = now },
         });
 

@@ -156,7 +156,7 @@ public static class TranscriptTail
                     var block = content[j];
                     if (GetString(block, "type") == "tool_use" &&
                         GetString(block, "name") is { Length: > 0 } name)
-                        return (name, ToolTarget(block));
+                        return (name, ToolActivity(name, block));
                 }
             }
             break; // only the last assistant event counts
@@ -546,24 +546,94 @@ public static class TranscriptTail
     }
 
     /// <summary>Short display target for a tool_use block: file path, else command excerpt.</summary>
-    private static string? ToolTarget(JsonElement toolUse)
+    /// <summary>
+    /// What the agent is doing, in a few readable words: "Writing middleware.ts",
+    /// "List project directory contents", "Searching the web". Raw arguments are
+    /// never shown — a shell one-liner or an absolute path tells you nothing at a
+    /// glance, so files are reduced to their name and commands prefer the
+    /// human description Claude Code sends with every Bash call.
+    /// </summary>
+    private static string? ToolActivity(string tool, JsonElement toolUse)
     {
         if (toolUse.ValueKind != JsonValueKind.Object ||
             !toolUse.TryGetProperty("input", out var input) ||
             input.ValueKind != JsonValueKind.Object)
             return null;
-        var filePath = GetString(input, "file_path");
-        if (!string.IsNullOrWhiteSpace(filePath)) return TrimPath(filePath, 60);
+
+        var file = GetString(input, "file_path");
+        var description = GetString(input, "description");
         var command = GetString(input, "command");
-        if (!string.IsNullOrWhiteSpace(command)) return Excerpt(command, 60);
-        return null;
+        var pattern = GetString(input, "pattern");
+
+        switch (tool)
+        {
+            case "Edit":
+            case "MultiEdit":
+            case "NotebookEdit":
+                return file is { Length: > 0 } ? "Editing " + FileName(file) : "Editing a file";
+
+            case "Write":
+                return file is { Length: > 0 } ? "Writing " + FileName(file) : "Writing a file";
+
+            case "Read":
+            case "NotebookRead":
+                return file is { Length: > 0 } ? "Reading " + FileName(file) : "Reading a file";
+
+            case "Bash":
+            case "PowerShell":
+            case "BashOutput":
+                if (description is { Length: > 0 }) return Excerpt(description, 46);
+                return command is { Length: > 0 } ? "Running " + ShortCommand(command) : "Running a command";
+
+            case "Grep":
+            case "Glob":
+                return pattern is { Length: > 0 } ? "Searching " + Excerpt(pattern, 28) : "Searching the code";
+
+            case "WebSearch":
+                return "Searching the web";
+
+            case "WebFetch":
+                return "Reading a web page";
+
+            case "Task":
+                return "Running a subagent";
+
+            case "TodoWrite":
+                return "Updating the plan";
+
+            case "AskUserQuestion":
+                return "Asking you a question";
+
+            default:
+                if (description is { Length: > 0 }) return Excerpt(description, 46);
+                if (file is { Length: > 0 }) return tool + " " + FileName(file);
+                return tool;
+        }
     }
 
-    /// <summary>Paths keep their (most useful) tail when shortened.</summary>
-    private static string TrimPath(string path, int max)
+    /// <summary>Last path segment — "middleware.ts", not the whole absolute path.</summary>
+    private static string FileName(string path)
     {
-        path = path.Trim();
-        return path.Length <= max ? path : "…" + path[^(max - 1)..];
+        var trimmed = path.TrimEnd('\\', '/');
+        int cut = trimmed.LastIndexOfAny(new[] { '\\', '/' });
+        var name = cut >= 0 ? trimmed[(cut + 1)..] : trimmed;
+        return name.Length <= 34 ? name : name[..34] + "…";
+    }
+
+    /// <summary>
+    /// A command worth reading: short ones in full, scripted one-liners reduced to
+    /// the program that runs them (and giving up entirely when even that is noise).
+    /// </summary>
+    private static string ShortCommand(string command)
+    {
+        var line = command.Split('\n')[0].Trim();
+        line = string.Join(' ', line.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        if (line.Length <= 34) return line;
+
+        var first = line.Split(' ')[0];
+        bool readable = first.Length is > 0 and <= 18 &&
+                        first.All(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' or '/' or '\\');
+        return readable ? first + "…" : "a command";
     }
 
     /// <summary>Reads a timestamp that may be epoch milliseconds (Date.now()) or an ISO string.</summary>
