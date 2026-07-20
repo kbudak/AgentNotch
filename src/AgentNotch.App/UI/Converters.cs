@@ -13,13 +13,16 @@ namespace AgentNotch.App.UI;
 /// </summary>
 public static class AgentIcons
 {
-    /// <summary>Anthropic-style sunburst: eight tapered rays. F1 = nonzero, so the
-    /// rays merge at the hub instead of punching holes where they overlap.</summary>
+    /// <summary>
+    /// The agent's face: a soft squircle with two eyes. Even-odd fill turns the
+    /// eyes into holes, so the panel shows through them and the body alone
+    /// carries the status colour.
+    /// </summary>
     public static readonly Geometry Claude = Frozen(
-        "F1 M13.1,13.75 L22.2,13 L22.2,11 L13.1,10.25Z M11.54,14.02 L18.51,19.92 L19.92,18.51 L14.02,11.54Z " +
-        "M10.25,13.1 L11,22.2 L13,22.2 L13.75,13.1Z M9.98,11.54 L4.08,18.51 L5.49,19.92 L12.46,14.02Z " +
-        "M10.9,10.25 L1.8,11 L1.8,13 L10.9,13.75Z M12.46,9.98 L5.49,4.08 L4.08,5.49 L9.98,12.46Z " +
-        "M13.75,10.9 L13,1.8 L11,1.8 L10.25,10.9Z M14.02,12.46 L19.92,5.49 L18.51,4.08 L11.54,9.98Z");
+        "M9,2.6 L15,2.6 A6.4,6.4 0 0 1 21.4,9 L21.4,15 A6.4,6.4 0 0 1 15,21.4 " +
+        "L9,21.4 A6.4,6.4 0 0 1 2.6,15 L2.6,9 A6.4,6.4 0 0 1 9,2.6Z " +
+        "M6.2,11.6 A2.5,2.5 0 1 0 11.2,11.6 A2.5,2.5 0 1 0 6.2,11.6Z " +
+        "M12.8,11.6 A2.5,2.5 0 1 0 17.8,11.6 A2.5,2.5 0 1 0 12.8,11.6Z");
 
     /// <summary>OpenAI-style hex knot: a hexagonal ring around a solid core
     /// (even-odd fill turns the inner hexagon into the hole, the core back into ink).</summary>
