@@ -3,7 +3,7 @@
                     xmlns:ui="clr-namespace:AgentNotch.App.UI">
 
     <!-- ===================== Fonts ===================== -->
-    <FontFamily x:Key="UiFontFamily">Segoe UI</FontFamily>
+    <FontFamily x:Key="UiFontFamily">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="MonoFontFamily">Cascadia Mono, Consolas, Courier New</FontFamily>
 
     <!-- ===================== Palette (VibeIsland dark) ===================== -->

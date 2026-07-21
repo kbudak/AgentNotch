@@ -90,8 +90,7 @@
                                            Foreground="{StaticResource TextPrimaryBrush}"
                                            TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Text="{Binding Converter={StaticResource SessionSubtitle}}"
-                                           FontSize="11" Margin="0,1,0,0"
-                                           FontFamily="{StaticResource MonoFontFamily}"
+                                           FontSize="12" Margin="0,2,0,0"
                                            Foreground="{StaticResource TextSecondaryBrush}"
                                            TextTrimming="CharacterEllipsis">
                                     <TextBlock.Style>

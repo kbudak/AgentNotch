@@ -15,6 +15,7 @@
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
         FontFamily="{StaticResource UiFontFamily}"
         FontSize="12.5"
         Foreground="{StaticResource TextPrimaryBrush}">
