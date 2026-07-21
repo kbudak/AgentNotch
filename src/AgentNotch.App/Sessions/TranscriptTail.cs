@@ -38,6 +38,17 @@ public static class TranscriptTail
     public static readonly TimeSpan BusyMax = TimeSpan.FromMinutes(20);
 
     /// <summary>
+    /// How long a "busy" registry status is trusted while the transcript stays frozen.
+    /// The registry only flips busy/idle on a turn transition, so an interrupted or
+    /// orphaned session can sit at "busy" for the whole <see cref="BusyMax"/> window
+    /// even though nothing is running. Real work keeps appending to the transcript
+    /// (thinking, tool calls, results) every minute or so — the one exception being a
+    /// tool call still in flight, which is handled separately. So outside a pending
+    /// tool, only treat a session as working while its transcript is this fresh.
+    /// </summary>
+    public static readonly TimeSpan WorkingGrace = TimeSpan.FromMinutes(3);
+
+    /// <summary>
     /// Non-working sessions idle longer than this are leftovers the user moved on
     /// from — drop them. They reappear the moment they do something again.
     /// </summary>
@@ -202,13 +213,17 @@ public static class TranscriptTail
     {
         if (LastTurn(events) is not { } last) return SessionStatus.Finished;
 
-        // A live busy/waiting means genuinely working — but the status only updates
-        // on transitions, so require it to be recent; a stale one is a hung session.
         bool statusFresh = statusAge is { } sa && sa < BusyMax;
-        if ((registryStatus == "busy" || registryStatus == "waiting") && statusFresh)
-            return SessionStatus.Working;
+        bool statusBusy = (registryStatus == "busy" || registryStatus == "waiting") && statusFresh;
+        bool pendingTool = IsPendingTool(events); // tool in flight — transcript legitimately frozen
+        bool transcriptFresh = transcriptAge < WorkingGrace;
 
-        bool active = transcriptAge < BusyMax; // plausibly still working (bounds abandonment)
+        // A live busy/waiting means genuinely working — but the registry only flips on
+        // a turn transition, so a session that was interrupted or orphaned mid-turn
+        // stays "busy" without doing anything. Trust it only when the work is visible:
+        // a tool call is still pending, or the transcript is actively advancing.
+        if (statusBusy && (pendingTool || transcriptFresh))
+            return SessionStatus.Working;
 
         if (GetString(last, "type") == "assistant")
         {
@@ -217,7 +232,7 @@ public static class TranscriptTail
                 // Pending tool, no result yet. CLI reports 'idle' at an approval
                 // prompt (waiting on you); otherwise it's the agent's turn.
                 if (registryStatus == "idle") return SessionStatus.NeedsYou;
-                return active ? SessionStatus.Working : SessionStatus.NeedsYou;
+                return transcriptAge < BusyMax ? SessionStatus.Working : SessionStatus.NeedsYou;
             }
 
             // Assistant ended its turn -> it's YOUR turn: a question, or simply done.
@@ -228,11 +243,13 @@ public static class TranscriptTail
                 : SessionStatus.Finished;
         }
 
-        // Last event is a user message — a new prompt, or a tool result fed back to
-        // the agent. Either way it's the AGENT'S turn: it's thinking/composing (the
-        // transcript stays frozen the whole time). Working — bounded so an abandoned
-        // mid-turn session eventually stops looking active.
-        return active ? SessionStatus.Working : SessionStatus.NeedsYou;
+        // Last event is a user message — a new prompt, or a tool result fed back to the
+        // agent. Normally the AGENT'S turn (thinking/composing while the transcript
+        // stays frozen), but a fresh 'idle' means it handed the turn back to you, and a
+        // transcript frozen past the grace means it was stopped/interrupted — either
+        // way the turn is back with you.
+        if (registryStatus == "idle" && statusFresh) return SessionStatus.NeedsYou;
+        return transcriptFresh ? SessionStatus.Working : SessionStatus.NeedsYou;
     }
 
     // ---------- token spend (incremental) ----------

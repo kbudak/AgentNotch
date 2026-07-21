@@ -165,6 +165,28 @@ public sealed class SessionParsingTests : IDisposable
     }
 
     [Fact]
+    public void StuckBusyRegistry_FrozenTranscript_TrailingUserMessage_IsNotWorking()
+    {
+        // Interrupted/orphaned session: the registry still reads "busy" (and recently
+        // so) but the transcript has been frozen past the working grace — nothing is
+        // actually running, so it must not show as working.
+        var events = Events(AssistantToolUse("Edit"), UserToolResult());
+        var status = TranscriptTail.DeriveStatus(events, TimeSpan.FromMinutes(5), "busy", TimeSpan.FromMinutes(5));
+        Assert.NotEqual(SessionStatus.Working, status);
+        Assert.Equal(SessionStatus.NeedsYou, status);
+    }
+
+    [Fact]
+    public void BusyRegistry_PendingTool_FrozenTranscript_StaysWorking()
+    {
+        // A long-running tool call legitimately freezes the transcript; a pending tool
+        // under a busy registry still counts as working.
+        var events = Events(AssistantToolUse("Bash"));
+        var status = TranscriptTail.DeriveStatus(events, TimeSpan.FromMinutes(10), "busy", TimeSpan.FromMinutes(10));
+        Assert.Equal(SessionStatus.Working, status);
+    }
+
+    [Fact]
     public void EndTurnEndingWithQuestion_IsNeedsYou()
     {
         var events = Events(AssistantText("I found two options.\nShould I refactor the parser?"));
