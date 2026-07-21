@@ -398,6 +398,28 @@ public sealed class SessionParsingTests : IDisposable
     }
 
     [Fact]
+    public void Snapshot_StaleRegistrySid_FallsBackToNewestProjectTranscript()
+    {
+        var home = Path.Combine(_dir, "stale-sid");
+        const string cwd = @"C:\enc\proj";
+        WriteRegistry(home, 4242, "missing-sid", cwd, status: "busy",
+            statusUpdatedAtMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        // Live transcript sits under a DIFFERENT id (editor resume rotated it), in the
+        // encoded project dir: C:\enc\proj -> "C--enc-proj".
+        var pdir = Path.Combine(home, "projects", "C--enc-proj");
+        Directory.CreateDirectory(pdir);
+        File.WriteAllText(Path.Combine(pdir, "rotated-id.jsonl"),
+            string.Join("\n", AssistantToolUse("Bash"), UserToolResult()) + "\n");
+
+        var list = TranscriptTail.BuildSnapshot(
+            home, new Dictionary<string, TranscriptTail.SpendState>(), _ => true, DateTime.UtcNow);
+
+        var s = Assert.Single(list);
+        Assert.Equal(4242, s.Pid);          // the session shows despite the stale sid
+        Assert.Equal("proj", s.ProjectName);
+    }
+
+    [Fact]
     public void Dedup_WithoutClassifier_KeepsMostRecent()
     {
         var home = Path.Combine(_dir, "dedup-recent");

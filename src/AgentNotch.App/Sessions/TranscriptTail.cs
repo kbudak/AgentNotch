@@ -405,7 +405,16 @@ public static class TranscriptTail
         {
             try
             {
-                if (!transcripts.TryGetValue(reg.SessionId, out var file)) continue;
+                // Registry sessionId goes stale after an editor resume/compaction
+                // (the live transcript rotates to a new id the <pid>.json never learns),
+                // so an editor-hosted session can have no transcript under its recorded
+                // id. Fall back to the newest transcript in the same project dir so the
+                // session still shows and its row can jump to the right window.
+                if (!transcripts.TryGetValue(reg.SessionId, out var file))
+                {
+                    file = NewestTranscriptForCwd(claudeHome, reg.Cwd);
+                    if (file is null) continue;
+                }
 
                 DateTime mtimeUtc, startedUtc;
                 try
@@ -501,6 +510,39 @@ public static class TranscriptTail
         SessionStatus.Finished => 1,
         _ => 2,
     };
+
+    /// <summary>
+    /// Newest transcript in the project dir for <paramref name="cwd"/>, or null.
+    /// Claude Code encodes a cwd into a dir name by replacing every non-alphanumeric
+    /// char with '-'; the drive letter's case is inconsistent, so match case-insensitively.
+    /// </summary>
+    internal static string? NewestTranscriptForCwd(string claudeHome, string? cwd)
+    {
+        if (string.IsNullOrWhiteSpace(cwd)) return null;
+        try
+        {
+            var projects = Path.Combine(claudeHome, "projects");
+            if (!Directory.Exists(projects)) return null;
+
+            var encoded = System.Text.RegularExpressions.Regex.Replace(cwd, "[^A-Za-z0-9]", "-");
+            foreach (var dir in Directory.EnumerateDirectories(projects))
+            {
+                if (!string.Equals(Path.GetFileName(dir), encoded, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string? newest = null;
+                DateTime newestUtc = DateTime.MinValue;
+                foreach (var f in Directory.EnumerateFiles(dir, "*.jsonl"))
+                {
+                    var w = File.GetLastWriteTimeUtc(f);
+                    if (w > newestUtc) { newestUtc = w; newest = f; }
+                }
+                return newest;
+            }
+        }
+        catch { /* missing dir / permission — no fallback */ }
+        return null;
+    }
 
     /// <summary>Last path segment of a cwd; "session" when unknown.</summary>
     public static string ProjectNameOf(string? cwd)
