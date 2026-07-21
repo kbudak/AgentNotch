@@ -127,6 +127,9 @@ public sealed class SessionParsingTests : IDisposable
         return path;
     }
 
+    private static string TranscriptPath(string home, string sessionId)
+        => Path.Combine(home, "projects", "C--encoded-project", sessionId + ".jsonl");
+
     // ---------- status derivation ----------
 
     [Fact]
@@ -367,6 +370,49 @@ public sealed class SessionParsingTests : IDisposable
         Assert.Equal("Searching TODO", ActivityFor("Grep", new { pattern = "TODO" }));
         Assert.Equal("Running a subagent", ActivityFor("Task", new { description = "x" }));
         Assert.Equal("Searching the web", ActivityFor("WebSearch", new { query = "wpf path geometry" }));
+    }
+
+    [Fact]
+    public void Dedup_PrefersEditorHostedSession_OverMoreRecentTerminalOne()
+    {
+        var home = Path.Combine(_dir, "dedup-host");
+        var cwd = Path.Combine(_dir, "repos", "belediyem");
+        // Terminal session is MORE recent; editor session older.
+        WriteRegistry(home, 100, "term", cwd, status: "busy",
+            statusUpdatedAtMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        WriteTranscript(home, "term", AssistantToolUse("Bash"), UserToolResult());
+        WriteRegistry(home, 200, "editor", cwd, status: "busy",
+            statusUpdatedAtMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        WriteTranscript(home, "editor", AssistantToolUse("Bash"), UserToolResult());
+        // Make the terminal transcript newer so recency alone would pick it.
+        File.SetLastWriteTimeUtc(TranscriptPath(home, "term"), DateTime.UtcNow);
+        File.SetLastWriteTimeUtc(TranscriptPath(home, "editor"), DateTime.UtcNow.AddMinutes(-5));
+
+        // Classifier: pid 100 = plain terminal (rank 2), pid 200 = editor (rank 0).
+        Func<int, int> hostRank = pid => pid == 100 ? 2 : pid == 200 ? 0 : 1;
+        var list = TranscriptTail.BuildSnapshot(
+            home, new Dictionary<string, TranscriptTail.SpendState>(), _ => true, DateTime.UtcNow, hostRank);
+
+        var s = Assert.Single(list);
+        Assert.Equal(200, s.Pid); // editor-hosted wins despite terminal being newer
+    }
+
+    [Fact]
+    public void Dedup_WithoutClassifier_KeepsMostRecent()
+    {
+        var home = Path.Combine(_dir, "dedup-recent");
+        var cwd = Path.Combine(_dir, "repos", "proj");
+        WriteRegistry(home, 100, "old", cwd, status: "busy", statusUpdatedAtMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        WriteTranscript(home, "old", AssistantToolUse("Bash"), UserToolResult());
+        WriteRegistry(home, 200, "new", cwd, status: "busy", statusUpdatedAtMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        WriteTranscript(home, "new", AssistantToolUse("Bash"), UserToolResult());
+        File.SetLastWriteTimeUtc(TranscriptPath(home, "old"), DateTime.UtcNow.AddMinutes(-5));
+        File.SetLastWriteTimeUtc(TranscriptPath(home, "new"), DateTime.UtcNow);
+
+        var list = TranscriptTail.BuildSnapshot(
+            home, new Dictionary<string, TranscriptTail.SpendState>(), _ => true, DateTime.UtcNow);
+
+        Assert.Equal(200, Assert.Single(list).Pid); // no classifier -> recency wins (unchanged behaviour)
     }
 
     [Fact]

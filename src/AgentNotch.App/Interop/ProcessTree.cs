@@ -201,6 +201,51 @@ public static class ProcessTree
         return null;
     }
 
+    private static readonly HashSet<string> TerminalNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "sh", "bash", "mintty", "zsh", "fish",
+        "powershell", "pwsh", "cmd", "conhost", "OpenConsole",
+        "WindowsTerminal", "wt", "alacritty", "wezterm", "wezterm-gui", "warp", "tmux",
+    };
+
+    private static readonly HashSet<string> EditorNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Orca", "orca-terminal-daemon", "Code", "Code - Insiders",
+        "Cursor", "Antigravity", "Windsurf", "devenv",
+    };
+
+    /// <summary>Exe name (no extension) of a pid's parent, or null when orphaned/unknown.</summary>
+    public static string? ParentProcessName(int pid)
+    {
+        try
+        {
+            var map = SnapshotProcesses();
+            if (!map.TryGetValue(pid, out var self)) return null;
+            if (!map.TryGetValue(self.ParentPid, out var parent)) return null; // dead/orphan parent
+            return TrimExe(parent.ExeFile);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("proctree: ParentProcessName failed: " + ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Preference for collapsing same-project sessions: lower wins. An editor's
+    /// integrated terminal (Orca / VS Code — parent is the editor, or orphaned by
+    /// its terminal daemon) is what the user looks at, so it beats a plain shell
+    /// window. 0 = editor-hosted, 1 = orphaned/unknown, 2 = plain terminal.
+    /// </summary>
+    public static int SessionHostRank(int pid)
+    {
+        var parent = ParentProcessName(pid);
+        if (parent is null) return 1;                 // orphaned — Orca-style integrated terminal
+        if (EditorNames.Contains(parent)) return 0;   // directly under an editor
+        if (TerminalNames.Contains(parent)) return 2; // a standalone terminal window
+        return 1;
+    }
+
     private static string? ResolveHost(int pid)
     {
         var processes = SnapshotProcesses();

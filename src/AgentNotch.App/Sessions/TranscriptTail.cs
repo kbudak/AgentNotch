@@ -367,7 +367,8 @@ public static class TranscriptTail
         string claudeHome,
         IDictionary<string, SpendState> spendCache,
         Func<int, bool> isAlive,
-        DateTime nowUtc)
+        DateTime nowUtc,
+        Func<int, int>? hostPreference = null)
     {
         var live = new List<RegistrySession>();
         try
@@ -468,7 +469,7 @@ public static class TranscriptTail
         foreach (var s in candidates)
         {
             var key = (s.Cwd.Length > 0 ? s.Cwd : s.SessionId).Replace('\\', '/').ToLowerInvariant();
-            if (!byProject.TryGetValue(key, out var prev) || s.LastActivityUtc > prev.LastActivityUtc)
+            if (!byProject.TryGetValue(key, out var prev) || PreferOver(s, prev, hostPreference))
                 byProject[key] = s;
         }
 
@@ -477,6 +478,20 @@ public static class TranscriptTail
             .ThenByDescending(s => s.LastActivityUtc)
             .Take(6)
             .ToList();
+    }
+
+    /// <summary>
+    /// When two sessions share a project, which represents it? The one hosted in an
+    /// editor (Orca/VS Code) beats a plain-terminal one — it's the window the user
+    /// looks at and expects a row-click to raise — and only then does recency break
+    /// the tie. With no host classifier both rank equal, so recency alone decides.
+    /// </summary>
+    private static bool PreferOver(AgentSession candidate, AgentSession current, Func<int, int>? hostPreference)
+    {
+        int rc = hostPreference?.Invoke(candidate.Pid) ?? 0;
+        int rp = hostPreference?.Invoke(current.Pid) ?? 0;
+        if (rc != rp) return rc < rp;
+        return candidate.LastActivityUtc > current.LastActivityUtc;
     }
 
     /// <summary>Display order: attention first.</summary>

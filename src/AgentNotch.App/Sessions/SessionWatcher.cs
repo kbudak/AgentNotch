@@ -128,7 +128,10 @@ public sealed class SessionWatcher : IDisposable
             IReadOnlyList<AgentSession> claude;
             lock (_snapshotGate) // protects _spend from overlapping rebuilds
             {
-                claude = TranscriptTail.BuildSnapshot(_claudeHome, _spend, IsProcessAlive, now);
+                // Prefer the editor-hosted session when a project has several open
+                // (only in production; tests inject their own home and no classifier).
+                Func<int, int>? hostPref = _multiSource ? Interop.ProcessTree.SessionHostRank : null;
+                claude = TranscriptTail.BuildSnapshot(_claudeHome, _spend, IsProcessAlive, now, hostPref);
             }
             snapshot = _multiSource ? MergeSources(claude, now) : claude;
         }
