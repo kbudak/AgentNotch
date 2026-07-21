@@ -102,7 +102,9 @@ public static class TerminalJump
             AppLog.Write($"jump: no hosting window found for cli pid={session.Pid}");
             return false;
         }
-        return Activate(hwnd);
+        // The found window can still refuse activation (e.g. a ConPTY conhost that
+        // exists but isn't the real UI) — an editor window is then the right target.
+        return Activate(hwnd) || FocusRunningEditorHost(session);
     }
 
     private static bool Usable(IntPtr hwnd)

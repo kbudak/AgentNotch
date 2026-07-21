@@ -233,15 +233,18 @@ public static class ProcessTree
 
     /// <summary>
     /// Preference for collapsing same-project sessions: lower wins. An editor's
-    /// integrated terminal (Orca / VS Code — parent is the editor, or orphaned by
-    /// its terminal daemon) is what the user looks at, so it beats a plain shell
-    /// window. 0 = editor-hosted, 1 = orphaned/unknown, 2 = plain terminal.
+    /// integrated terminal is what the user looks at, so it beats a plain shell
+    /// window. The EDITOR verdict walks the whole ancestor chain (Orca spawns
+    /// claude ← cmd ← orca-terminal-daemon, so the immediate parent alone would
+    /// lie and say "terminal"); the terminal verdict then falls back to the
+    /// immediate parent. 0 = editor-hosted, 1 = orphaned/unknown, 2 = terminal.
     /// </summary>
     public static int SessionHostRank(int pid)
     {
+        if (HostAppOf(pid) is not null) return 0;     // an editor is somewhere up the chain
         var parent = ParentProcessName(pid);
         if (parent is null) return 1;                 // orphaned — Orca-style integrated terminal
-        if (EditorNames.Contains(parent)) return 0;   // directly under an editor
+        if (EditorNames.Contains(parent)) return 0;
         if (TerminalNames.Contains(parent)) return 2; // a standalone terminal window
         return 1;
     }
@@ -270,6 +273,9 @@ public static class ProcessTree
         if (name.Equals("Antigravity", StringComparison.OrdinalIgnoreCase)) return "antigravity";
         if (name.Equals("Code", StringComparison.OrdinalIgnoreCase)) return "vscode";
         if (name.Equals("Orca", StringComparison.OrdinalIgnoreCase)) return "orca";
+        // Orca's integrated terminal spawns sessions under its daemon (claude ← cmd ←
+        // orca-terminal-daemon) — that chain is still "hosted by Orca".
+        if (name.Equals("orca-terminal-daemon", StringComparison.OrdinalIgnoreCase)) return "orca";
         return null;
     }
 
@@ -336,10 +342,22 @@ public static class ProcessTree
                 {
                     if (cur <= 0 || !seen.Add(cur)) break;
                     if (!processes.TryGetValue(cur, out var entry)) break;
-                    if (HostLabels.TryGetValue(TrimExe(entry.ExeFile), out var found))
+                    // depth 0 is the session process itself (claude.exe) — its own
+                    // name must not become the "hosted in" chip. And an editor
+                    // anywhere up the chain outranks a shell wrapper below it
+                    // (Orca spawns claude ← cmd ← orca-terminal-daemon: the chip
+                    // must say Orca, not Command Prompt), so keep walking past
+                    // terminal names until the chain ends.
+                    var name = TrimExe(entry.ExeFile);
+                    if (depth > 0)
                     {
-                        label = found;
-                        break;
+                        if (EditorNames.Contains(name) && HostLabels.TryGetValue(name, out var editor))
+                        {
+                            label = editor;
+                            break;
+                        }
+                        if (label is null && HostLabels.TryGetValue(name, out var found))
+                            label = found; // remember the nearest terminal, keep looking for an editor
                     }
                     cur = entry.ParentPid;
                 }
