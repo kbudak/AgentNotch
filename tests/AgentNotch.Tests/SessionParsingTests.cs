@@ -171,7 +171,7 @@ public sealed class SessionParsingTests : IDisposable
         // so) but the transcript has been frozen past the working grace — nothing is
         // actually running, so it must not show as working.
         var events = Events(AssistantToolUse("Edit"), UserToolResult());
-        var status = TranscriptTail.DeriveStatus(events, TimeSpan.FromMinutes(5), "busy", TimeSpan.FromMinutes(5));
+        var status = TranscriptTail.DeriveStatus(events, TimeSpan.FromMinutes(8), "busy", TimeSpan.FromMinutes(8));
         Assert.NotEqual(SessionStatus.Working, status);
         Assert.Equal(SessionStatus.NeedsYou, status);
     }

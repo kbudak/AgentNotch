@@ -45,8 +45,10 @@ public static class TranscriptTail
     /// (thinking, tool calls, results) every minute or so — the one exception being a
     /// tool call still in flight, which is handled separately. So outside a pending
     /// tool, only treat a session as working while its transcript is this fresh.
+    /// Set generously enough to cover a long think/compose gap between transcript
+    /// writes, so a genuinely busy session doesn't briefly flip out of "working".
     /// </summary>
-    public static readonly TimeSpan WorkingGrace = TimeSpan.FromMinutes(3);
+    public static readonly TimeSpan WorkingGrace = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Non-working sessions idle longer than this are leftovers the user moved on
