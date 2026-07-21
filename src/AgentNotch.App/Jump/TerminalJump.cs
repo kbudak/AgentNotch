@@ -89,15 +89,38 @@ public static class TerminalJump
         }
 
         IntPtr hwnd = ResolveConsoleWindow((uint)session.Pid);
-        if (hwnd == IntPtr.Zero)
+        if (!Usable(hwnd))
             hwnd = ResolveWindowedAncestor(session.Pid);
 
-        if (hwnd == IntPtr.Zero)
+        // Integrated terminals (Orca, VS Code, …) host the CLI in a ConPTY: its
+        // console window is a hidden pseudoconsole and the parent chain is often
+        // orphaned, so both lookups above miss. Fall back to the running editor's
+        // own window — that's what the user actually wants raised.
+        if (!Usable(hwnd))
         {
+            if (FocusRunningEditorHost(session)) return true;
             AppLog.Write($"jump: no hosting window found for cli pid={session.Pid}");
             return false;
         }
         return Activate(hwnd);
+    }
+
+    private static bool Usable(IntPtr hwnd)
+        => hwnd != IntPtr.Zero && NativeMethods.IsWindowVisible(hwnd);
+
+    private static bool IsEditorHostProcess(string name) =>
+        name.Equals("Orca", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("Code", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("Code - Insiders", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("Cursor", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("Antigravity", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("Windsurf", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Raise a running editor's window (project title preferred), else any.</summary>
+    private static bool FocusRunningEditorHost(AgentSession session)
+    {
+        IntPtr hwnd = FindProcessWindowPreferTitle(IsEditorHostProcess, FolderOf(session));
+        return hwnd != IntPtr.Zero && Activate(hwnd);
     }
 
     /// <summary>
@@ -277,6 +300,7 @@ public static class TerminalJump
             "cursor" => "Cursor",
             "antigravity" => "Antigravity",
             "vscode" => "Code",
+            "orca" => "Orca",
             _ => null,
         };
         if (process is null)

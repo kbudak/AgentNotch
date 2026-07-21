@@ -224,6 +224,7 @@ public static class ProcessTree
         if (name.Equals("Cursor", StringComparison.OrdinalIgnoreCase)) return "cursor";
         if (name.Equals("Antigravity", StringComparison.OrdinalIgnoreCase)) return "antigravity";
         if (name.Equals("Code", StringComparison.OrdinalIgnoreCase)) return "vscode";
+        if (name.Equals("Orca", StringComparison.OrdinalIgnoreCase)) return "orca";
         return null;
     }
 
@@ -238,6 +239,8 @@ public static class ProcessTree
     {
         ["Cursor"] = "Cursor",
         ["Antigravity"] = "Antigravity",
+        ["Orca"] = "Orca",
+        ["orca-terminal-daemon"] = "Orca",
         ["Code"] = "VS Code",
         ["Code - Insiders"] = "VS Code",
         ["windsurf"] = "Windsurf",
