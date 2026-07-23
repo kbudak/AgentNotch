@@ -71,11 +71,15 @@
                                                              Value="working">
                                                     <DataTrigger.EnterActions>
                                                         <BeginStoryboard x:Name="RowSpin">
-                                                            <Storyboard>
-                                                                <DoubleAnimation
+                                                            <Storyboard RepeatBehavior="Forever">
+                                                                <DoubleAnimationUsingKeyFrames
                                                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                                                                    From="0" To="360" Duration="0:0:1.1"
-                                                                    RepeatBehavior="Forever"/>
+                                                                    Duration="0:0:0.8">
+                                                                    <DiscreteDoubleKeyFrame KeyTime="0:0:0.0" Value="0"/>
+                                                                    <DiscreteDoubleKeyFrame KeyTime="0:0:0.2" Value="90"/>
+                                                                    <DiscreteDoubleKeyFrame KeyTime="0:0:0.4" Value="180"/>
+                                                                    <DiscreteDoubleKeyFrame KeyTime="0:0:0.6" Value="270"/>
+                                                                </DoubleAnimationUsingKeyFrames>
                                                             </Storyboard>
                                                         </BeginStoryboard>
                                                     </DataTrigger.EnterActions>
