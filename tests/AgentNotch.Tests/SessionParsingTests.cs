@@ -159,21 +159,22 @@ public sealed class SessionParsingTests : IDisposable
     [Fact]
     public void StaleBusyRegistryStatus_FallsBackToTranscript()
     {
+        // Only a busy status past the whole trust window is treated as abandoned and
+        // falls back to the transcript's turn-ownership.
         var events = Events(AssistantText("Refactor complete. All tests pass."));
-        var status = TranscriptTail.DeriveStatus(events, TimeSpan.FromMinutes(1), "busy", TimeSpan.FromMinutes(30));
+        var status = TranscriptTail.DeriveStatus(events, TimeSpan.FromMinutes(1), "busy", TimeSpan.FromMinutes(60));
         Assert.Equal(SessionStatus.Finished, status);
     }
 
     [Fact]
-    public void StuckBusyRegistry_FrozenTranscript_TrailingUserMessage_IsNotWorking()
+    public void LongBusyRegistry_FrozenTranscriptAfterEndTurn_StaysWorking()
     {
-        // Interrupted/orphaned session: the registry still reads "busy" (and recently
-        // so) but the transcript has been frozen past the working grace — nothing is
-        // actually running, so it must not show as working.
-        var events = Events(AssistantToolUse("Edit"), UserToolResult());
-        var status = TranscriptTail.DeriveStatus(events, TimeSpan.FromMinutes(8), "busy", TimeSpan.FromMinutes(8));
-        Assert.NotEqual(SessionStatus.Working, status);
-        Assert.Equal(SessionStatus.NeedsYou, status);
+        // A background job (e.g. a workflow) keeps the session "busy" long after the
+        // visible turn ended and the transcript went quiet — it must still read as
+        // working, not "done", as long as the busy status is within the trust window.
+        var events = Events(AssistantText("Kicked off the workflow; it's running."));
+        var status = TranscriptTail.DeriveStatus(events, TimeSpan.FromMinutes(6), "busy", TimeSpan.FromMinutes(26));
+        Assert.Equal(SessionStatus.Working, status);
     }
 
     [Fact]

@@ -32,10 +32,12 @@ public static class TranscriptTail
 
     /// <summary>
     /// A busy/waiting registry status older than this is a leftover from a hung or
-    /// abandoned session, not a live one. Generous enough for a long thinking block.
-    /// Also bounds how long a mid-turn transcript keeps counting as "working".
+    /// abandoned session, not a live one. Set well above a single long task so a
+    /// genuinely busy session — including one running a background job (a workflow)
+    /// after its visible turn ended — keeps counting as working. Also bounds how long
+    /// a mid-turn transcript keeps counting as "working".
     /// </summary>
-    public static readonly TimeSpan BusyMax = TimeSpan.FromMinutes(20);
+    public static readonly TimeSpan BusyMax = TimeSpan.FromMinutes(45);
 
     /// <summary>
     /// How long a "busy" registry status is trusted while the transcript stays frozen.
@@ -216,15 +218,15 @@ public static class TranscriptTail
         if (LastTurn(events) is not { } last) return SessionStatus.Finished;
 
         bool statusFresh = statusAge is { } sa && sa < BusyMax;
-        bool statusBusy = (registryStatus == "busy" || registryStatus == "waiting") && statusFresh;
-        bool pendingTool = IsPendingTool(events); // tool in flight — transcript legitimately frozen
         bool transcriptFresh = transcriptAge < WorkingGrace;
 
-        // A live busy/waiting means genuinely working — but the registry only flips on
-        // a turn transition, so a session that was interrupted or orphaned mid-turn
-        // stays "busy" without doing anything. Trust it only when the work is visible:
-        // a tool call is still pending, or the transcript is actively advancing.
-        if (statusBusy && (pendingTool || transcriptFresh))
+        // Claude Code marks a session "busy"/"waiting" while it's doing work and only
+        // flips to "idle" when the turn is handed back to you (interrupts flip to idle
+        // too). It stays busy while a background job — e.g. a workflow — keeps running
+        // after the visible turn ended and the transcript went quiet. So a busy status
+        // that hasn't gone stale means working, regardless of what the transcript's
+        // last event was.
+        if ((registryStatus == "busy" || registryStatus == "waiting") && statusFresh)
             return SessionStatus.Working;
 
         if (GetString(last, "type") == "assistant")
