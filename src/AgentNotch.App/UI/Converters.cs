@@ -74,13 +74,29 @@ public static class AgentIcons
     // to tweak. Colour comes from the status brush; the working spinner is rotated
     // by the view. All are centred in the same 24x24 box as the agent marks.
 
-    /// <summary>Working: a tidy pixel ring with a single notch — spun, it reads as a loader.</summary>
-    public static readonly Geometry Spinner = FromMatrix(
-        " XXX ",
-        "X   X",
-        "X    ",
-        "X   X",
-        " XXX ");
+    /// <summary>
+    /// Working: a smooth 3/4 ring (filled annulus with a gap). A pixel block ring
+    /// smears when spun continuously; a curved arc stays clean at every angle.
+    /// </summary>
+    public static readonly Geometry Spinner = BuildArc();
+
+    private static Geometry BuildArc()
+    {
+        const double cx = 12, cy = 12, rOut = 10, rIn = 6.4;
+        const double startA = -Math.PI / 2;          // start at the top
+        const double sweep = Math.PI * 1.5;           // 270° — a quarter-gap
+        double endA = startA + sweep;
+        var fig = new PathFigure { StartPoint = Polar(cx, cy, rOut, startA), IsClosed = true };
+        fig.Segments.Add(new ArcSegment(Polar(cx, cy, rOut, endA), new System.Windows.Size(rOut, rOut),
+            0, true, SweepDirection.Clockwise, true));
+        fig.Segments.Add(new LineSegment(Polar(cx, cy, rIn, endA), true));
+        fig.Segments.Add(new ArcSegment(Polar(cx, cy, rIn, startA), new System.Windows.Size(rIn, rIn),
+            0, true, SweepDirection.Counterclockwise, true));
+        var g = new PathGeometry();
+        g.Figures.Add(fig);
+        g.Freeze();
+        return g;
+    }
 
     /// <summary>Needs you: a clean pixel question mark (a question is waiting).</summary>
     public static readonly Geometry Question = FromMatrix(
