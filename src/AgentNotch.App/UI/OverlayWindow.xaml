@@ -91,7 +91,8 @@
 
                     <!-- Confirmation of what the notch just sent back; replaces the
                          normal pill content for a couple of seconds. -->
-                    <TextBlock Grid.Row="1" Text="{Binding ToastText}" Height="30" FontSize="12.5" FontWeight="SemiBold"
+                    <TextBlock Grid.Row="1" Text="{Binding ToastText}" Height="42" Padding="0,7,0,0"
+                               FontSize="12.5" FontWeight="SemiBold"
                                HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
                                Foreground="{Binding ToastKind, Converter={StaticResource ToastBrush}}"
                                Visibility="{Binding HasToast, Converter={StaticResource BoolToVis}}"/>
