@@ -160,33 +160,89 @@
                             <TranslateTransform x:Name="ContentSlide" Y="-14"/>
                         </StackPanel.RenderTransform>
 
-                    <!-- Plan limits: "✦ 5h 20% 2h14m │ 7d 4% 6d14h" -->
-                    <ItemsControl ItemsSource="{Binding Usage}" Focusable="False"
-                                  Margin="8,6,4,0"
-                                  Visibility="{Binding Usage, Converter={StaticResource CollectionToVisibility}}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
-                                    <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{StaticResource TextPrimaryBrush}"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding PercentText}" FontSize="11" Margin="5,0,0,0"
-                                               FontFamily="{StaticResource MonoFontFamily}"
-                                               Foreground="{Binding UsedPct, Converter={StaticResource UsageSeverityBrush}}"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding ResetText}" FontSize="11" Margin="5,0,0,0"
-                                               FontFamily="{StaticResource MonoFontFamily}"
-                                               Foreground="{StaticResource TextTertiaryBrush}"
-                                               VerticalAlignment="Center"/>
+                    <!-- Plan limits ("5h 20% 2h14m │ 7d 4% 6d14h") + settings gear -->
+                    <Grid Margin="8,6,4,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ItemsControl Grid.Column="0" ItemsSource="{Binding Usage}" Focusable="False"
+                                      VerticalAlignment="Center"
+                                      Visibility="{Binding Usage, Converter={StaticResource CollectionToVisibility}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
+                                        <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding PercentText}" FontSize="11" Margin="5,0,0,0"
+                                                   FontFamily="{StaticResource MonoFontFamily}"
+                                                   Foreground="{Binding UsedPct, Converter={StaticResource UsageSeverityBrush}}"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding ResetText}" FontSize="11" Margin="5,0,0,0"
+                                                   FontFamily="{StaticResource MonoFontFamily}"
+                                                   Foreground="{StaticResource TextTertiaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Grid.Column="1" Style="{StaticResource GhostButtonStyle}"
+                                Click="OnSettingsClick" Content="&#x2699;" FontSize="15"
+                                VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,2,0"/>
+                    </Grid>
+
+                    <!-- Settings flyout (gear-toggled) -->
+                    <Border Margin="4,8,4,0" Padding="12,10"
+                            Background="{StaticResource CardBgBrush}"
+                            BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1"
+                            CornerRadius="10"
+                            Visibility="{Binding SettingsOpen, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="SETTINGS" FontSize="10" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextTertiaryBrush}" Margin="0,0,0,8"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Launch at login" FontSize="13"
+                                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="Start AgentNotch when Windows starts" FontSize="11"
+                                               Foreground="{StaticResource TextTertiaryBrush}"/>
                                 </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                                <Button Grid.Column="1" Click="OnToggleLaunchAtLogin"
+                                        VerticalAlignment="Center" Cursor="Hand"
+                                        Focusable="False" IsTabStop="False">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="{x:Type Button}">
+                                            <Border x:Name="track" Width="40" Height="22" CornerRadius="11"
+                                                    Background="{StaticResource OptionBgBrush}">
+                                                <Ellipse x:Name="thumb" Width="16" Height="16"
+                                                         HorizontalAlignment="Left" Margin="3,0,0,0"
+                                                         Fill="{StaticResource TextSecondaryBrush}"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding LaunchAtLogin}" Value="True">
+                                                    <Setter TargetName="track" Property="Background"
+                                                            Value="{StaticResource StatusFinishedBrush}"/>
+                                                    <Setter TargetName="thumb" Property="HorizontalAlignment" Value="Right"/>
+                                                    <Setter TargetName="thumb" Property="Margin" Value="0,0,3,0"/>
+                                                    <Setter TargetName="thumb" Property="Fill" Value="White"/>
+                                                </DataTrigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
 
                     <!-- Prompt card (permission / question by Kind) + queue badge -->
                     <StackPanel Margin="4,6,4,0"

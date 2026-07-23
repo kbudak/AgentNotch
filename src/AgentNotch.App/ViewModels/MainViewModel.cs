@@ -59,7 +59,28 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>"1 of 3" badge text (only shown when QueueCount > 1).</summary>
     public string QueueBadgeText => $"1 of {_queue.Count}";
 
-    public bool IsExpanded => _hoverHeld || _queue.Count > 0;
+    public bool IsExpanded => _hoverHeld || _queue.Count > 0 || _settingsOpen;
+
+    private bool _settingsOpen;
+
+    /// <summary>Whether the settings flyout is showing (gear toggles it).</summary>
+    public bool SettingsOpen => _settingsOpen;
+
+    /// <summary>Launch AgentNotch at Windows login. Reads/writes the HKCU Run entry.</summary>
+    public bool LaunchAtLogin
+    {
+        get => Integration.StartupManager.IsEnabled();
+        set { Integration.StartupManager.SetEnabled(value); Raise(nameof(LaunchAtLogin)); }
+    }
+
+    /// <summary>Open/close the settings flyout; keeps the notch expanded while open.</summary>
+    public void ToggleSettings()
+    {
+        _settingsOpen = !_settingsOpen;
+        Raise(nameof(SettingsOpen));
+        Raise(nameof(LaunchAtLogin)); // re-read the live registry state as it opens
+        Raise(nameof(IsExpanded));
+    }
 
     public string CollapsedText
     {
@@ -240,6 +261,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (!_hover && _hoverHeld)
         {
             _hoverHeld = false;
+            if (_settingsOpen) { _settingsOpen = false; Raise(nameof(SettingsOpen)); }
             Raise(nameof(IsExpanded));
         }
     }

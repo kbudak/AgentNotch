@@ -97,6 +97,15 @@ public partial class OverlayWindow
             Animate(RevealHost, HeightProperty, ContentHeight(), 220, Ease.Out);
     }
 
+    // -------------------------------------------------------------- settings
+
+    private void OnSettingsClick(object sender, RoutedEventArgs e) => _vm?.ToggleSettings();
+
+    private void OnToggleLaunchAtLogin(object sender, RoutedEventArgs e)
+    {
+        if (_vm is not null) _vm.LaunchAtLogin = !_vm.LaunchAtLogin;
+    }
+
     // ------------------------------------------------------------- animation
 
     private static class Ease
