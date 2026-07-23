@@ -1,0 +1,54 @@
+<UserControl x:Class="AgentNotch.App.UI.PixelSpinner"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="False">
+    <!-- 8 pixel dots on a ring. Nothing rotates: each dot's opacity fades from full
+         to dim on the same 0.9s loop, staggered so a bright "head" chases around the
+         ring. Dots never move, so the pixels stay perfectly crisp; the motion is pure
+         opacity, so it's smooth. Fill follows the control's Foreground (status colour). -->
+    <Viewbox Stretch="Uniform">
+        <Canvas Width="24" Height="24">
+            <Canvas.Resources>
+                <Style TargetType="{x:Type Rectangle}">
+                    <Setter Property="Width" Value="3.6"/>
+                    <Setter Property="Height" Value="3.6"/>
+                    <Setter Property="Fill"
+                            Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
+                </Style>
+            </Canvas.Resources>
+            <Rectangle x:Name="d0" Canvas.Left="10.2" Canvas.Top="3.8"/>
+            <Rectangle x:Name="d1" Canvas.Left="14.73" Canvas.Top="5.67"/>
+            <Rectangle x:Name="d2" Canvas.Left="16.6" Canvas.Top="10.2"/>
+            <Rectangle x:Name="d3" Canvas.Left="14.73" Canvas.Top="14.73"/>
+            <Rectangle x:Name="d4" Canvas.Left="10.2" Canvas.Top="16.6"/>
+            <Rectangle x:Name="d5" Canvas.Left="5.67" Canvas.Top="14.73"/>
+            <Rectangle x:Name="d6" Canvas.Left="3.8" Canvas.Top="10.2"/>
+            <Rectangle x:Name="d7" Canvas.Left="5.67" Canvas.Top="5.67"/>
+        </Canvas>
+    </Viewbox>
+
+    <UserControl.Triggers>
+        <EventTrigger RoutedEvent="UserControl.Loaded">
+            <BeginStoryboard>
+                <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="d0" Storyboard.TargetProperty="Opacity"
+                                     From="1" To="0.18" Duration="0:0:0.9" BeginTime="0:0:0.0000" RepeatBehavior="Forever"/>
+                    <DoubleAnimation Storyboard.TargetName="d1" Storyboard.TargetProperty="Opacity"
+                                     From="1" To="0.18" Duration="0:0:0.9" BeginTime="0:0:0.1125" RepeatBehavior="Forever"/>
+                    <DoubleAnimation Storyboard.TargetName="d2" Storyboard.TargetProperty="Opacity"
+                                     From="1" To="0.18" Duration="0:0:0.9" BeginTime="0:0:0.2250" RepeatBehavior="Forever"/>
+                    <DoubleAnimation Storyboard.TargetName="d3" Storyboard.TargetProperty="Opacity"
+                                     From="1" To="0.18" Duration="0:0:0.9" BeginTime="0:0:0.3375" RepeatBehavior="Forever"/>
+                    <DoubleAnimation Storyboard.TargetName="d4" Storyboard.TargetProperty="Opacity"
+                                     From="1" To="0.18" Duration="0:0:0.9" BeginTime="0:0:0.4500" RepeatBehavior="Forever"/>
+                    <DoubleAnimation Storyboard.TargetName="d5" Storyboard.TargetProperty="Opacity"
+                                     From="1" To="0.18" Duration="0:0:0.9" BeginTime="0:0:0.5625" RepeatBehavior="Forever"/>
+                    <DoubleAnimation Storyboard.TargetName="d6" Storyboard.TargetProperty="Opacity"
+                                     From="1" To="0.18" Duration="0:0:0.9" BeginTime="0:0:0.6750" RepeatBehavior="Forever"/>
+                    <DoubleAnimation Storyboard.TargetName="d7" Storyboard.TargetProperty="Opacity"
+                                     From="1" To="0.18" Duration="0:0:0.9" BeginTime="0:0:0.7875" RepeatBehavior="Forever"/>
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+    </UserControl.Triggers>
+</UserControl>

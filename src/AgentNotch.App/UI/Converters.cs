@@ -430,6 +430,34 @@ public sealed class SessionStatusIconConverter : IValueConverter
         => Binding.DoNothing;
 }
 
+/// <summary>
+/// State → Visibility for swapping the working spinner against the static "?"/"✓"
+/// glyph. Accepts either an AgentSession or a state string; the parameter is the
+/// state to match, optionally prefixed "!" to invert (e.g. "!working").
+/// </summary>
+public sealed class StateVisibilityConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        string state = value is AgentSession s
+            ? s.Status switch
+            {
+                SessionStatus.Working => "working",
+                SessionStatus.NeedsYou => "needsyou",
+                _ => "finished",
+            }
+            : value as string ?? "";
+        var want = parameter as string ?? "";
+        bool invert = want.StartsWith('!');
+        if (invert) want = want[1..];
+        bool match = string.Equals(state, want, StringComparison.Ordinal);
+        return (invert ? !match : match) ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
 /// <summary>value == parameter → bool. Two-way: checking returns the parameter (segmented picker).</summary>
 public sealed class EqualsParamConverter : IValueConverter
 {

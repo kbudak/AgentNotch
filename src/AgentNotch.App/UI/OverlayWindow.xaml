@@ -60,85 +60,64 @@
                         <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"
                               Data="{Binding LeadAgent, Converter={StaticResource AgentIcon}}"
                               Fill="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF6B7280}"/>
-                        <!-- Status glyph to its right: spinner / "?" / "✓"; hidden when idle. -->
-                        <Path Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center"
-                              Margin="6,0,0,0" RenderTransformOrigin="0.5,0.5"
-                              Data="{Binding StateKind, Converter={StaticResource StateKindIcon}}"
-                              Fill="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF6B7280}">
-                            <Path.RenderTransform>
-                                <RotateTransform Angle="0"/>
-                            </Path.RenderTransform>
-                            <Path.Style>
-                                <Style TargetType="{x:Type Path}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding StateKind, FallbackValue=idle}" Value="idle">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding StateKind, FallbackValue=idle}" Value="working">
-                                            <DataTrigger.EnterActions>
-                                                <BeginStoryboard x:Name="PillPulseWorking">
-                                                    <Storyboard RepeatBehavior="Forever">
-                                                        <DoubleAnimationUsingKeyFrames
-                                                            Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                                                            Duration="0:0:0.8">
-                                                            <DiscreteDoubleKeyFrame KeyTime="0:0:0.0" Value="0"/>
-                                                            <DiscreteDoubleKeyFrame KeyTime="0:0:0.2" Value="90"/>
-                                                            <DiscreteDoubleKeyFrame KeyTime="0:0:0.4" Value="180"/>
-                                                            <DiscreteDoubleKeyFrame KeyTime="0:0:0.6" Value="270"/>
-                                                        </DoubleAnimationUsingKeyFrames>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </DataTrigger.EnterActions>
-                                            <DataTrigger.ExitActions>
-                                                <StopStoryboard BeginStoryboardName="PillPulseWorking"/>
-                                            </DataTrigger.ExitActions>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding StateKind, FallbackValue=idle}" Value="needsyou">
-                                            <DataTrigger.EnterActions>
-                                                <BeginStoryboard x:Name="PillPulseNeedsYou">
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                         From="1" To="0.3" Duration="0:0:0.6"
-                                                                         AutoReverse="True" RepeatBehavior="Forever"/>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </DataTrigger.EnterActions>
-                                            <DataTrigger.ExitActions>
-                                                <StopStoryboard BeginStoryboardName="PillPulseNeedsYou"/>
-                                            </DataTrigger.ExitActions>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding StateKind, FallbackValue=idle}" Value="prompt">
-                                            <DataTrigger.EnterActions>
-                                                <BeginStoryboard x:Name="PillPulsePrompt">
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                         From="1" To="0.25" Duration="0:0:0.45"
-                                                                         AutoReverse="True" RepeatBehavior="Forever"/>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </DataTrigger.EnterActions>
-                                            <DataTrigger.ExitActions>
-                                                <StopStoryboard BeginStoryboardName="PillPulsePrompt"/>
-                                            </DataTrigger.ExitActions>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Path.Style>
-                        </Path>
+                        <!-- Status glyph to its right: working = pixel comet spinner,
+                             needs-you = "?", prompt = "?", done = "✓"; hidden when idle. -->
+                        <Grid Width="12" Height="12" Margin="6,0,0,0" VerticalAlignment="Center">
+                            <ui:PixelSpinner
+                                Foreground="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF6B7280}"
+                                Visibility="{Binding StateKind, Converter={StaticResource StateVisibility}, ConverterParameter=working}"/>
+                            <Path Stretch="Uniform"
+                                  Data="{Binding StateKind, Converter={StaticResource StateKindIcon}}"
+                                  Fill="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF6B7280}">
+                                <Path.Style>
+                                    <Style TargetType="{x:Type Path}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding StateKind, FallbackValue=idle}" Value="finished">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StateKind, FallbackValue=idle}" Value="needsyou">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="PillPulseNeedsYou">
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="1" To="0.3" Duration="0:0:0.6"
+                                                                             AutoReverse="True" RepeatBehavior="Forever"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="PillPulseNeedsYou"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StateKind, FallbackValue=idle}" Value="prompt">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="PillPulsePrompt">
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="1" To="0.25" Duration="0:0:0.45"
+                                                                             AutoReverse="True" RepeatBehavior="Forever"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="PillPulsePrompt"/>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Path.Style>
+                            </Path>
+                        </Grid>
                         <TextBlock Text="{Binding CollapsedText, FallbackValue=idle}"
                                    Margin="10,0,0,0" FontSize="12" VerticalAlignment="Center"
                                    MaxWidth="200" TextTrimming="CharacterEllipsis"
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
-                    </StackPanel>
-                    <!-- Top-right of the pill: settings gear (only while expanded) + the
-                         active-agent count. Putting the gear here keeps settings at the
-                         very top of the panel. Count is bound to Sessions.Count (not the
-                         collection) so its change notifications re-evaluate. -->
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
-                                VerticalAlignment="Center" Margin="0,0,10,0">
-                        <!-- Plan limits (5h / 7d), shown on the top line while expanded. -->
+                        <!-- Plan limits (5h / 7d) at the top-left, shown while expanded. -->
                         <ItemsControl ItemsSource="{Binding Usage}" Focusable="False"
-                                      VerticalAlignment="Center" Margin="0,0,10,0">
+                                      VerticalAlignment="Center" Margin="16,0,0,0">
                             <ItemsControl.Style>
                                 <Style TargetType="{x:Type ItemsControl}">
                                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -176,13 +155,15 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <Button Style="{StaticResource GhostButtonStyle}" Click="OnSettingsClick"
-                                VerticalAlignment="Center" Margin="0,0,4,0"
-                                Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
-                            <Path Data="{x:Static ui:AgentIcons.Gear}" Width="13" Height="13" Stretch="Uniform"
-                                  Fill="{StaticResource TextSecondaryBrush}"/>
-                        </Button>
-                        <Border VerticalAlignment="Center" Padding="7,1"
+                    </StackPanel>
+                    <!-- Top-right of the pill: settings gear (only while expanded) + the
+                         active-agent count. Putting the gear here keeps settings at the
+                         very top of the panel. Count is bound to Sessions.Count (not the
+                         collection) so its change notifications re-evaluate. -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                VerticalAlignment="Center" Margin="0,0,10,0">
+                        <!-- Active-agent count. -->
+                        <Border VerticalAlignment="Center" Padding="7,1" Margin="0,0,4,0"
                                 Background="{StaticResource KbdBgBrush}"
                                 BorderBrush="{StaticResource KbdBorderBrush}"
                                 BorderThickness="1" CornerRadius="9">
@@ -202,6 +183,13 @@
                                        FontSize="11"
                                        Foreground="{StaticResource TextSecondaryBrush}"/>
                         </Border>
+                        <!-- Settings gear at the far top-right (only while expanded). -->
+                        <Button Style="{StaticResource GhostButtonStyle}" Click="OnSettingsClick"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
+                            <Path Data="{x:Static ui:AgentIcons.Gear}" Width="13" Height="13" Stretch="Uniform"
+                                  Fill="{StaticResource TextSecondaryBrush}"/>
+                        </Button>
                     </StackPanel>
                 </Grid>
 
