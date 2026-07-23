@@ -128,7 +128,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             if (needs > 0) parts.Add(needs == 1 ? "1 needs you" : $"{needs} need you");
             if (working > 0) parts.Add($"{working} working");
             if (done > 0) parts.Add($"{done} done");
-            return parts.Count == 0 ? "idle" : string.Join(" · ", parts);
+            return string.Join(" · ", parts); // "" when idle — no "idle" label
         }
     }
 

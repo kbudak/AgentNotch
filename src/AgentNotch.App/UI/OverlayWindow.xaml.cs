@@ -24,7 +24,7 @@ namespace AgentNotch.App.UI;
 /// </summary>
 public partial class OverlayWindow
 {
-    private const double CollapsedPanelWidth = 280;
+    private const double CollapsedPanelWidth = 248;
     private const double ExpandedPanelWidth = 576; // 560 content + 8+8 panel padding
 
     private MainViewModel? _vm;

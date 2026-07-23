@@ -34,9 +34,9 @@
             </Border.Effect>
         </Border>
 
-        <!-- Notch panel — Width is animated from code-behind (280 pill ⇄ 576 open). -->
+        <!-- Notch panel — Width is animated from code-behind (248 pill ⇄ 576 open). -->
         <Border x:Name="NotchPanel"
-                Width="280"
+                Width="248"
                 Background="{StaticResource PanelBgBrush}"
                 BorderBrush="{StaticResource PanelBorderBrush}"
                 BorderThickness="1,0,1,1"
@@ -45,7 +45,7 @@
             <StackPanel>
 
                 <!-- ============ Top header + collapsed pill ============ -->
-                <Grid MinWidth="240">
+                <Grid MinWidth="210">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -91,14 +91,14 @@
 
                     <!-- Confirmation of what the notch just sent back; replaces the
                          normal pill content for a couple of seconds. -->
-                    <TextBlock Grid.Row="1" Text="{Binding ToastText}" Height="34" FontSize="12.5" FontWeight="SemiBold"
+                    <TextBlock Grid.Row="1" Text="{Binding ToastText}" Height="30" FontSize="12.5" FontWeight="SemiBold"
                                HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
                                Foreground="{Binding ToastKind, Converter={StaticResource ToastBrush}}"
                                Visibility="{Binding HasToast, Converter={StaticResource BoolToVis}}"/>
 
                     <!-- Status summary — only while collapsed; once expanded the session
                          list below shows every status, so this would just repeat it. -->
-                    <StackPanel Grid.Row="1" Height="34" Orientation="Horizontal"
+                    <StackPanel Grid.Row="1" Height="30" Orientation="Horizontal"
                                 VerticalAlignment="Center" Margin="14,0,0,0">
                         <StackPanel.Style>
                             <Style TargetType="{x:Type StackPanel}">
@@ -119,8 +119,10 @@
                               Data="{Binding LeadAgent, Converter={StaticResource AgentIcon}}"
                               Fill="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF6B7280}"/>
                         <!-- Status glyph to its right: working = pixel comet spinner,
-                             needs-you = "?", prompt = "?", done = "✓"; hidden when idle. -->
-                        <Grid Width="12" Height="12" Margin="6,0,0,0" VerticalAlignment="Center">
+                             needs-you = "?", prompt = "?", done = "✓"; the whole slot is
+                             hidden when idle so nothing but the grey dot shows. -->
+                        <Grid Width="12" Height="12" Margin="6,0,0,0" VerticalAlignment="Center"
+                              Visibility="{Binding StateKind, Converter={StaticResource StateVisibility}, ConverterParameter=!idle}">
                             <ui:PixelSpinner
                                 Foreground="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF6B7280}"
                                 Visibility="{Binding StateKind, Converter={StaticResource StateVisibility}, ConverterParameter=working}"/>
@@ -169,10 +171,21 @@
                                 </Path.Style>
                             </Path>
                         </Grid>
-                        <TextBlock Text="{Binding CollapsedText, FallbackValue=idle}"
+                        <TextBlock Text="{Binding CollapsedText}"
                                    Margin="10,0,0,0" FontSize="12" VerticalAlignment="Center"
                                    MaxWidth="260" TextTrimming="CharacterEllipsis"
-                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                                   Foreground="{StaticResource TextSecondaryBrush}">
+                            <TextBlock.Style>
+                                <Style TargetType="{x:Type TextBlock}">
+                                    <Style.Triggers>
+                                        <!-- No text (idle): drop the left margin so the dot isn't offset. -->
+                                        <DataTrigger Binding="{Binding CollapsedText}" Value="">
+                                            <Setter Property="Margin" Value="0"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                 </Grid>
 
