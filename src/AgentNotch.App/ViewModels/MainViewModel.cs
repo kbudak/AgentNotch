@@ -147,7 +147,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 if (s.Status == SessionStatus.NeedsYou) return s.Agent;
             foreach (var s in Sessions)
                 if (s.Status == SessionStatus.Working) return s.Agent;
-            return Sessions.Count > 0 ? Sessions[0].Agent : "";
+            // Idle (no sessions): show the Claude mark in the idle grey, not a bare dot.
+            return Sessions.Count > 0 ? Sessions[0].Agent : "claude";
         }
     }
 
