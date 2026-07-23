@@ -48,7 +48,7 @@
                 <Grid MinWidth="240">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="34"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <!-- Row 0 (expanded only): plan limits at the top-left, gear at the
@@ -91,13 +91,29 @@
 
                     <!-- Confirmation of what the notch just sent back; replaces the
                          normal pill content for a couple of seconds. -->
-                    <TextBlock Grid.Row="1" Text="{Binding ToastText}" FontSize="12.5" FontWeight="SemiBold"
-                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                    <TextBlock Grid.Row="1" Text="{Binding ToastText}" Height="34" FontSize="12.5" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
                                Foreground="{Binding ToastKind, Converter={StaticResource ToastBrush}}"
                                Visibility="{Binding HasToast, Converter={StaticResource BoolToVis}}"/>
 
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0"
-                                Visibility="{Binding HasToast, Converter={StaticResource BoolToCollapsed}}">
+                    <!-- Status summary — only while collapsed; once expanded the session
+                         list below shows every status, so this would just repeat it. -->
+                    <StackPanel Grid.Row="1" Height="34" Orientation="Horizontal"
+                                VerticalAlignment="Center" Margin="14,0,0,0">
+                        <StackPanel.Style>
+                            <Style TargetType="{x:Type StackPanel}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding HasToast}" Value="False"/>
+                                            <Condition Binding="{Binding IsExpanded}" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
                         <!-- Lead agent mark (shape = which agent) tinted by state colour. -->
                         <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"
                               Data="{Binding LeadAgent, Converter={StaticResource AgentIcon}}"
