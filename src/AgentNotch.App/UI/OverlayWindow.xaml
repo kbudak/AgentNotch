@@ -56,11 +56,13 @@
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0"
                                 Visibility="{Binding HasToast, Converter={StaticResource BoolToCollapsed}}">
-                        <!-- Lead state's pixel mark: shape = state (spinner / "?" / "✓"),
-                             fill = that state's colour. Idle falls back to a grey dot;
-                             working spins. -->
+                        <!-- Lead agent mark (shape = which agent) tinted by state colour. -->
                         <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"
-                              RenderTransformOrigin="0.5,0.5"
+                              Data="{Binding LeadAgent, Converter={StaticResource AgentIcon}}"
+                              Fill="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF6B7280}"/>
+                        <!-- Status glyph to its right: spinner / "?" / "✓"; hidden when idle. -->
+                        <Path Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center"
+                              Margin="6,0,0,0" RenderTransformOrigin="0.5,0.5"
                               Data="{Binding StateKind, Converter={StaticResource StateKindIcon}}"
                               Fill="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF6B7280}">
                             <Path.RenderTransform>
@@ -69,6 +71,9 @@
                             <Path.Style>
                                 <Style TargetType="{x:Type Path}">
                                     <Style.Triggers>
+                                        <DataTrigger Binding="{Binding StateKind, FallbackValue=idle}" Value="idle">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
                                         <DataTrigger Binding="{Binding StateKind, FallbackValue=idle}" Value="working">
                                             <DataTrigger.EnterActions>
                                                 <BeginStoryboard x:Name="PillPulseWorking">

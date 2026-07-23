@@ -74,15 +74,15 @@ public static class AgentIcons
     // to tweak. Colour comes from the status brush; the working spinner is rotated
     // by the view. All are centred in the same 24x24 box as the agent marks.
 
-    /// <summary>Working: a broken pixel ring — spun continuously it reads as a loader.</summary>
+    /// <summary>Working: a tidy pixel ring with a single notch — spun, it reads as a loader.</summary>
     public static readonly Geometry Spinner = FromMatrix(
         " XXX ",
         "X   X",
         "X    ",
         "X   X",
-        " XX  ");
+        " XXX ");
 
-    /// <summary>Needs you: a pixel question mark (a question is waiting).</summary>
+    /// <summary>Needs you: a clean pixel question mark (a question is waiting).</summary>
     public static readonly Geometry Question = FromMatrix(
         " XXX ",
         "X   X",
@@ -92,12 +92,13 @@ public static class AgentIcons
         "     ",
         "  X  ");
 
-    /// <summary>Finished: a pixel check mark (done).</summary>
+    /// <summary>Finished: a symmetric pixel check mark (done).</summary>
     public static readonly Geometry Check = FromMatrix(
-        "    X",
-        "   X ",
-        "X X  ",
-        " XX  ");
+        "      X",
+        "     X ",
+        "X   X  ",
+        " X X   ",
+        "  X    ");
 
     /// <summary>Mark for an agent id ("claude" | "codex" | "antigravity" | "cursor").</summary>
     public static Geometry For(string? agent) => agent?.Trim().ToLowerInvariant() switch
@@ -134,11 +135,14 @@ public static class AgentIcons
     /// </summary>
     private static Geometry FromMatrix(params string[] rows)
     {
-        const double cell = 3.2, gap = 0.7, step = cell + gap;
+        // Integer cell + gap on the 24-unit grid, and the whole bitmap snapped to a
+        // whole-unit origin, so every square lands on the grid — no sub-pixel skew
+        // that would read as "crooked".
+        const double cell = 3, gap = 1, step = cell + gap;
         int h = rows.Length, w = 0;
         foreach (var r in rows) if (r.Length > w) w = r.Length;
         double gridW = w * step - gap, gridH = h * step - gap;
-        double ox = (24 - gridW) / 2.0, oy = (24 - gridH) / 2.0;
+        double ox = Math.Round((24 - gridW) / 2.0), oy = Math.Round((24 - gridH) / 2.0);
 
         var sb = new System.Text.StringBuilder();
         for (int r = 0; r < h; r++)

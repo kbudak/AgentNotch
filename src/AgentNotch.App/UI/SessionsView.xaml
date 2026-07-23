@@ -47,56 +47,62 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
-                            <!-- Status mark: the SHAPE says the state (spinner = working,
-                                 "?" = needs you, "✓" = done), the FILL says its colour
-                                 (blue / orange / green). Working spins; needs-you pulses. -->
-                            <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform"
-                                  VerticalAlignment="Center" Margin="1,0,10,0"
-                                  RenderTransformOrigin="0.5,0.5"
-                                  Data="{Binding Converter={StaticResource SessionStatusIcon}}"
-                                  Fill="{Binding Converter={StaticResource SessionStatusBrush}}"
-                                  Tag="{Binding Converter={StaticResource SessionState}}">
-                                <Path.RenderTransform>
-                                    <RotateTransform Angle="0"/>
-                                </Path.RenderTransform>
-                                <Path.Style>
-                                    <Style TargetType="{x:Type Path}">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}"
-                                                         Value="working">
-                                                <DataTrigger.EnterActions>
-                                                    <BeginStoryboard x:Name="RowSpin">
-                                                        <Storyboard>
-                                                            <DoubleAnimation
-                                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                                                                From="0" To="360" Duration="0:0:1.1"
-                                                                RepeatBehavior="Forever"/>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </DataTrigger.EnterActions>
-                                                <DataTrigger.ExitActions>
-                                                    <StopStoryboard BeginStoryboardName="RowSpin"/>
-                                                </DataTrigger.ExitActions>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}"
-                                                         Value="needsyou">
-                                                <DataTrigger.EnterActions>
-                                                    <BeginStoryboard x:Name="RowAlert">
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                             From="1" To="0.35" Duration="0:0:0.6"
-                                                                             AutoReverse="True" RepeatBehavior="Forever"/>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </DataTrigger.EnterActions>
-                                                <DataTrigger.ExitActions>
-                                                    <StopStoryboard BeginStoryboardName="RowAlert"/>
-                                                </DataTrigger.ExitActions>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Path.Style>
-                            </Path>
+                            <!-- Lead: the AGENT mark (Claude invader / Codex / Gemini) and,
+                                 to its right, a small STATUS glyph — a pixel ring that spins
+                                 while working, "?" when it needs you, "✓" when done. Both are
+                                 tinted by the state colour (blue / orange / green). -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                        VerticalAlignment="Center" Margin="1,0,10,0">
+                                <Path Width="17" Height="17" Stretch="Uniform" VerticalAlignment="Center"
+                                      Data="{Binding Converter={StaticResource SessionAgentIcon}}"
+                                      Fill="{Binding Converter={StaticResource SessionStatusBrush}}"/>
+                                <Path Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center"
+                                      Margin="6,0,0,0" RenderTransformOrigin="0.5,0.5"
+                                      Data="{Binding Converter={StaticResource SessionStatusIcon}}"
+                                      Fill="{Binding Converter={StaticResource SessionStatusBrush}}"
+                                      Tag="{Binding Converter={StaticResource SessionState}}">
+                                    <Path.RenderTransform>
+                                        <RotateTransform Angle="0"/>
+                                    </Path.RenderTransform>
+                                    <Path.Style>
+                                        <Style TargetType="{x:Type Path}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}"
+                                                             Value="working">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard x:Name="RowSpin">
+                                                            <Storyboard>
+                                                                <DoubleAnimation
+                                                                    Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                    From="0" To="360" Duration="0:0:1.1"
+                                                                    RepeatBehavior="Forever"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <StopStoryboard BeginStoryboardName="RowSpin"/>
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}"
+                                                             Value="needsyou">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard x:Name="RowAlert">
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                                 From="1" To="0.35" Duration="0:0:0.6"
+                                                                                 AutoReverse="True" RepeatBehavior="Forever"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <StopStoryboard BeginStoryboardName="RowAlert"/>
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Path.Style>
+                                </Path>
+                            </StackPanel>
 
                             <!-- Title + subtitle -->
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
