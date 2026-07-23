@@ -25,9 +25,9 @@
     <!-- ===================== Status palette =====================
          The notch reads as "shape = which agent, colour = what state".
          One distinct colour per state, warm = wants you, cool = doesn't. -->
-    <SolidColorBrush x:Key="StatusWorkingBrush"  Color="#FF4ADE80"/> <!-- green  · running now      -->
-    <SolidColorBrush x:Key="StatusNeedsYouBrush" Color="#FFF59E0B"/> <!-- amber  · waiting on you   -->
-    <SolidColorBrush x:Key="StatusFinishedBrush" Color="#FF60A5FA"/> <!-- blue   · finished, calm   -->
+    <SolidColorBrush x:Key="StatusWorkingBrush"  Color="#FF3B82F6"/> <!-- blue   · running now      -->
+    <SolidColorBrush x:Key="StatusNeedsYouBrush" Color="#FFFB923C"/> <!-- orange · a question waits  -->
+    <SolidColorBrush x:Key="StatusFinishedBrush" Color="#FF4ADE80"/> <!-- green  · finished, done    -->
     <SolidColorBrush x:Key="StatusPromptBrush"   Color="#FFFB923C"/> <!-- orange · approval blocking-->
     <SolidColorBrush x:Key="StatusIdleBrush"     Color="#FF6B7280"/> <!-- grey   · nothing running  -->
 
@@ -65,8 +65,10 @@
     <ui:SessionSubtitleConverter x:Key="SessionSubtitle"/>
     <ui:SessionTokensConverter x:Key="SessionTokens"/>
     <ui:SessionAgentIconConverter x:Key="SessionAgentIcon"/>
+    <ui:SessionStatusIconConverter x:Key="SessionStatusIcon"/>
     <ui:SessionStatusBrushConverter x:Key="SessionStatusBrush"/>
     <ui:AgentIconConverter x:Key="AgentIcon"/>
+    <ui:StateKindIconConverter x:Key="StateKindIcon"/>
     <ui:StateKindBrushConverter x:Key="StateKindBrush"/>
     <ui:SessionBrandConverter x:Key="SessionBrand"/>
     <ui:SessionHostConverter x:Key="SessionHost"/>

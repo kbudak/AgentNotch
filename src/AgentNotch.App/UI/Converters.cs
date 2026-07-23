@@ -69,6 +69,36 @@ public static class AgentIcons
     /// <summary>Neutral dot — unknown agent, or the idle pill.</summary>
     public static readonly Geometry Generic = Frozen("M7,12 A5,5 0 1 0 17,12 A5,5 0 1 0 7,12Z");
 
+    // ---- Pixel-art STATUS glyphs (shape = what state) --------------------------
+    // Built from an ASCII bitmap so they read as chunky retro pixels and stay easy
+    // to tweak. Colour comes from the status brush; the working spinner is rotated
+    // by the view. All are centred in the same 24x24 box as the agent marks.
+
+    /// <summary>Working: a broken pixel ring — spun continuously it reads as a loader.</summary>
+    public static readonly Geometry Spinner = FromMatrix(
+        " XXX ",
+        "X   X",
+        "X    ",
+        "X   X",
+        " XX  ");
+
+    /// <summary>Needs you: a pixel question mark (a question is waiting).</summary>
+    public static readonly Geometry Question = FromMatrix(
+        " XXX ",
+        "X   X",
+        "    X",
+        "   X ",
+        "  X  ",
+        "     ",
+        "  X  ");
+
+    /// <summary>Finished: a pixel check mark (done).</summary>
+    public static readonly Geometry Check = FromMatrix(
+        "    X",
+        "   X ",
+        "X X  ",
+        " XX  ");
+
     /// <summary>Mark for an agent id ("claude" | "codex" | "antigravity" | "cursor").</summary>
     public static Geometry For(string? agent) => agent?.Trim().ToLowerInvariant() switch
     {
@@ -78,6 +108,49 @@ public static class AgentIcons
         "cursor" => Cursor,
         _ => Generic,
     };
+
+    /// <summary>Pixel status glyph: spinner while working, "?" when it needs you, "✓" when done.</summary>
+    public static Geometry StatusGlyph(SessionStatus status) => status switch
+    {
+        SessionStatus.Working => Spinner,
+        SessionStatus.NeedsYou => Question,
+        _ => Check,
+    };
+
+    /// <summary>Pixel status glyph from the collapsed-pill state string.</summary>
+    public static Geometry StatusGlyph(string? state) => state switch
+    {
+        "working" => Spinner,
+        "needsyou" or "prompt" => Question,
+        "finished" => Check,
+        _ => Generic,
+    };
+
+    /// <summary>
+    /// Builds a filled geometry from an ASCII bitmap: every non-space cell becomes a
+    /// small square. The grid is centred in a 24x24 box so all marks share a scale.
+    /// Paths are emitted with the invariant culture — a comma decimal separator (e.g.
+    /// on a Turkish system) would otherwise corrupt the path data.
+    /// </summary>
+    private static Geometry FromMatrix(params string[] rows)
+    {
+        const double cell = 3.2, gap = 0.7, step = cell + gap;
+        int h = rows.Length, w = 0;
+        foreach (var r in rows) if (r.Length > w) w = r.Length;
+        double gridW = w * step - gap, gridH = h * step - gap;
+        double ox = (24 - gridW) / 2.0, oy = (24 - gridH) / 2.0;
+
+        var sb = new System.Text.StringBuilder();
+        for (int r = 0; r < h; r++)
+            for (int c = 0; c < rows[r].Length; c++)
+            {
+                if (rows[r][c] == ' ') continue;
+                double x = ox + c * step, y = oy + r * step;
+                sb.Append(FormattableString.Invariant(
+                    $"M{x:0.##},{y:0.##} h{cell:0.##} v{cell:0.##} h-{cell:0.##} Z "));
+            }
+        return Frozen(sb.ToString());
+    }
 
     private static Geometry Frozen(string data)
     {
@@ -89,17 +162,21 @@ public static class AgentIcons
 
 /// <summary>
 /// One colour per state, resolved from the theme so the palette has a single home.
-/// working = green (running), needs-you = amber (waiting on you), finished = blue
-/// (done), prompt = orange (approval card open), idle = grey (nothing running).
+/// working = blue (running), needs-you = orange (a question is waiting), finished =
+/// green (done), prompt = orange (approval card open), idle = grey (nothing running).
+/// The usage meter keeps its own green/amber/red ramp (see <see cref="Good"/> /
+/// <see cref="Warn"/>) so it stays semantic regardless of the status palette.
 /// </summary>
 internal static class StatusBrushes
 {
-    public static Brush Working => Lookup("StatusWorkingBrush", 0x4A, 0xDE, 0x80);
-    public static Brush NeedsYou => Lookup("StatusNeedsYouBrush", 0xF5, 0x9E, 0x0B);
-    public static Brush Finished => Lookup("StatusFinishedBrush", 0x60, 0xA5, 0xFA);
+    public static Brush Working => Lookup("StatusWorkingBrush", 0x3B, 0x82, 0xF6);
+    public static Brush NeedsYou => Lookup("StatusNeedsYouBrush", 0xFB, 0x92, 0x3C);
+    public static Brush Finished => Lookup("StatusFinishedBrush", 0x4A, 0xDE, 0x80);
     public static Brush Prompt => Lookup("StatusPromptBrush", 0xFB, 0x92, 0x3C);
     public static Brush Idle => Lookup("StatusIdleBrush", 0x6B, 0x72, 0x80);
     public static Brush Danger => Lookup("AccentRedBrush", 0xF8, 0x71, 0x71);
+    public static Brush Good => Lookup("AccentGreenBrush", 0x4A, 0xDE, 0x80); // meter: safe
+    public static Brush Warn => Lookup("AccentAmberBrush", 0xF5, 0x9E, 0x0B); // meter: caution
 
     public static Brush Of(SessionStatus status) => status switch
     {
@@ -294,6 +371,33 @@ public sealed class SessionAgentIconConverter : IValueConverter
         => Binding.DoNothing;
 }
 
+/// <summary>AgentSession → its pixel status glyph (spinner / "?" / "✓").</summary>
+public sealed class SessionStatusIconConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        try
+        {
+            if (value is AgentSession s) return AgentIcons.StatusGlyph(s.Status);
+        }
+        catch { /* fall through */ }
+        return AgentIcons.Check;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>Collapsed-pill state string → its pixel status glyph.</summary>
+public sealed class StateKindIconConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => AgentIcons.StatusGlyph(value as string);
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
 /// <summary>AgentSession → the colour of its status (colour identifies the state).</summary>
 public sealed class SessionStatusBrushConverter : IValueConverter
 {
@@ -435,8 +539,8 @@ public sealed class UsageSeverityBrushConverter : IValueConverter
         {
             var pct = System.Convert.ToDouble(value, CultureInfo.InvariantCulture);
             if (pct >= 90) return StatusBrushes.Danger;
-            if (pct >= 70) return StatusBrushes.NeedsYou;
-            return StatusBrushes.Working;
+            if (pct >= 70) return StatusBrushes.Warn;
+            return StatusBrushes.Good;
         }
         catch { return StatusBrushes.Idle; }
     }
@@ -449,7 +553,7 @@ public sealed class UsageSeverityBrushConverter : IValueConverter
 public sealed class ToastBrushConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => (value as string) == "deny" ? StatusBrushes.Danger : StatusBrushes.Working;
+        => (value as string) == "deny" ? StatusBrushes.Danger : StatusBrushes.Good;
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => Binding.DoNothing;

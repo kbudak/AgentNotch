@@ -29,6 +29,16 @@
                     <Border x:Name="Row" Background="Transparent" CornerRadius="8"
                             Padding="10,7" Margin="0,2,0,0" Cursor="Hand"
                             MouseLeftButtonUp="OnSessionRowClick">
+                        <Border.Style>
+                            <Style TargetType="{x:Type Border}">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource CardHoverBrush}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -37,30 +47,35 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
-                            <!-- Agent mark: the SHAPE says which agent (Claude sunburst,
-                                 Codex hex-knot, Gemini sparkle), the FILL says its status.
-                                 Working breathes; needs-you pulses harder; done sits still. -->
-                            <Path Grid.Column="0" Width="15" Height="15" Stretch="Uniform"
+                            <!-- Status mark: the SHAPE says the state (spinner = working,
+                                 "?" = needs you, "✓" = done), the FILL says its colour
+                                 (blue / orange / green). Working spins; needs-you pulses. -->
+                            <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform"
                                   VerticalAlignment="Center" Margin="1,0,10,0"
-                                  Data="{Binding Converter={StaticResource SessionAgentIcon}}"
+                                  RenderTransformOrigin="0.5,0.5"
+                                  Data="{Binding Converter={StaticResource SessionStatusIcon}}"
                                   Fill="{Binding Converter={StaticResource SessionStatusBrush}}"
                                   Tag="{Binding Converter={StaticResource SessionState}}">
+                                <Path.RenderTransform>
+                                    <RotateTransform Angle="0"/>
+                                </Path.RenderTransform>
                                 <Path.Style>
                                     <Style TargetType="{x:Type Path}">
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}"
                                                          Value="working">
                                                 <DataTrigger.EnterActions>
-                                                    <BeginStoryboard x:Name="RowPulse">
+                                                    <BeginStoryboard x:Name="RowSpin">
                                                         <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                             From="1" To="0.4" Duration="0:0:0.9"
-                                                                             AutoReverse="True" RepeatBehavior="Forever"/>
+                                                            <DoubleAnimation
+                                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                From="0" To="360" Duration="0:0:1.1"
+                                                                RepeatBehavior="Forever"/>
                                                         </Storyboard>
                                                     </BeginStoryboard>
                                                 </DataTrigger.EnterActions>
                                                 <DataTrigger.ExitActions>
-                                                    <StopStoryboard BeginStoryboardName="RowPulse"/>
+                                                    <StopStoryboard BeginStoryboardName="RowSpin"/>
                                                 </DataTrigger.ExitActions>
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}"
@@ -69,7 +84,7 @@
                                                     <BeginStoryboard x:Name="RowAlert">
                                                         <Storyboard>
                                                             <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                             From="1" To="0.3" Duration="0:0:0.6"
+                                                                             From="1" To="0.35" Duration="0:0:0.6"
                                                                              AutoReverse="True" RepeatBehavior="Forever"/>
                                                         </Storyboard>
                                                     </BeginStoryboard>

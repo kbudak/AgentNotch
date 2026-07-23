@@ -56,11 +56,16 @@
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0"
                                 Visibility="{Binding HasToast, Converter={StaticResource BoolToCollapsed}}">
-                        <!-- Lead agent's mark: shape = which agent is driving the current
-                             state, fill = that state's colour. Idle falls back to a grey dot. -->
+                        <!-- Lead state's pixel mark: shape = state (spinner / "?" / "✓"),
+                             fill = that state's colour. Idle falls back to a grey dot;
+                             working spins. -->
                         <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"
-                              Data="{Binding LeadAgent, Converter={StaticResource AgentIcon}}"
+                              RenderTransformOrigin="0.5,0.5"
+                              Data="{Binding StateKind, Converter={StaticResource StateKindIcon}}"
                               Fill="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF6B7280}">
+                            <Path.RenderTransform>
+                                <RotateTransform Angle="0"/>
+                            </Path.RenderTransform>
                             <Path.Style>
                                 <Style TargetType="{x:Type Path}">
                                     <Style.Triggers>
@@ -68,9 +73,10 @@
                                             <DataTrigger.EnterActions>
                                                 <BeginStoryboard x:Name="PillPulseWorking">
                                                     <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                         From="1" To="0.4" Duration="0:0:0.9"
-                                                                         AutoReverse="True" RepeatBehavior="Forever"/>
+                                                        <DoubleAnimation
+                                                            Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                            From="0" To="360" Duration="0:0:1.1"
+                                                            RepeatBehavior="Forever"/>
                                                     </Storyboard>
                                                 </BeginStoryboard>
                                             </DataTrigger.EnterActions>
