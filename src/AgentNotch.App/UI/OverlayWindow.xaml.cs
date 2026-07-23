@@ -72,12 +72,15 @@ public partial class OverlayWindow
         _vm = DataContext as MainViewModel;
         if (_vm is not null) _vm.PropertyChanged += OnVmPropertyChanged;
         SyncExpansion();
+        Recenter(); // apply the saved notch position now the view model is available
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.IsExpanded))
             SyncExpansion();
+        else if (e.PropertyName == nameof(MainViewModel.Position))
+            Recenter();
     }
 
     private void SyncExpansion()
@@ -100,11 +103,6 @@ public partial class OverlayWindow
     // -------------------------------------------------------------- settings
 
     private void OnSettingsClick(object sender, RoutedEventArgs e) => _vm?.ToggleSettings();
-
-    private void OnToggleLaunchAtLogin(object sender, RoutedEventArgs e)
-    {
-        if (_vm is not null) _vm.LaunchAtLogin = !_vm.LaunchAtLogin;
-    }
 
     // ------------------------------------------------------------- animation
 
@@ -169,7 +167,10 @@ public partial class OverlayWindow
         try
         {
             double screenWidth = SystemParameters.PrimaryScreenWidth;
-            Left = Math.Round((screenWidth - Width) / 2.0);
+            // The panel is centred inside the fixed-width window, so aligning the
+            // window's centre to a fraction of the screen places the pill there.
+            double frac = _vm?.Position switch { "left" => 0.20, "right" => 0.80, _ => 0.50 };
+            Left = Math.Round(screenWidth * frac - Width / 2.0);
             Top = 0;
         }
         catch (Exception ex)

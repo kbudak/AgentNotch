@@ -76,6 +76,7 @@
     <ui:UsageSeverityBrushConverter x:Key="UsageSeverityBrush"/>
     <ui:ToastBrushConverter x:Key="ToastBrush"/>
     <ui:BoolToCollapsedConverter x:Key="BoolToCollapsed"/>
+    <ui:EqualsParamConverter x:Key="EqualsParam"/>
     <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
     <!-- Chip on a session row: which agent, and which app it runs in. -->
@@ -226,6 +227,61 @@
                 <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
             </Trigger>
         </Style.Triggers>
+    </Style>
+
+    <!-- ===================== Settings controls ===================== -->
+    <!-- iOS-style toggle switch (ToggleButton). IsChecked drives the knob + track. -->
+    <Style x:Key="ToggleSwitchStyle" TargetType="{x:Type ToggleButton}">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                    <Border x:Name="track" Width="40" Height="22" CornerRadius="11"
+                            Background="{StaticResource OptionBgBrush}">
+                        <Ellipse x:Name="thumb" Width="16" Height="16"
+                                 HorizontalAlignment="Left" Margin="3,0,0,0"
+                                 Fill="{StaticResource TextSecondaryBrush}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="track" Property="Background" Value="{StaticResource StatusFinishedBrush}"/>
+                            <Setter TargetName="thumb" Property="HorizontalAlignment" Value="Right"/>
+                            <Setter TargetName="thumb" Property="Margin" Value="0,0,3,0"/>
+                            <Setter TargetName="thumb" Property="Fill" Value="White"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Segmented picker cell (RadioButton). Checked cell fills; the group is one pill. -->
+    <Style x:Key="SegmentRadioStyle" TargetType="{x:Type RadioButton}">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type RadioButton}">
+                    <Border x:Name="bd" Background="Transparent" CornerRadius="6" Padding="12,4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{StaticResource OptionHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{StaticResource OptionPressedBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- ===================== Slim dark scrollbars ===================== -->

@@ -100,6 +100,40 @@ public static class AgentIcons
         " X X   ",
         "  X    ");
 
+    /// <summary>A cog/gear mark for the settings button: 8 square teeth + a centre hole.</summary>
+    public static readonly Geometry Gear = BuildGear();
+
+    private static Geometry BuildGear()
+    {
+        const int teeth = 8;
+        const double cx = 12, cy = 12, rOut = 11.2, rIn = 7.6, rHole = 3.4;
+        var outer = new StreamGeometry();
+        using (var ctx = outer.Open())
+        {
+            var pts = new System.Windows.Point[teeth * 4];
+            double stepA = 2 * Math.PI / teeth;
+            for (int t = 0; t < teeth; t++)
+            {
+                double a = t * stepA;
+                pts[t * 4 + 0] = Polar(cx, cy, rOut, a);
+                pts[t * 4 + 1] = Polar(cx, cy, rOut, a + stepA * 0.5);
+                pts[t * 4 + 2] = Polar(cx, cy, rIn,  a + stepA * 0.5);
+                pts[t * 4 + 3] = Polar(cx, cy, rIn,  a + stepA);
+            }
+            ctx.BeginFigure(pts[0], true, true);
+            for (int i = 1; i < pts.Length; i++) ctx.LineTo(pts[i], true, false);
+        }
+        outer.Freeze();
+        var group = new GeometryGroup { FillRule = FillRule.EvenOdd }; // centre ellipse = hole
+        group.Children.Add(outer);
+        group.Children.Add(new EllipseGeometry(new System.Windows.Point(cx, cy), rHole, rHole));
+        group.Freeze();
+        return group;
+    }
+
+    private static System.Windows.Point Polar(double cx, double cy, double r, double a)
+        => new(cx + r * Math.Cos(a), cy + r * Math.Sin(a));
+
     /// <summary>Mark for an agent id ("claude" | "codex" | "antigravity" | "cursor").</summary>
     public static Geometry For(string? agent) => agent?.Trim().ToLowerInvariant() switch
     {
@@ -390,6 +424,16 @@ public sealed class SessionStatusIconConverter : IValueConverter
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => Binding.DoNothing;
+}
+
+/// <summary>value == parameter → bool. Two-way: checking returns the parameter (segmented picker).</summary>
+public sealed class EqualsParamConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => string.Equals(value as string, parameter as string, StringComparison.Ordinal);
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? (parameter ?? Binding.DoNothing) : Binding.DoNothing;
 }
 
 /// <summary>Collapsed-pill state string → its pixel status glyph.</summary>

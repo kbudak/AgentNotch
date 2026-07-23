@@ -18,6 +18,7 @@ namespace AgentNotch.App.ViewModels;
 public sealed class MainViewModel : INotifyPropertyChanged
 {
     private readonly List<PromptViewModel> _queue = new();
+    private readonly Integration.AppConfig _config = Integration.AppConfig.Load();
     private readonly DispatcherTimer _collapseTimer;
     private readonly DispatcherTimer _toastTimer;
     private bool _hover;      // pointer is currently over the notch
@@ -73,12 +74,34 @@ public sealed class MainViewModel : INotifyPropertyChanged
         set { Integration.StartupManager.SetEnabled(value); Raise(nameof(LaunchAtLogin)); }
     }
 
+    /// <summary>Show the plan-limit row (5h/7d) at the top of the panel.</summary>
+    public bool ShowUsage
+    {
+        get => _config.ShowUsage;
+        set { _config.ShowUsage = value; _config.Save(); Raise(nameof(ShowUsage)); }
+    }
+
+    /// <summary>Notch position along the top edge: "left" | "center" | "right".</summary>
+    public string Position
+    {
+        get => _config.Position;
+        set
+        {
+            if (string.Equals(value, _config.Position, StringComparison.Ordinal)) return;
+            _config.Position = value;
+            _config.Save();
+            Raise(nameof(Position));
+        }
+    }
+
     /// <summary>Open/close the settings flyout; keeps the notch expanded while open.</summary>
     public void ToggleSettings()
     {
         _settingsOpen = !_settingsOpen;
         Raise(nameof(SettingsOpen));
         Raise(nameof(LaunchAtLogin)); // re-read the live registry state as it opens
+        Raise(nameof(ShowUsage));
+        Raise(nameof(Position));
         Raise(nameof(IsExpanded));
     }
 

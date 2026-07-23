@@ -165,7 +165,8 @@
                             <TranslateTransform x:Name="ContentSlide" Y="-14"/>
                         </StackPanel.RenderTransform>
 
-                    <!-- Plan limits ("5h 20% 2h14m │ 7d 4% 6d14h") + settings gear -->
+                    <!-- Plan limits ("5h 20% 2h14m │ 7d 4% 6d14h") + settings gear.
+                         This row and the settings flyout sit at the very top of the panel. -->
                     <Grid Margin="8,6,4,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -173,7 +174,7 @@
                         </Grid.ColumnDefinitions>
                         <ItemsControl Grid.Column="0" ItemsSource="{Binding Usage}" Focusable="False"
                                       VerticalAlignment="Center"
-                                      Visibility="{Binding Usage, Converter={StaticResource CollectionToVisibility}}">
+                                      Visibility="{Binding ShowUsage, Converter={StaticResource BoolToVis}}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <StackPanel Orientation="Horizontal"/>
@@ -198,20 +199,25 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <Button Grid.Column="1" Style="{StaticResource GhostButtonStyle}"
-                                Click="OnSettingsClick" Content="&#x2699;" FontSize="15"
-                                VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,2,0"/>
+                                Click="OnSettingsClick"
+                                VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,2,0">
+                            <Path Data="{x:Static ui:AgentIcons.Gear}" Width="13" Height="13" Stretch="Uniform"
+                                  Fill="{StaticResource TextSecondaryBrush}"/>
+                        </Button>
                     </Grid>
 
                     <!-- Settings flyout (gear-toggled) -->
-                    <Border Margin="4,8,4,0" Padding="12,10"
+                    <Border Margin="4,8,4,0" Padding="14,12"
                             Background="{StaticResource CardBgBrush}"
                             BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1"
                             CornerRadius="10"
                             Visibility="{Binding SettingsOpen, Converter={StaticResource BoolToVis}}">
                         <StackPanel>
                             <TextBlock Text="SETTINGS" FontSize="10" FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextTertiaryBrush}" Margin="0,0,0,8"/>
-                            <Grid>
+                                       Foreground="{StaticResource TextTertiaryBrush}" Margin="0,0,0,10"/>
+
+                            <!-- Launch at login -->
+                            <Grid Margin="0,0,0,12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
@@ -222,29 +228,54 @@
                                     <TextBlock Text="Start AgentNotch when Windows starts" FontSize="11"
                                                Foreground="{StaticResource TextTertiaryBrush}"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Click="OnToggleLaunchAtLogin"
-                                        VerticalAlignment="Center" Cursor="Hand"
-                                        Focusable="False" IsTabStop="False">
-                                    <Button.Template>
-                                        <ControlTemplate TargetType="{x:Type Button}">
-                                            <Border x:Name="track" Width="40" Height="22" CornerRadius="11"
-                                                    Background="{StaticResource OptionBgBrush}">
-                                                <Ellipse x:Name="thumb" Width="16" Height="16"
-                                                         HorizontalAlignment="Left" Margin="3,0,0,0"
-                                                         Fill="{StaticResource TextSecondaryBrush}"/>
-                                            </Border>
-                                            <ControlTemplate.Triggers>
-                                                <DataTrigger Binding="{Binding LaunchAtLogin}" Value="True">
-                                                    <Setter TargetName="track" Property="Background"
-                                                            Value="{StaticResource StatusFinishedBrush}"/>
-                                                    <Setter TargetName="thumb" Property="HorizontalAlignment" Value="Right"/>
-                                                    <Setter TargetName="thumb" Property="Margin" Value="0,0,3,0"/>
-                                                    <Setter TargetName="thumb" Property="Fill" Value="White"/>
-                                                </DataTrigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </Button.Template>
-                                </Button>
+                                <ToggleButton Grid.Column="1" VerticalAlignment="Center"
+                                              Style="{StaticResource ToggleSwitchStyle}"
+                                              IsChecked="{Binding LaunchAtLogin, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <!-- Show usage limits -->
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Show usage limits" FontSize="13"
+                                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="Display the 5h / 7d plan usage row" FontSize="11"
+                                               Foreground="{StaticResource TextTertiaryBrush}"/>
+                                </StackPanel>
+                                <ToggleButton Grid.Column="1" VerticalAlignment="Center"
+                                              Style="{StaticResource ToggleSwitchStyle}"
+                                              IsChecked="{Binding ShowUsage, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <!-- Position -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Notch position" FontSize="13"
+                                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="Where it sits along the top edge" FontSize="11"
+                                               Foreground="{StaticResource TextTertiaryBrush}"/>
+                                </StackPanel>
+                                <Border Grid.Column="1" VerticalAlignment="Center"
+                                        Background="{StaticResource OptionBgBrush}" CornerRadius="8" Padding="2">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton GroupName="notchpos" Content="Left"
+                                                     Style="{StaticResource SegmentRadioStyle}"
+                                                     IsChecked="{Binding Position, Converter={StaticResource EqualsParam}, ConverterParameter=left, Mode=TwoWay}"/>
+                                        <RadioButton GroupName="notchpos" Content="Center"
+                                                     Style="{StaticResource SegmentRadioStyle}"
+                                                     IsChecked="{Binding Position, Converter={StaticResource EqualsParam}, ConverterParameter=center, Mode=TwoWay}"/>
+                                        <RadioButton GroupName="notchpos" Content="Right"
+                                                     Style="{StaticResource SegmentRadioStyle}"
+                                                     IsChecked="{Binding Position, Converter={StaticResource EqualsParam}, ConverterParameter=right, Mode=TwoWay}"/>
+                                    </StackPanel>
+                                </Border>
                             </Grid>
                         </StackPanel>
                     </Border>
