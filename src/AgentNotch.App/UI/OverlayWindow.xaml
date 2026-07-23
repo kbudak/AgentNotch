@@ -132,6 +132,46 @@
                          collection) so its change notifications re-evaluate. -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                                 VerticalAlignment="Center" Margin="0,0,10,0">
+                        <!-- Plan limits (5h / 7d), shown on the top line while expanded. -->
+                        <ItemsControl ItemsSource="{Binding Usage}" Focusable="False"
+                                      VerticalAlignment="Center" Margin="0,0,10,0">
+                            <ItemsControl.Style>
+                                <Style TargetType="{x:Type ItemsControl}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsExpanded}" Value="True"/>
+                                                <Condition Binding="{Binding ShowUsage}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ItemsControl.Style>
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+                                        <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding PercentText}" FontSize="11" Margin="5,0,0,0"
+                                                   FontFamily="{StaticResource MonoFontFamily}"
+                                                   Foreground="{Binding UsedPct, Converter={StaticResource UsageSeverityBrush}}"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding ResetText}" FontSize="11" Margin="5,0,0,0"
+                                                   FontFamily="{StaticResource MonoFontFamily}"
+                                                   Foreground="{StaticResource TextTertiaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                         <Button Style="{StaticResource GhostButtonStyle}" Click="OnSettingsClick"
                                 VerticalAlignment="Center" Margin="0,0,4,0"
                                 Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
@@ -174,34 +214,7 @@
                             <TranslateTransform x:Name="ContentSlide" Y="-14"/>
                         </StackPanel.RenderTransform>
 
-                    <!-- Plan limits ("5h 20% 2h14m │ 7d 4% 6d14h") — the very top row of the
-                         expanded panel. The settings gear lives up in the pill header. -->
-                    <ItemsControl ItemsSource="{Binding Usage}" Focusable="False"
-                                  Margin="8,6,4,0"
-                                  Visibility="{Binding ShowUsage, Converter={StaticResource BoolToVis}}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
-                                    <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{StaticResource TextPrimaryBrush}"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding PercentText}" FontSize="11" Margin="5,0,0,0"
-                                               FontFamily="{StaticResource MonoFontFamily}"
-                                               Foreground="{Binding UsedPct, Converter={StaticResource UsageSeverityBrush}}"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding ResetText}" FontSize="11" Margin="5,0,0,0"
-                                               FontFamily="{StaticResource MonoFontFamily}"
-                                               Foreground="{StaticResource TextTertiaryBrush}"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <!-- Plan limits now live in the pill header (top line); nothing here. -->
 
                     <!-- Settings flyout (gear-toggled) -->
                     <Border Margin="4,8,4,0" Padding="14,12"
