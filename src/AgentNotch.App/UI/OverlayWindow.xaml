@@ -44,17 +44,59 @@
                 Padding="8,0,8,8">
             <StackPanel>
 
-                <!-- ============ Collapsed pill (always visible) ============ -->
-                <Grid Height="34" MinWidth="240">
+                <!-- ============ Top header + collapsed pill ============ -->
+                <Grid MinWidth="240">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="34"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Row 0 (expanded only): plan limits at the top-left, gear at the
+                         top-right — above the agent icon / status line. -->
+                    <Grid Grid.Row="0" Margin="14,7,10,0"
+                          Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ItemsControl Grid.Column="0" ItemsSource="{Binding Usage}" Focusable="False"
+                                      VerticalAlignment="Center"
+                                      Visibility="{Binding ShowUsage, Converter={StaticResource BoolToVis}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
+                                        <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding PercentText}" FontSize="11" Margin="5,0,0,0"
+                                                   FontFamily="{StaticResource MonoFontFamily}"
+                                                   Foreground="{Binding UsedPct, Converter={StaticResource UsageSeverityBrush}}"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding ResetText}" FontSize="11" Margin="5,0,0,0"
+                                                   FontFamily="{StaticResource MonoFontFamily}"
+                                                   Foreground="{StaticResource TextTertiaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Grid.Column="1" Style="{StaticResource GhostButtonStyle}" Click="OnSettingsClick"
+                                VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <Path Data="{x:Static ui:AgentIcons.Gear}" Width="14" Height="14" Stretch="Uniform"
+                                  Fill="{StaticResource TextSecondaryBrush}"/>
+                        </Button>
+                    </Grid>
 
                     <!-- Confirmation of what the notch just sent back; replaces the
                          normal pill content for a couple of seconds. -->
-                    <TextBlock Text="{Binding ToastText}" FontSize="12.5" FontWeight="SemiBold"
+                    <TextBlock Grid.Row="1" Text="{Binding ToastText}" FontSize="12.5" FontWeight="SemiBold"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                Foreground="{Binding ToastKind, Converter={StaticResource ToastBrush}}"
                                Visibility="{Binding HasToast, Converter={StaticResource BoolToVis}}"/>
 
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0"
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0"
                                 Visibility="{Binding HasToast, Converter={StaticResource BoolToCollapsed}}">
                         <!-- Lead agent mark (shape = which agent) tinted by state colour. -->
                         <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"
@@ -113,83 +155,8 @@
                         </Grid>
                         <TextBlock Text="{Binding CollapsedText, FallbackValue=idle}"
                                    Margin="10,0,0,0" FontSize="12" VerticalAlignment="Center"
-                                   MaxWidth="200" TextTrimming="CharacterEllipsis"
+                                   MaxWidth="260" TextTrimming="CharacterEllipsis"
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
-                        <!-- Plan limits (5h / 7d) at the top-left, shown while expanded. -->
-                        <ItemsControl ItemsSource="{Binding Usage}" Focusable="False"
-                                      VerticalAlignment="Center" Margin="16,0,0,0">
-                            <ItemsControl.Style>
-                                <Style TargetType="{x:Type ItemsControl}">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <MultiDataTrigger>
-                                            <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding IsExpanded}" Value="True"/>
-                                                <Condition Binding="{Binding ShowUsage}" Value="True"/>
-                                            </MultiDataTrigger.Conditions>
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </MultiDataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ItemsControl.Style>
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
-                                        <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource TextPrimaryBrush}"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding PercentText}" FontSize="11" Margin="5,0,0,0"
-                                                   FontFamily="{StaticResource MonoFontFamily}"
-                                                   Foreground="{Binding UsedPct, Converter={StaticResource UsageSeverityBrush}}"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding ResetText}" FontSize="11" Margin="5,0,0,0"
-                                                   FontFamily="{StaticResource MonoFontFamily}"
-                                                   Foreground="{StaticResource TextTertiaryBrush}"
-                                                   VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                    <!-- Top-right of the pill: settings gear (only while expanded) + the
-                         active-agent count. Putting the gear here keeps settings at the
-                         very top of the panel. Count is bound to Sessions.Count (not the
-                         collection) so its change notifications re-evaluate. -->
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
-                                VerticalAlignment="Center" Margin="0,0,10,0">
-                        <!-- Active-agent count. -->
-                        <Border VerticalAlignment="Center" Padding="7,1" Margin="0,0,4,0"
-                                Background="{StaticResource KbdBgBrush}"
-                                BorderBrush="{StaticResource KbdBorderBrush}"
-                                BorderThickness="1" CornerRadius="9">
-                            <Border.Style>
-                                <Style TargetType="{x:Type Border}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Sessions.Count, FallbackValue=0}" Value="0">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding HasToast}" Value="True">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <TextBlock Text="{Binding Sessions.Count, FallbackValue=0}"
-                                       FontSize="11"
-                                       Foreground="{StaticResource TextSecondaryBrush}"/>
-                        </Border>
-                        <!-- Settings gear at the far top-right (only while expanded). -->
-                        <Button Style="{StaticResource GhostButtonStyle}" Click="OnSettingsClick"
-                                VerticalAlignment="Center"
-                                Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
-                            <Path Data="{x:Static ui:AgentIcons.Gear}" Width="13" Height="13" Stretch="Uniform"
-                                  Fill="{StaticResource TextSecondaryBrush}"/>
-                        </Button>
                     </StackPanel>
                 </Grid>
 
