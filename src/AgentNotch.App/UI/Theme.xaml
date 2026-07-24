@@ -18,6 +18,9 @@
     <SolidColorBrush x:Key="TextTertiaryBrush" Color="#FF6B7280"/>
 
     <SolidColorBrush x:Key="AccentAmberBrush" Color="#FFF59E0B"/>
+    <!-- Middle stops of the usage ramp: plenty ▸ getting low ▸ nearly out ▸ out. -->
+    <SolidColorBrush x:Key="AccentYellowBrush" Color="#FFFACC15"/>
+    <SolidColorBrush x:Key="AccentOrangeBrush" Color="#FFFB923C"/>
     <SolidColorBrush x:Key="AccentTealBrush" Color="#FF2DD4BF"/>
     <SolidColorBrush x:Key="AccentGreenBrush" Color="#FF4ADE80"/>
     <SolidColorBrush x:Key="AccentRedBrush" Color="#FFF87171"/>

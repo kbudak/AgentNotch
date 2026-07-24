@@ -217,8 +217,11 @@ internal static class StatusBrushes
     public static Brush Prompt => Lookup("StatusPromptBrush", 0xFB, 0x92, 0x3C);
     public static Brush Idle => Lookup("StatusIdleBrush", 0x6B, 0x72, 0x80);
     public static Brush Danger => Lookup("AccentRedBrush", 0xF8, 0x71, 0x71);
-    public static Brush Good => Lookup("AccentGreenBrush", 0x4A, 0xDE, 0x80); // meter: safe
-    public static Brush Warn => Lookup("AccentAmberBrush", 0xF5, 0x9E, 0x0B); // meter: caution
+    // The usage ramp, by how much of the window is LEFT: plenty ▸ getting low ▸
+    // nearly out ▸ out.
+    public static Brush Good => Lookup("AccentGreenBrush", 0x4A, 0xDE, 0x80);
+    public static Brush Caution => Lookup("AccentYellowBrush", 0xFA, 0xCC, 0x15);
+    public static Brush Alert => Lookup("AccentOrangeBrush", 0xFB, 0x92, 0x3C);
 
     public static Brush Of(SessionStatus status) => status switch
     {
@@ -617,9 +620,13 @@ public sealed class UsageSeverityBrushConverter : IValueConverter
     {
         try
         {
-            var pct = System.Convert.ToDouble(value, CultureInfo.InvariantCulture);
-            if (pct >= 90) return StatusBrushes.Danger;
-            if (pct >= 70) return StatusBrushes.Warn;
+            // The input is percent USED; the colour tracks what is LEFT, which is
+            // what you actually decide on: green while there is room, sliding
+            // through yellow and orange to red as the window runs out.
+            double remaining = 100 - System.Convert.ToDouble(value, CultureInfo.InvariantCulture);
+            if (remaining <= 10) return StatusBrushes.Danger;
+            if (remaining <= 25) return StatusBrushes.Alert;
+            if (remaining <= 50) return StatusBrushes.Caution;
             return StatusBrushes.Good;
         }
         catch { return StatusBrushes.Idle; }
