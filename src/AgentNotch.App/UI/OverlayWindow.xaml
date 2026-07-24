@@ -90,78 +90,44 @@
                     </Grid>
 
                     <!-- Confirmation of what the notch just sent back; replaces the
-                         normal pill content for a couple of seconds. -->
-                    <Grid Grid.Row="1" Height="34" Margin="0,7,0,0"
-                          HorizontalAlignment="Center" VerticalAlignment="Center"
-                          RenderTransformOrigin="0.5,0.5"
-                          Visibility="{Binding HasToast, Converter={StaticResource BoolToVis}}">
-                        <Grid.RenderTransform>
-                            <ScaleTransform ScaleX="1" ScaleY="1"/>
-                        </Grid.RenderTransform>
-                        <Grid.Style>
-                            <Style TargetType="{x:Type Grid}">
+                         normal pill content for a couple of seconds. Deliberately
+                         undecorated — no capsule, no badge, no background: a glyph and
+                         one line in the kind's colour IS the message. The colour and
+                         the glyph already say allowed / denied / handed back, so
+                         nothing else has to. -->
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Height="30" Margin="0,5,0,0"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Visibility="{Binding HasToast, Converter={StaticResource BoolToVis}}">
+                        <StackPanel.Style>
+                            <Style TargetType="{x:Type StackPanel}">
                                 <Style.Triggers>
-                                    <!-- Pop in: the capsule swells from slightly small as it
-                                         appears, so the confirmation lands rather than blinks. -->
                                     <DataTrigger Binding="{Binding HasToast}" Value="True">
                                         <DataTrigger.EnterActions>
                                             <BeginStoryboard>
                                                 <Storyboard>
-                                                    <DoubleAnimation
-                                                        Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                                        From="0.92" To="1" Duration="0:0:0.22">
-                                                        <DoubleAnimation.EasingFunction>
-                                                            <BackEase EasingMode="EaseOut" Amplitude="0.5"/>
-                                                        </DoubleAnimation.EasingFunction>
-                                                    </DoubleAnimation>
-                                                    <DoubleAnimation
-                                                        Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                                        From="0.92" To="1" Duration="0:0:0.22">
-                                                        <DoubleAnimation.EasingFunction>
-                                                            <BackEase EasingMode="EaseOut" Amplitude="0.5"/>
-                                                        </DoubleAnimation.EasingFunction>
-                                                    </DoubleAnimation>
                                                     <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                     From="0" To="1" Duration="0:0:0.16"/>
+                                                                     From="0" To="1" Duration="0:0:0.18"/>
                                                 </Storyboard>
                                             </BeginStoryboard>
                                         </DataTrigger.EnterActions>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </Grid.Style>
+                        </StackPanel.Style>
 
-                        <!-- Capsule: the kind's colour washed into a fill and a hairline
-                             ring, so the confirmation reads as its own object on the panel
-                             instead of loose text. Two layers because Border.Opacity would
-                             fade the content with it. -->
-                        <Border CornerRadius="17" Background="{Binding ToastKind, Converter={StaticResource ToastBrush}}"
-                                Opacity="0.13"/>
-                        <Border CornerRadius="17" BorderThickness="1"
-                                BorderBrush="{Binding ToastKind, Converter={StaticResource ToastBrush}}"
-                                Opacity="0.4"/>
-
-                        <StackPanel Orientation="Horizontal" Margin="9,0,15,0" VerticalAlignment="Center">
-                            <!-- Solid badge, glyph knocked out in the panel colour. -->
-                            <Grid Width="19" Height="19" VerticalAlignment="Center">
-                                <Ellipse Fill="{Binding ToastKind, Converter={StaticResource ToastBrush}}"/>
-                                <TextBlock Text="{Binding ToastKind, Converter={StaticResource ToastGlyph}}"
-                                           FontSize="11" FontWeight="Bold" Margin="0,-1,0,0"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                                           Foreground="#FF0B0B0E"/>
-                            </Grid>
-                            <!-- What happened, then what it applied to — weight and colour
-                                 carry the hierarchy instead of an em dash. -->
-                            <TextBlock Text="{Binding ToastText}" Margin="9,0,0,0"
-                                       FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"
-                                       Foreground="{StaticResource TextPrimaryBrush}"/>
-                            <TextBlock Text="{Binding ToastDetail}" Margin="7,0,0,0"
-                                       FontSize="12" VerticalAlignment="Center"
-                                       MaxWidth="320" TextTrimming="CharacterEllipsis"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                       Visibility="{Binding ToastDetail, Converter={StaticResource StringToVisibility}}"/>
-                        </StackPanel>
-                    </Grid>
+                        <TextBlock Text="{Binding ToastKind, Converter={StaticResource ToastGlyph}}"
+                                   FontSize="13.5" FontWeight="Bold" VerticalAlignment="Center"
+                                   Foreground="{Binding ToastKind, Converter={StaticResource ToastBrush}}"/>
+                        <TextBlock Text="{Binding ToastText}" Margin="7,0,0,0"
+                                   FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"
+                                   Foreground="{Binding ToastKind, Converter={StaticResource ToastBrush}}"/>
+                        <!-- Same colour, dimmed: what it applied to, without a second style. -->
+                        <TextBlock Text="{Binding ToastDetail}" Margin="6,0,0,0" Opacity="0.6"
+                                   FontSize="12.5" VerticalAlignment="Center"
+                                   MaxWidth="300" TextTrimming="CharacterEllipsis"
+                                   Foreground="{Binding ToastKind, Converter={StaticResource ToastBrush}}"
+                                   Visibility="{Binding ToastDetail, Converter={StaticResource StringToVisibility}}"/>
+                    </StackPanel>
 
                     <!-- Status summary — only while collapsed; once expanded the session
                          list below shows every status, so this would just repeat it. -->
