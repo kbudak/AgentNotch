@@ -86,6 +86,15 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool BringWindowToTop(IntPtr hWnd);
 
+    /// <summary>
+    /// What Alt-Tab itself uses. Not subject to the same foreground lock as
+    /// SetForegroundWindow, so it is the fallback when that one is refused —
+    /// otherwise the first click on a row silently does nothing and the user
+    /// has to click again.
+    /// </summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern void SwitchToThisWindow(IntPtr hWnd, bool fAltTab);
+
     public const int SW_RESTORE = 9;
     public const int SW_SHOW = 5;
 

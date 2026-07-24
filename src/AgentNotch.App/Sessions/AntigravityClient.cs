@@ -196,6 +196,11 @@ public sealed class AntigravityClient : IDisposable
     /// </summary>
     private static int FindLanguageServerPid()
     {
+        // Antigravity is usually not running at all. The shared process snapshot
+        // answers that for free; only then is the expensive per-process
+        // MainModule/StartTime walk below worth doing.
+        if (!Interop.ProcessTree.AnyRunning("language_server")) return 0;
+
         int best = 0, fallback = 0;
         var bestStart = DateTime.MinValue;
         var fallbackStart = DateTime.MinValue;

@@ -1,4 +1,5 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
+using System.Linq;
 using System.ComponentModel;
 using System.Windows.Threading;
 using AgentNotch.App.Diagnostics;
@@ -248,10 +249,29 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         try
         {
-            Sessions.Clear();
-            if (sessions is not null)
-                foreach (var s in sessions)
-                    Sessions.Add(s);
+            IReadOnlyList<AgentSession> incoming = sessions ?? Array.Empty<AgentSession>();
+
+            // The watcher re-sorts by last activity, so a working session climbs
+            // the list every tick. While the panel is open that pulls rows out
+            // from under the pointer mid-click — you jump to the wrong project,
+            // or miss entirely and have to click again. Freeze the order the
+            // user can actually see; only the contents keep refreshing.
+            if (IsExpanded && Sessions.Count > 0)
+                incoming = InVisibleOrder(incoming);
+
+            var now = DateTime.UtcNow;
+            // Reconcile row-by-row instead of Clear()+Add(): an unchanged row
+            // keeps its own container (and its hover/press state), so a rebuild
+            // no longer destroys the Border the click is landing on.
+            for (int i = 0; i < incoming.Count; i++)
+            {
+                if (i >= Sessions.Count)
+                    Sessions.Add(incoming[i]);
+                else if (RowKey(Sessions[i], now) != RowKey(incoming[i], now))
+                    Sessions[i] = incoming[i];
+            }
+            while (Sessions.Count > incoming.Count)
+                Sessions.RemoveAt(Sessions.Count - 1);
         }
         catch (Exception ex)
         {
@@ -261,6 +281,29 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Raise(nameof(StateKind));
         Raise(nameof(LeadAgent));
     }
+
+    /// <summary>Incoming rows re-ordered to match what is already on screen; new ones land last.</summary>
+    private IReadOnlyList<AgentSession> InVisibleOrder(IReadOnlyList<AgentSession> incoming)
+    {
+        var slot = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (int i = 0; i < Sessions.Count; i++)
+            slot.TryAdd(Sessions[i].SessionId, i);
+
+        return incoming
+            .OrderBy(s => slot.TryGetValue(s.SessionId, out int i) ? i : int.MaxValue)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Everything the row template renders, as one string. AgentSession is a
+    /// plain snapshot with no change notification, so a row can only refresh by
+    /// being replaced — this decides when that is actually worth doing. The age
+    /// chip is clock-driven, so it is folded in at minute resolution.
+    /// </summary>
+    private static string RowKey(AgentSession s, DateTime now) => string.Join('',
+        s.SessionId, s.Agent, (int)s.Status, s.ProjectName, s.Model, s.HostLabel,
+        s.CurrentTool, s.CurrentTarget, s.LastMessage, s.TokensSpent,
+        (long)(now - s.StartedUtc).TotalMinutes);
 
     // ---------------------------------------------------------------- hover
 

@@ -1,5 +1,4 @@
-using System.Diagnostics;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using AgentNotch.App.Diagnostics;
 
 namespace AgentNotch.App.Interop;
@@ -7,10 +6,13 @@ namespace AgentNotch.App.Interop;
 /// <summary>
 /// Cheap process-level facts for agent and host detection.
 ///
-///  * <see cref="AnyRunning"/> — is any process with one of these names alive?
-///    Lets collectors skip file scans entirely when the agent app isn't even
-///    running. Backed by a ≤2 s cached name snapshot, so a burst of calls (one
-///    per candidate agent per poll) costs a single Process.GetProcesses().
+/// Everything here is answered from ONE Toolhelp32 snapshot cached for
+/// <c>SnapshotTtlMs</c> — never from System.Diagnostics.Process, whose
+/// ProcessName getter re-queries the whole system per pid.
+///
+///  * <see cref="AnyRunning"/> / <see cref="IsAlive"/> — name and pid liveness,
+///    a dictionary lookup each. Lets collectors skip file scans entirely when
+///    the agent app isn't even running.
 ///  * <see cref="HostAppOf"/> — which known host app (Cursor, Antigravity,
 ///    VS Code) sits above a pid in the parent-process chain; resolves whether a
 ///    CLI session lives in an editor's integrated terminal. Toolhelp32-based —
@@ -24,59 +26,49 @@ public static class ProcessTree
 {
     // ------------------------------------------------------------ AnyRunning ----
 
-    private const long NamesTtlMs = 2_000;
-    private static readonly object NamesGate = new();
-    private static HashSet<string>? _names;
-    private static long _namesAtMs;
-
     /// <summary>
     /// True when at least one currently-running process has one of the given
     /// names (case-insensitive; a trailing ".exe" on a query name is tolerated).
     /// </summary>
     public static bool AnyRunning(params string[] processNames)
+        => FirstPidNamed(processNames) > 0;
+
+    /// <summary>
+    /// Pid of the first running process named one of <paramref name="processNames"/>,
+    /// or 0. One shared snapshot lookup — no per-name system scan.
+    /// </summary>
+    public static int FirstPidNamed(params string[] processNames)
     {
         try
         {
-            if (processNames is not { Length: > 0 }) return false;
-            var names = SnapshotNames();
+            if (processNames is not { Length: > 0 }) return 0;
+            var byName = Current().FirstPidByName;
             foreach (var name in processNames)
             {
                 if (string.IsNullOrWhiteSpace(name)) continue;
-                if (names.Contains(TrimExe(name))) return true;
+                if (byName.TryGetValue(TrimExe(name), out int pid)) return pid;
             }
-            return false;
         }
         catch (Exception ex)
         {
-            AppLog.Write("proctree: AnyRunning failed: " + ex.Message);
-            return false;
+            AppLog.Write("proctree: FirstPidNamed failed: " + ex.Message);
         }
+        return 0;
     }
 
-    /// <summary>Names of all running processes, cached for <see cref="NamesTtlMs"/>.</summary>
-    private static HashSet<string> SnapshotNames()
+    /// <summary>Is this pid a live process? Snapshot lookup, no handle open.</summary>
+    public static bool IsAlive(int pid)
     {
-        lock (NamesGate)
+        try { return pid > 0 && Snapshot().ContainsKey(pid); }
+        catch (Exception ex)
         {
-            long now = Environment.TickCount64;
-            if (_names is not null && now - _namesAtMs <= NamesTtlMs)
-                return _names;
-
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var p in Process.GetProcesses())
-            {
-                try { set.Add(p.ProcessName); }
-                catch { /* exited mid-snapshot — skip */ }
-                finally { p.Dispose(); }
-            }
-            _names = set;
-            _namesAtMs = now;
-            return set;
+            AppLog.Write("proctree: IsAlive failed: " + ex.Message);
+            return true; // unknowable — don't drop a session on a transient failure
         }
     }
 
     /// <summary>"Cursor.exe" -> "Cursor" (Process.ProcessName carries no extension).</summary>
-    private static string TrimExe(string name)
+    public static string TrimExe(string name)
     {
         name = name.Trim();
         return name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
@@ -144,29 +136,8 @@ public static class ProcessTree
     /// </summary>
     public static string? HostOfRunningProcess(params string[] processNames)
     {
-        try
-        {
-            if (processNames is not { Length: > 0 }) return null;
-            var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var n in processNames)
-                if (!string.IsNullOrWhiteSpace(n)) wanted.Add(TrimExe(n));
-
-            foreach (var p in Process.GetProcesses())
-            {
-                int pid; string name;
-                try { name = p.ProcessName; pid = p.Id; }
-                catch { p.Dispose(); continue; }
-                p.Dispose();
-
-                if (wanted.Contains(name) && HostAppOf(pid) is { } host)
-                    return host;
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLog.Write("proctree: HostOfRunningProcess failed: " + ex.Message);
-        }
-        return null;
+        int pid = FirstPidNamed(processNames);
+        return pid > 0 ? HostAppOf(pid) : null;
     }
 
     /// <summary>
@@ -176,29 +147,8 @@ public static class ProcessTree
     /// </summary>
     public static string? HostLabelOfRunningProcess(params string[] processNames)
     {
-        try
-        {
-            if (processNames is not { Length: > 0 }) return null;
-            var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var n in processNames)
-                if (!string.IsNullOrWhiteSpace(n)) wanted.Add(TrimExe(n));
-
-            foreach (var p in Process.GetProcesses())
-            {
-                int pid; string name;
-                try { name = p.ProcessName; pid = p.Id; }
-                catch { p.Dispose(); continue; }
-                p.Dispose();
-
-                if (wanted.Contains(name) && HostLabelOf(pid) is { } label)
-                    return label;
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLog.Write("proctree: HostLabelOfRunningProcess failed: " + ex.Message);
-        }
-        return null;
+        int pid = FirstPidNamed(processNames);
+        return pid > 0 ? HostLabelOf(pid) : null;
     }
 
     private static readonly HashSet<string> TerminalNames = new(StringComparer.OrdinalIgnoreCase)
@@ -219,7 +169,7 @@ public static class ProcessTree
     {
         try
         {
-            var map = SnapshotProcesses();
+            var map = Snapshot();
             if (!map.TryGetValue(pid, out var self)) return null;
             if (!map.TryGetValue(self.ParentPid, out var parent)) return null; // dead/orphan parent
             return TrimExe(parent.ExeFile);
@@ -251,7 +201,7 @@ public static class ProcessTree
 
     private static string? ResolveHost(int pid)
     {
-        var processes = SnapshotProcesses();
+        var processes = Snapshot();
         if (processes.Count == 0) return null;
 
         var seen = new HashSet<int>();
@@ -333,7 +283,7 @@ public static class ProcessTree
             }
 
             string? label = null;
-            var processes = SnapshotProcesses();
+            var processes = Snapshot();
             if (processes.Count > 0)
             {
                 var seen = new HashSet<int>();
@@ -392,9 +342,48 @@ public static class ProcessTree
     // here per module rules (NativeMethods only gains members other modules
     // also need).
 
-    private readonly record struct ProcEntry(int ParentPid, string ExeFile);
+    public readonly record struct ProcEntry(int ParentPid, string ExeFile);
+
+    private sealed record ProcSnapshot(
+        Dictionary<int, ProcEntry> ByPid,
+        Dictionary<string, int> FirstPidByName);
+
+    private static readonly ProcSnapshot EmptySnapshot = new(new(), new(StringComparer.OrdinalIgnoreCase));
+
+    // One Toolhelp pass answers every question this class asks, so the whole
+    // module shares a single short-lived snapshot: a poll tick resolves host,
+    // label, rank and liveness for every session off ONE syscall instead of one
+    // per lookup. The TTL is well under the 1s emit floor, so a session that
+    // starts or dies is still picked up by the next rebuild.
+    private const long SnapshotTtlMs = 750;
+    private static readonly object SnapshotGate = new();
+    private static ProcSnapshot? _snapshot;
+    private static long _snapshotAtMs;
 
     /// <summary>pid -> (parent pid, exe file name) for every running process.</summary>
+    public static IReadOnlyDictionary<int, ProcEntry> Snapshot() => Current().ByPid;
+
+    private static ProcSnapshot Current()
+    {
+        lock (SnapshotGate)
+        {
+            long now = Environment.TickCount64;
+            if (_snapshot is not null && now - _snapshotAtMs <= SnapshotTtlMs)
+                return _snapshot;
+
+            var byPid = SnapshotProcesses();
+            if (byPid.Count == 0) return _snapshot ?? EmptySnapshot; // snapshot failed — keep the last good one
+
+            var byName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (pid, entry) in byPid)
+                byName.TryAdd(TrimExe(entry.ExeFile), pid);
+
+            _snapshot = new ProcSnapshot(byPid, byName);
+            _snapshotAtMs = now;
+            return _snapshot;
+        }
+    }
+
     private static Dictionary<int, ProcEntry> SnapshotProcesses()
     {
         var map = new Dictionary<int, ProcEntry>();

@@ -27,6 +27,14 @@ public partial class OverlayWindow
     private const double CollapsedPanelWidth = 248;
     private const double ExpandedPanelWidth = 576; // 560 content + 8+8 panel padding
 
+    // AllowsTransparency makes this a layered window: WPF hands the ENTIRE window
+    // surface to UpdateLayeredWindow on every frame, so idle cost scales with the
+    // window's area, not with what actually changed. At 640x800 the collapsed
+    // pill's spinner was repainting 2 MB per frame. The HWND still never resizes
+    // *during* an animation — it is sized once at each end.
+    private const double ExpandedWindowHeight = 800;
+    private const double CollapsedWindowHeight = 120; // pill (38) + room for the drop shadow
+
     private MainViewModel? _vm;
     private bool _open;
 
@@ -119,6 +127,8 @@ public partial class OverlayWindow
     // single smooth shape rather than three loosely-synced parts.
     private void AnimateOpen()
     {
+        Height = ExpandedWindowHeight;              // grow the surface first, then animate inside it
+        RevealHost.Visibility = Visibility.Visible; // before measuring — a collapsed element measures 0
         Animate(RevealHost, HeightProperty, ContentHeight(), 240, Ease.Morph);
         Animate(NotchPanel, WidthProperty, ExpandedPanelWidth, 240, Ease.Morph);
         Animate(ExpandedContent, OpacityProperty, 1, 190, Ease.Out, beginMs: 40);
@@ -127,7 +137,20 @@ public partial class OverlayWindow
 
     private void AnimateClose()
     {
-        Animate(RevealHost, HeightProperty, 0, 200, Ease.Morph);
+        // Height 0 + ClipToBounds only HIDES the panel — WPF still lays it out and
+        // re-rasterizes it every frame, and this is a layered window (software
+        // compositing), so the row spinners kept burning CPU while collapsed.
+        // Collapsing once the curtain is shut takes the whole subtree out of the
+        // render pass; the notch spends nearly all its life in this state.
+        var height = new DoubleAnimation(0, TimeSpan.FromMilliseconds(200)) { EasingFunction = Ease.Morph };
+        height.Completed += (_, _) =>
+        {
+            if (_open) return; // re-opened mid-close — leave the surface alone
+            RevealHost.Visibility = Visibility.Collapsed;
+            Height = CollapsedWindowHeight;
+        };
+        RevealHost.BeginAnimation(HeightProperty, height, HandoffBehavior.SnapshotAndReplace);
+
         Animate(NotchPanel, WidthProperty, CollapsedPanelWidth, 200, Ease.Morph);
         // Fade the content out a touch faster than the shape closes, so it's gone
         // before the panel finishes shrinking (also masks the prompt card unloading).

@@ -39,42 +39,55 @@ public static class TerminalJump
     /// <summary>Focus the window hosting <paramref name="session"/>. True if a window was activated.</summary>
     public static bool FocusSession(AgentSession session)
     {
+        var clock = Stopwatch.StartNew();
         try
         {
-            if (session is null)
-            {
-                AppLog.Write("jump: null session");
-                return false;
-            }
-
-            switch (session.Agent)
-            {
-                case "codex":
-                    return FocusCodex(session);
-                case "antigravity":
-                    return FocusAntigravity(session);
-            }
-
-            // claude (and unknown agents): a session known to live inside a
-            // host app IS that app's window — try it first; on failure fall
-            // back to the entrypoint-based strategy unchanged.
-            if (session.Host is { Length: > 0 } host && FocusHostApp(host, session))
-                return true;
-
-            switch (session.Entrypoint)
-            {
-                case "claude-desktop":
-                    return FocusClaudeDesktop();
-                case "claude-vscode":
-                    return FocusVsCode(session);
-                default: // "cli" and anything unknown that still carries a pid
-                    return FocusCli(session);
-            }
+            return Resolve(session);
         }
         catch (Exception ex)
         {
             AppLog.Write("jump: focus failed: " + ex);
             return false;
+        }
+        finally
+        {
+            // This runs on the UI thread, so anything slow here freezes the notch
+            // and reads as "the click didn't work". Keep it visible in the log.
+            if (clock.ElapsedMilliseconds > 100)
+                AppLog.Write($"jump: slow activation ({clock.ElapsedMilliseconds} ms)");
+        }
+    }
+
+    private static bool Resolve(AgentSession session)
+    {
+        if (session is null)
+        {
+            AppLog.Write("jump: null session");
+            return false;
+        }
+
+        switch (session.Agent)
+        {
+            case "codex":
+                return FocusCodex(session);
+            case "antigravity":
+                return FocusAntigravity(session);
+        }
+
+        // claude (and unknown agents): a session known to live inside a
+        // host app IS that app's window — try it first; on failure fall
+        // back to the entrypoint-based strategy unchanged.
+        if (session.Host is { Length: > 0 } host && FocusHostApp(host, session))
+            return true;
+
+        switch (session.Entrypoint)
+        {
+            case "claude-desktop":
+                return FocusClaudeDesktop();
+            case "claude-vscode":
+                return FocusVsCode(session);
+            default: // "cli" and anything unknown that still carries a pid
+                return FocusCli(session);
         }
     }
 
@@ -166,7 +179,8 @@ public static class TerminalJump
     /// </summary>
     private static IntPtr ResolveWindowedAncestor(int pid)
     {
-        var parents = SnapshotParents();
+        var procs = ProcessTree.Snapshot();
+        var windows = VisibleWindowsByPid(); // one EnumWindows pass for the whole climb
         var seen = new HashSet<int>();
         int cur = pid;
         for (int depth = 0; depth < 24; depth++)
@@ -174,31 +188,40 @@ public static class TerminalJump
             if (cur <= 0 || !seen.Add(cur))
                 break;
 
-            IntPtr hwnd = VisibleMainWindow(cur);
-            if (hwnd != IntPtr.Zero)
+            if (!procs.TryGetValue(cur, out var entry))
+                break;
+
+            if (!ProcessTree.TrimExe(entry.ExeFile).Equals("explorer", StringComparison.OrdinalIgnoreCase)
+                && windows.TryGetValue(cur, out IntPtr hwnd))
                 return hwnd;
 
-            if (!parents.TryGetValue(cur, out int parent))
-                break;
-            cur = parent;
+            cur = entry.ParentPid;
         }
         return IntPtr.Zero;
     }
 
-    private static IntPtr VisibleMainWindow(int pid)
+    /// <summary>
+    /// pid -> its first visible, titled top-level window. Process.MainWindowHandle
+    /// would give the same answer but runs its own EnumWindows AND a full system
+    /// process query per pid; the chain is up to 24 pids deep, so one shared pass
+    /// replaces up to 24 of those.
+    /// </summary>
+    private static Dictionary<int, IntPtr> VisibleWindowsByPid()
     {
-        try
+        var map = new Dictionary<int, IntPtr>();
+        NativeMethods.EnumWindows((hwnd, _) =>
         {
-            using var p = Process.GetProcessById(pid);
-            if (string.Equals(p.ProcessName, "explorer", StringComparison.OrdinalIgnoreCase))
-                return IntPtr.Zero;
-            IntPtr h = p.MainWindowHandle;
-            return h != IntPtr.Zero && NativeMethods.IsWindowVisible(h) ? h : IntPtr.Zero;
-        }
-        catch
-        {
-            return IntPtr.Zero; // exited / access denied — keep climbing
-        }
+            try
+            {
+                if (!NativeMethods.IsWindowVisible(hwnd)) return true;
+                if (NativeMethods.GetWindowTextLength(hwnd) <= 0) return true; // helper/message window
+                NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+                if (pid != 0) map.TryAdd((int)pid, hwnd);
+            }
+            catch { /* one bad window must not abort the scan */ }
+            return true;
+        }, IntPtr.Zero);
+        return map;
     }
 
     // ---------------------------------------------------- desktop / vscode ----
@@ -361,7 +384,11 @@ public static class TerminalJump
     private static IntPtr FindProcessWindow(Func<string, bool> processMatches, Func<string, bool>? titleMatches)
     {
         IntPtr found = IntPtr.Zero;
-        var nameCache = new Dictionary<uint, string>();
+        // One shared process snapshot for the whole scan. Resolving each window's
+        // owner via Process.GetProcessById().ProcessName instead would re-query
+        // every process on the machine ONCE PER WINDOW — that is what made a row
+        // click take the better part of a second.
+        var procs = ProcessTree.Snapshot();
 
         // EnumWindows is synchronous, so the callback delegate stays alive for
         // the duration of the call — no explicit pinning needed.
@@ -376,8 +403,9 @@ public static class TerminalJump
                 if (pid == 0)
                     return true;
 
-                if (!nameCache.TryGetValue(pid, out string? name))
-                    nameCache[pid] = name = ProcessNameOf((int)pid);
+                if (!procs.TryGetValue((int)pid, out var entry))
+                    return true;
+                string name = ProcessTree.TrimExe(entry.ExeFile);
                 if (name.Length == 0 || !processMatches(name))
                     return true;
 
@@ -394,19 +422,6 @@ public static class TerminalJump
         }, IntPtr.Zero);
 
         return found;
-    }
-
-    private static string ProcessNameOf(int pid)
-    {
-        try
-        {
-            using var p = Process.GetProcessById(pid);
-            return p.ProcessName;
-        }
-        catch
-        {
-            return "";
-        }
     }
 
     private static string WindowTitle(IntPtr hwnd)
@@ -458,8 +473,18 @@ public static class TerminalJump
                 // (and vice versa is rare) — trust the actual foreground state.
                 if (!ok)
                     ok = NativeMethods.GetForegroundWindow() == hwnd;
+
+                // Still refused: the foreground lock won. SwitchToThisWindow is
+                // the Alt-Tab path and is not bound by it — without this the
+                // click looks ignored and the user clicks a second time.
                 if (!ok)
-                    AppLog.Write("jump: SetForegroundWindow did not take");
+                {
+                    NativeMethods.SwitchToThisWindow(hwnd, true);
+                    ok = NativeMethods.GetForegroundWindow() == hwnd;
+                }
+
+                if (!ok)
+                    AppLog.Write("jump: window refused activation");
                 return ok;
             }
             finally
@@ -475,71 +500,6 @@ public static class TerminalJump
         }
     }
 
-    // ------------------------------------------- private interop (Toolhelp) ----
-    // Parent-chain snapshot via Toolhelp32 — works at standard user privilege
-    // and without WMI. Kept private here per module rules (NativeMethods only
-    // gains members that other modules also need).
-
-    private const uint TH32CS_SNAPPROCESS = 0x00000002;
-    private static readonly IntPtr InvalidHandleValue = new(-1);
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct PROCESSENTRY32W
-    {
-        public uint dwSize;
-        public uint cntUsage;
-        public uint th32ProcessID;
-        public IntPtr th32DefaultHeapID;
-        public uint th32ModuleID;
-        public uint cntThreads;
-        public uint th32ParentProcessID;
-        public int pcPriClassBase;
-        public uint dwFlags;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string szExeFile;
-    }
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "Process32FirstW")]
-    private static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32W lppe);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "Process32NextW")]
-    private static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32W lppe);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CloseHandle(IntPtr hObject);
-
     [DllImport("kernel32.dll")]
     private static extern uint GetCurrentThreadId();
-
-    /// <summary>pid → parent pid for every running process.</summary>
-    private static Dictionary<int, int> SnapshotParents()
-    {
-        var map = new Dictionary<int, int>();
-        IntPtr snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if (snap == IntPtr.Zero || snap == InvalidHandleValue)
-        {
-            AppLog.Write("jump: CreateToolhelp32Snapshot failed");
-            return map;
-        }
-        try
-        {
-            var entry = new PROCESSENTRY32W { dwSize = (uint)Marshal.SizeOf<PROCESSENTRY32W>() };
-            if (Process32First(snap, ref entry))
-            {
-                do
-                {
-                    map[(int)entry.th32ProcessID] = (int)entry.th32ParentProcessID;
-                }
-                while (Process32Next(snap, ref entry));
-            }
-        }
-        finally
-        {
-            CloseHandle(snap);
-        }
-        return map;
-    }
 }

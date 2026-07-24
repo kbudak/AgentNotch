@@ -34,7 +34,10 @@
     <UserControl.Triggers>
         <EventTrigger RoutedEvent="UserControl.Loaded">
             <BeginStoryboard>
-                <Storyboard>
+                <!-- 30fps, not the default 60: the window is layered (AllowsTransparency),
+                     so every frame is rasterized on the CPU. A 0.9s fade looks identical
+                     at half the frames and costs half the compositing. -->
+                <Storyboard Timeline.DesiredFrameRate="30">
                     <DoubleAnimation Storyboard.TargetName="d0"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.000"  RepeatBehavior="Forever"/>
                     <DoubleAnimation Storyboard.TargetName="d1"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.075"  RepeatBehavior="Forever"/>
                     <DoubleAnimation Storyboard.TargetName="d2"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.150"  RepeatBehavior="Forever"/>

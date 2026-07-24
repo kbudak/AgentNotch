@@ -306,17 +306,5 @@ public sealed class SessionWatcher : IDisposable
     /// Closing a session tab removes its registry file, but a hard crash can leave a
     /// stale one — verify the process actually exists before trusting the entry.
     /// </summary>
-    private static bool IsProcessAlive(int pid)
-    {
-        try
-        {
-            using var process = Process.GetProcessById(pid);
-            try { return !process.HasExited; }
-            catch { return true; } // exists but not queryable — alive
-        }
-        catch
-        {
-            return false; // no such process
-        }
-    }
+    private static bool IsProcessAlive(int pid) => Interop.ProcessTree.IsAlive(pid);
 }

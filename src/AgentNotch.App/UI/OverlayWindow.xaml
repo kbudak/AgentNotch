@@ -11,7 +11,7 @@
         ShowInTaskbar="False"
         ShowActivated="False"
         Focusable="False"
-        Width="640" Height="800"
+        Width="640" Height="120"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display"
@@ -261,7 +261,7 @@
                      (0 ⇄ content height) while ClipToBounds hides the rest — the content
                      itself never scales or squashes; it slides down a touch and fades.
                      Content height changes while open (prompt card swaps) are morphed. -->
-                <Grid x:Name="RevealHost" ClipToBounds="True" Height="0">
+                <Grid x:Name="RevealHost" ClipToBounds="True" Height="0" Visibility="Collapsed">
                     <StackPanel x:Name="ExpandedContent" Width="560"
                                 VerticalAlignment="Top" HorizontalAlignment="Center"
                                 Opacity="0">
