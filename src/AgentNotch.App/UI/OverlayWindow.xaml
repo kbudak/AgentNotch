@@ -68,11 +68,8 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
-                                        <!-- Label takes the same ramp colour as the number, so the
-                                             whole chip reads as one signal at a glance. -->
                                         <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{Binding UsedPct, Converter={StaticResource UsageSeverityBrush}}"
-                                                   VerticalAlignment="Center"/>
+                                                   Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                         <TextBlock Text="{Binding PercentText}" FontSize="11" Margin="5,0,0,0"
                                                    FontFamily="{StaticResource MonoFontFamily}"
                                                    Foreground="{Binding UsedPct, Converter={StaticResource UsageSeverityBrush}}"
