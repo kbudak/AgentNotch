@@ -40,13 +40,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ObservableCollection<UsageWindow> Usage { get; } = new();
 
     /// <summary>
-    /// Short-lived confirmation after you resolve a prompt ("✓ Allowed",
-    /// "✓ Production", "✕ Denied") — the notch reports what it sent back so you
-    /// never have to switch to the terminal to check. Null when nothing to show.
+    /// Short-lived confirmation after you resolve a prompt ("Allowed", "Denied",
+    /// "Answered") — the notch reports what it sent back so you never have to switch
+    /// to the terminal to check. Null when nothing to show.
     /// </summary>
     public string? ToastText { get; private set; }
 
-    /// <summary>"ok" | "deny" — colours the confirmation.</summary>
+    /// <summary>What the confirmation applied to ("Write(hello.txt)"); may be empty.</summary>
+    public string ToastDetail { get; private set; } = "";
+
+    /// <summary>"ok" | "deny" | "pass" — picks the badge glyph and colour.</summary>
     public string ToastKind { get; private set; } = "ok";
 
     public bool HasToast => ToastText is { Length: > 0 };
@@ -219,11 +222,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>Flashes a confirmation in the notch for a couple of seconds.</summary>
-    private void ShowToast(string text, string kind)
+    private void ShowToast(string text, string detail, string kind)
     {
         ToastText = text;
+        ToastDetail = detail;
         ToastKind = kind;
         Raise(nameof(ToastText));
+        Raise(nameof(ToastDetail));
         Raise(nameof(ToastKind));
         Raise(nameof(HasToast));
 
@@ -297,7 +302,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var prompt = ActivePrompt;
         if (prompt is null || prompt.Kind != PromptKind.Permission) return;
         Resolve(prompt, new DecisionBody { Behavior = "allow" }, "allow");
-        ShowToast("✓  Allowed — " + ShortTitle(prompt), "ok");
+        ShowToast("Allowed", ShortTitle(prompt), "ok");
     }
 
     public void DenyActive()
@@ -305,7 +310,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var prompt = ActivePrompt;
         if (prompt is null || prompt.Kind != PromptKind.Permission) return;
         Resolve(prompt, new DecisionBody { Behavior = "deny", Message = "Denied from AgentNotch" }, "deny");
-        ShowToast("✕  Denied — " + ShortTitle(prompt), "deny");
+        ShowToast("Denied", ShortTitle(prompt), "deny");
     }
 
     public void PassActive()
@@ -313,7 +318,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var prompt = ActivePrompt;
         if (prompt is null) return;
         Resolve(prompt, new DecisionBody { Behavior = "pass" }, "pass");
-        ShowToast("→  Handed back to the terminal", "ok");
+        ShowToast("Handed back", "over to the terminal", "pass");
     }
 
     /// <summary>Prompt title trimmed to fit the confirmation pill.</summary>
@@ -339,7 +344,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             },
         };
         Resolve(prompt, body, $"answer #{index + 1}");
-        ShowToast("✓  " + option.Label, "ok");
+        ShowToast("Answered", option.Label, "ok");
     }
 
     private void Resolve(PromptViewModel prompt, DecisionBody body, string what)

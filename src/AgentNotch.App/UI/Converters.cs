@@ -629,11 +629,26 @@ public sealed class UsageSeverityBrushConverter : IValueConverter
         => Binding.DoNothing;
 }
 
-/// <summary>Toast kind ("ok" | "deny") → its colour.</summary>
+/// <summary>Toast kind ("ok" | "deny" | "pass") → its colour.</summary>
 public sealed class ToastBrushConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => (value as string) == "deny" ? StatusBrushes.Danger : StatusBrushes.Good;
+        => (value as string) switch
+        {
+            "deny" => StatusBrushes.Danger,
+            "pass" => StatusBrushes.Working,
+            _ => StatusBrushes.Good,
+        };
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>Toast kind → the glyph shown in its badge.</summary>
+public sealed class ToastGlyphConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => (value as string) switch { "deny" => "✕", "pass" => "→", _ => "✓" };
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => Binding.DoNothing;

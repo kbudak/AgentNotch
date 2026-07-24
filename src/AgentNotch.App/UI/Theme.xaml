@@ -75,6 +75,7 @@
     <ui:SessionAgeConverter x:Key="SessionAge"/>
     <ui:UsageSeverityBrushConverter x:Key="UsageSeverityBrush"/>
     <ui:ToastBrushConverter x:Key="ToastBrush"/>
+    <ui:ToastGlyphConverter x:Key="ToastGlyph"/>
     <ui:BoolToCollapsedConverter x:Key="BoolToCollapsed"/>
     <ui:EqualsParamConverter x:Key="EqualsParam"/>
     <ui:StateVisibilityConverter x:Key="StateVisibility"/>
