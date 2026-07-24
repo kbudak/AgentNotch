@@ -97,7 +97,7 @@ public partial class OverlayWindow
     private void OnContentSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         if (_open && IsLoaded)
-            Animate(RevealHost, HeightProperty, ContentHeight(), 300, Ease.Morph);
+            Animate(RevealHost, HeightProperty, ContentHeight(), 200, Ease.Morph);
     }
 
     // -------------------------------------------------------------- settings
@@ -108,9 +108,9 @@ public partial class OverlayWindow
 
     private static class Ease
     {
-        // The island morph: smooth acceleration AND deceleration so open and close
-        // both ease gently in and out instead of snapping.
-        public static readonly IEasingFunction Morph = new QuinticEase { EasingMode = EasingMode.EaseInOut };
+        // The island morph: cubic ease-in-out — smooth in and out but quicker off the
+        // mark than a higher-power curve, so it feels fast without snapping.
+        public static readonly IEasingFunction Morph = new CubicEase { EasingMode = EasingMode.EaseInOut };
         // Gentle decel for the content fade.
         public static readonly IEasingFunction Out = new SineEase { EasingMode = EasingMode.EaseOut };
     }
@@ -119,20 +119,20 @@ public partial class OverlayWindow
     // single smooth shape rather than three loosely-synced parts.
     private void AnimateOpen()
     {
-        Animate(RevealHost, HeightProperty, ContentHeight(), 380, Ease.Morph);
-        Animate(NotchPanel, WidthProperty, ExpandedPanelWidth, 380, Ease.Morph);
-        Animate(ExpandedContent, OpacityProperty, 1, 260, Ease.Out, beginMs: 80);
-        AnimateSlide(0, 380, Ease.Morph);
+        Animate(RevealHost, HeightProperty, ContentHeight(), 240, Ease.Morph);
+        Animate(NotchPanel, WidthProperty, ExpandedPanelWidth, 240, Ease.Morph);
+        Animate(ExpandedContent, OpacityProperty, 1, 190, Ease.Out, beginMs: 40);
+        AnimateSlide(0, 240, Ease.Morph);
     }
 
     private void AnimateClose()
     {
-        Animate(RevealHost, HeightProperty, 0, 320, Ease.Morph);
-        Animate(NotchPanel, WidthProperty, CollapsedPanelWidth, 320, Ease.Morph);
+        Animate(RevealHost, HeightProperty, 0, 200, Ease.Morph);
+        Animate(NotchPanel, WidthProperty, CollapsedPanelWidth, 200, Ease.Morph);
         // Fade the content out a touch faster than the shape closes, so it's gone
         // before the panel finishes shrinking (also masks the prompt card unloading).
-        Animate(ExpandedContent, OpacityProperty, 0, 150, Ease.Out);
-        AnimateSlide(-12, 320, Ease.Morph);
+        Animate(ExpandedContent, OpacityProperty, 0, 110, Ease.Out);
+        AnimateSlide(-12, 200, Ease.Morph);
     }
 
     private double ContentHeight()
