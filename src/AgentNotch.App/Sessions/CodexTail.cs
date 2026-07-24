@@ -236,9 +236,16 @@ public static class CodexTail
             }
         }
 
-        // Guardian/reviewer/sub-agent rollouts are implementation details of the
-        // visible user task; showing them creates duplicate phantom agents.
-        if (!string.IsNullOrEmpty(threadSource) && threadSource != "user") return null;
+        // Which threads are real, user-facing tasks:
+        //  * null/empty  -> a plain CLI session (codex_exec)
+        //  * "user"      -> a top-level task
+        //  * "subagent" / "realtime_voice" -> a task delegated from another task or a
+        //    voice chat (Codex Desktop) — these ARE what the user is watching run.
+        // Any other named source (guardian/reviewer/compaction internals) stays hidden.
+        // Same-cwd duplicates (a task plus its reviewer sub-agents) are collapsed later.
+        if (threadSource is { Length: > 0 } ts &&
+            ts is not ("user" or "subagent" or "realtime_voice"))
+            return null;
         if (stateEvent is not { } state) return null;
 
         SessionStatus status;

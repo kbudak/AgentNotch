@@ -188,6 +188,14 @@ public sealed class SessionWatcher : IDisposable
             if (Interop.ProcessTree.AnyRunning("codex", "chatgpt", "codex-code-mode-host"))
             {
                 var codex = CodexTail.Collect(_codexDir, now);
+                // A task and its reviewer sub-agents share a cwd and each get their own
+                // rollout; collapse them to one row (the most recently active) so a
+                // single running task doesn't sprout phantom duplicates.
+                codex = codex
+                    .GroupBy(s => string.IsNullOrEmpty(s.Cwd) ? s.SessionId : s.Cwd,
+                             StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.OrderByDescending(s => s.LastActivityUtc).First())
+                    .ToList();
                 // A rollout only says "vscode" (some VS Code fork). Pin down the real
                 // editor by walking the running Codex process up to its host window
                 // app — the Codex extension is a child of Cursor.exe / Code.exe.

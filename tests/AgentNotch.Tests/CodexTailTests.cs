@@ -209,6 +209,21 @@ public sealed class CodexTailTests : IDisposable
     }
 
     [Fact]
+    public void DelegatedAndVoiceThreadSourcesAreIncluded()
+    {
+        // A task delegated from another task / a voice chat (Codex Desktop) reports
+        // "subagent" / "realtime_voice" — the user is watching these run, so they must
+        // show, unlike the internal guardian/reviewer threads.
+        var now = DateTime.UtcNow;
+        WriteRollout("sub.jsonl", now.AddSeconds(-10), Meta(threadSource: "subagent"), TaskStarted());
+        WriteRollout("voice.jsonl", now.AddSeconds(-5), Meta(threadSource: "realtime_voice"), TaskStarted());
+
+        var sessions = CodexTail.Collect(_dir, now);
+        Assert.Equal(2, sessions.Count);
+        Assert.All(sessions, s => Assert.Equal(SessionStatus.Working, s.Status));
+    }
+
+    [Fact]
     public void NoLifecycleEventIsSkipped()
     {
         var now = DateTime.UtcNow;
