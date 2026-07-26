@@ -210,13 +210,29 @@
                         </Grid>
                         </StackPanel>
 
-                        <!-- Right-aligned wording. White and semi-bold so it is the thing
-                             you read; the marks beside it carry the colour. -->
-                        <TextBlock Text="{Binding CollapsedText}"
-                                   HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Margin="12,0,0,0" FontSize="12.5" FontWeight="SemiBold"
-                                   MaxWidth="180" TextTrimming="CharacterEllipsis"
-                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <!-- Right-aligned summary. The count carries its state's colour
+                             and the word stays white, so two segments separate on sight
+                             instead of needing a dot between them. -->
+                        <ItemsControl ItemsSource="{Binding CollapsedParts}" Focusable="False"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center"
+                                      Margin="12,0,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="13,0,0,0">
+                                        <TextBlock Text="{Binding Count}" FontSize="13" FontWeight="Bold"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{Binding Kind, Converter={StaticResource StateKindBrush}}"
+                                                   Visibility="{Binding Count, Converter={StaticResource StringToVisibility}}"/>
+                                        <TextBlock Text="{Binding Word}" Margin="5,0,0,0" FontSize="12.5"
+                                                   FontWeight="Medium" VerticalAlignment="Center"
+                                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </Grid>
                 </Grid>
 

@@ -10,6 +10,11 @@ using AgentNotch.Protocol;
 
 namespace AgentNotch.App.ViewModels;
 
+/// <summary>One segment of the collapsed pill: a count, the word it counts, and
+/// the state kind that colours the count ("working" | "needsyou" | "finished" |
+/// "prompt"). Count is empty for segments that are pure wording.</summary>
+public sealed record StatusPart(string Count, string Word, string Kind);
+
 /// <summary>
 /// The single view model behind the notch. All mutation happens on the UI thread
 /// (the composition root marshals pipe/watcher events before calling in); the
@@ -109,13 +114,23 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Raise(nameof(IsExpanded));
     }
 
-    public string CollapsedText
+    /// <summary>
+    /// The collapsed pill's summary, split so each count can be coloured by the
+    /// state it counts. As one flat string ("1 working · 1 done") the segments
+    /// ran together and the separator was the loudest thing in the pill.
+    /// Empty when idle — the pill then shows nothing but the grey mark.
+    /// </summary>
+    private const int MaxCollapsedParts = 2;
+
+    public IReadOnlyList<StatusPart> CollapsedParts
     {
         get
         {
-            if (_queue.Count > 1) return $"{_queue.Count} waiting for you";
+            if (_queue.Count > 1)
+                return new[] { new StatusPart(_queue.Count.ToString(), "waiting for you", "prompt") };
             if (_queue.Count == 1)
-                return _queue[0].Kind == PromptKind.Question ? "Claude asks" : "approval needed";
+                return new[] { new StatusPart("", _queue[0].Kind == PromptKind.Question
+                    ? "Claude asks" : "approval needed", "prompt") };
 
             int needs = 0, working = 0, done = 0;
             foreach (var s in Sessions)
@@ -128,11 +143,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 }
             }
 
-            var parts = new List<string>(3);
-            if (needs > 0) parts.Add(needs == 1 ? "1 needs you" : $"{needs} need you");
-            if (working > 0) parts.Add($"{working} working");
-            if (done > 0) parts.Add($"{done} done");
-            return string.Join(" · ", parts); // "" when idle — no "idle" label
+            // Built most-urgent first, then capped: all three at once overflows the
+            // 248px pill and runs into the marks on its left. Two is what fits, and
+            // the ones that get dropped are the least actionable — the expanded
+            // panel below lists every session anyway.
+            var parts = new List<StatusPart>(3);
+            if (needs > 0) parts.Add(new StatusPart(needs.ToString(), needs == 1 ? "needs you" : "need you", "needsyou"));
+            if (working > 0) parts.Add(new StatusPart(working.ToString(), "working", "working"));
+            if (done > 0) parts.Add(new StatusPart(done.ToString(), "done", "finished"));
+            if (parts.Count > MaxCollapsedParts) parts.RemoveRange(MaxCollapsedParts, parts.Count - MaxCollapsedParts);
+            return parts;
         }
     }
 
@@ -277,7 +297,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             AppLog.Write("UpdateSessions: " + ex.Message);
         }
-        Raise(nameof(CollapsedText));
+        Raise(nameof(CollapsedParts));
         Raise(nameof(StateKind));
         Raise(nameof(LeadAgent));
     }
@@ -417,7 +437,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Raise(nameof(QueueCount));
         Raise(nameof(QueueBadgeText));
         Raise(nameof(IsExpanded));
-        Raise(nameof(CollapsedText));
+        Raise(nameof(CollapsedParts));
         Raise(nameof(StateKind));
         Raise(nameof(LeadAgent));
     }

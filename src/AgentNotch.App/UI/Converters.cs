@@ -517,6 +517,7 @@ public sealed class StateKindBrushConverter : IValueConverter
             "working" => StatusBrushes.Working,
             "needsyou" => StatusBrushes.NeedsYou,
             "prompt" => StatusBrushes.Prompt,
+            "finished" => StatusBrushes.Finished,
             _ => StatusBrushes.Idle,
         };
 
