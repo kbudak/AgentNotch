@@ -5,6 +5,11 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <!-- Slot 0 is the palette and ThemeManager swaps it at runtime; the
+                     entry here is only the boot default, replaced on startup by
+                     whichever theme config.json remembers. Slot 1 (styles) reaches
+                     into it exclusively through DynamicResource. -->
+                <ResourceDictionary Source="UI/Themes/Island.xaml" />
                 <ResourceDictionary Source="UI/Theme.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

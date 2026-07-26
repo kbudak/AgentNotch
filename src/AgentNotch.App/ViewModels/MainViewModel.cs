@@ -36,6 +36,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _collapseTimer.Tick += OnCollapseTick;
         _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(2400) };
         _toastTimer.Tick += OnToastTick;
+        UI.ThemeManager.Apply(_config.Theme); // before any window is built, so it opens in the right skin
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -103,6 +104,44 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Which palette the notch wears: "island" | "console".</summary>
+    public string Theme
+    {
+        get => UI.ThemeManager.Normalize(_config.Theme);
+        set
+        {
+            var next = UI.ThemeManager.Normalize(value);
+            if (string.Equals(next, Theme, StringComparison.Ordinal)) return;
+            _config.Theme = next;
+            _config.Save();
+            UI.ThemeManager.Apply(next);
+            RepaintConverterBindings();
+            Raise(nameof(Theme));
+        }
+    }
+
+    /// <summary>
+    /// Swapping the palette updates every DynamicResource on its own, but the
+    /// status/usage colours come from converters, which returned a Brush once and
+    /// are not re-run by a resource change. Handing the list back through a
+    /// Clear/re-Add rebuilds the row containers, which re-runs them; the computed
+    /// properties just need a notify. Rare enough (a settings click) that the
+    /// container churn does not matter.
+    /// </summary>
+    private void RepaintConverterBindings()
+    {
+        var sessions = Sessions.ToList();
+        Sessions.Clear();
+        foreach (var s in sessions) Sessions.Add(s);
+
+        var usage = Usage.ToList();
+        Usage.Clear();
+        foreach (var u in usage) Usage.Add(u);
+
+        Raise(nameof(CollapsedParts));
+        Raise(nameof(ToastKind));
+    }
+
     /// <summary>Open/close the settings flyout; keeps the notch expanded while open.</summary>
     public void ToggleSettings()
     {
@@ -111,6 +150,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Raise(nameof(LaunchAtLogin)); // re-read the live registry state as it opens
         Raise(nameof(ShowUsage));
         Raise(nameof(Position));
+        Raise(nameof(Theme));
         Raise(nameof(IsExpanded));
     }
 

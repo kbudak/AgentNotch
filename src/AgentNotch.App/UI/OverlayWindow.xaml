@@ -16,9 +16,9 @@
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display"
         TextOptions.TextRenderingMode="ClearType"
-        FontFamily="{StaticResource UiFontFamily}"
+        FontFamily="{DynamicResource UiFontFamily}"
         FontSize="12.5"
-        Foreground="{StaticResource TextPrimaryBrush}">
+        Foreground="{DynamicResource TextPrimaryBrush}">
 
     <!-- Fixed-size fully transparent window: the HWND never resizes, so the
          expand/collapse animation happens purely in composition (no per-frame
@@ -27,8 +27,8 @@
     <Grid Margin="28,0,28,32" HorizontalAlignment="Center" VerticalAlignment="Top">
 
         <!-- Shadow layer: same shape, effect applied here so text above stays crisp. -->
-        <Border Background="{StaticResource PanelBgBrush}"
-                CornerRadius="0,0,18,18">
+        <Border Background="{DynamicResource PanelBgBrush}"
+                CornerRadius="{DynamicResource PanelCornerRadius}">
             <Border.Effect>
                 <DropShadowEffect Color="#FF000000" Opacity="0.4" BlurRadius="24" ShadowDepth="8" Direction="270"/>
             </Border.Effect>
@@ -37,10 +37,10 @@
         <!-- Notch panel — Width is animated from code-behind (248 pill ⇄ 576 open). -->
         <Border x:Name="NotchPanel"
                 Width="248"
-                Background="{StaticResource PanelBgBrush}"
-                BorderBrush="{StaticResource PanelBorderBrush}"
+                Background="{DynamicResource PanelBgBrush}"
+                BorderBrush="{DynamicResource PanelBorderBrush}"
                 BorderThickness="1,0,1,1"
-                CornerRadius="0,0,18,18"
+                CornerRadius="{DynamicResource PanelCornerRadius}"
                 Padding="8,0,8,8">
             <StackPanel>
 
@@ -69,14 +69,14 @@
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
                                         <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                         <TextBlock Text="{Binding PercentText}" FontSize="11" Margin="5,0,0,0"
-                                                   FontFamily="{StaticResource MonoFontFamily}"
+                                                   FontFamily="{DynamicResource MonoFontFamily}"
                                                    Foreground="{Binding UsedPct, Converter={StaticResource UsageSeverityBrush}}"
                                                    VerticalAlignment="Center"/>
                                         <TextBlock Text="{Binding ResetText}" FontSize="11" Margin="5,0,0,0"
-                                                   FontFamily="{StaticResource MonoFontFamily}"
-                                                   Foreground="{StaticResource TextTertiaryBrush}"
+                                                   FontFamily="{DynamicResource MonoFontFamily}"
+                                                   Foreground="{DynamicResource TextTertiaryBrush}"
                                                    VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </DataTemplate>
@@ -85,7 +85,7 @@
                         <Button Grid.Column="1" Style="{StaticResource GhostButtonStyle}" Click="OnSettingsClick"
                                 VerticalAlignment="Center" HorizontalAlignment="Right">
                             <Path Data="{x:Static ui:AgentIcons.Gear}" Width="14" Height="14" Stretch="Uniform"
-                                  Fill="{StaticResource TextSecondaryBrush}"/>
+                                  Fill="{DynamicResource TextSecondaryBrush}"/>
                         </Button>
                     </Grid>
 
@@ -224,7 +224,7 @@
                                     <!-- Two layers: Border.Opacity would wash out the number
                                          with the tint, so the fill sits behind it. -->
                                     <Grid Margin="6,0,0,0" MinWidth="26" Height="21">
-                                        <Border CornerRadius="6" Opacity="0.16"
+                                        <Border CornerRadius="{DynamicResource CountChipCornerRadius}" Opacity="0.16"
                                                 Background="{Binding Kind, Converter={StaticResource StateKindBrush}}"/>
                                         <TextBlock Text="{Binding Count}" FontSize="12.5" FontWeight="Bold"
                                                    Margin="8,0,8,0"
@@ -254,13 +254,13 @@
 
                     <!-- Settings flyout (gear-toggled) -->
                     <Border Margin="4,8,4,0" Padding="14,12"
-                            Background="{StaticResource CardBgBrush}"
-                            BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1"
-                            CornerRadius="10"
+                            Background="{DynamicResource CardBgBrush}"
+                            BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1"
+                            CornerRadius="{DynamicResource CardCornerRadius}"
                             Visibility="{Binding SettingsOpen, Converter={StaticResource BoolToVis}}">
                         <StackPanel>
                             <TextBlock Text="SETTINGS" FontSize="10" FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextTertiaryBrush}" Margin="0,0,0,10"/>
+                                       Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,0,0,10"/>
 
                             <!-- Launch at login -->
                             <Grid Margin="0,0,0,12">
@@ -270,9 +270,9 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock Text="Launch at login" FontSize="13"
-                                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
                                     <TextBlock Text="Start AgentNotch when Windows starts" FontSize="11"
-                                               Foreground="{StaticResource TextTertiaryBrush}"/>
+                                               Foreground="{DynamicResource TextTertiaryBrush}"/>
                                 </StackPanel>
                                 <ToggleButton Grid.Column="1" VerticalAlignment="Center"
                                               Style="{StaticResource ToggleSwitchStyle}"
@@ -287,13 +287,39 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock Text="Show usage limits" FontSize="13"
-                                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
                                     <TextBlock Text="Display the 5h / 7d plan usage row" FontSize="11"
-                                               Foreground="{StaticResource TextTertiaryBrush}"/>
+                                               Foreground="{DynamicResource TextTertiaryBrush}"/>
                                 </StackPanel>
                                 <ToggleButton Grid.Column="1" VerticalAlignment="Center"
                                               Style="{StaticResource ToggleSwitchStyle}"
                                               IsChecked="{Binding ShowUsage, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <!-- Theme -->
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Theme" FontSize="13"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="Rounded island, or the square console" FontSize="11"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                </StackPanel>
+                                <Border Grid.Column="1" VerticalAlignment="Center"
+                                        Background="{DynamicResource OptionBgBrush}"
+                                        CornerRadius="{DynamicResource ButtonCornerRadius}" Padding="2">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton GroupName="notchtheme" Content="Island"
+                                                     Style="{StaticResource SegmentRadioStyle}"
+                                                     IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=island, Mode=TwoWay}"/>
+                                        <RadioButton GroupName="notchtheme" Content="Console"
+                                                     Style="{StaticResource SegmentRadioStyle}"
+                                                     IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=console, Mode=TwoWay}"/>
+                                    </StackPanel>
+                                </Border>
                             </Grid>
 
                             <!-- Position -->
@@ -304,12 +330,12 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock Text="Notch position" FontSize="13"
-                                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
                                     <TextBlock Text="Where it sits along the top edge" FontSize="11"
-                                               Foreground="{StaticResource TextTertiaryBrush}"/>
+                                               Foreground="{DynamicResource TextTertiaryBrush}"/>
                                 </StackPanel>
                                 <Border Grid.Column="1" VerticalAlignment="Center"
-                                        Background="{StaticResource OptionBgBrush}" CornerRadius="8" Padding="2">
+                                        Background="{DynamicResource OptionBgBrush}" CornerRadius="{DynamicResource ButtonCornerRadius}" Padding="2">
                                     <StackPanel Orientation="Horizontal">
                                         <RadioButton GroupName="notchpos" Content="Left"
                                                      Style="{StaticResource SegmentRadioStyle}"
@@ -330,12 +356,12 @@
                     <StackPanel Margin="4,6,4,0"
                                 Visibility="{Binding ActivePrompt, Converter={StaticResource NullToVisibility}}">
                         <Border HorizontalAlignment="Right" Margin="0,0,2,4"
-                                Background="{StaticResource KbdBgBrush}"
-                                BorderBrush="{StaticResource KbdBorderBrush}"
-                                BorderThickness="1" CornerRadius="4" Padding="6,2"
+                                Background="{DynamicResource KbdBgBrush}"
+                                BorderBrush="{DynamicResource KbdBorderBrush}"
+                                BorderThickness="1" CornerRadius="{DynamicResource ChipCornerRadius}" Padding="6,2"
                                 Visibility="{Binding QueueCount, Converter={StaticResource GreaterThanOneToVisibility}}">
                             <TextBlock Text="{Binding QueueBadgeText, FallbackValue=''}"
-                                       FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                       FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </Border>
                         <ContentControl Content="{Binding ActivePrompt}" Focusable="False" IsTabStop="False">
                             <ContentControl.Style>

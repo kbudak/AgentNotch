@@ -4,30 +4,32 @@
              Focusable="False">
 
     <!-- DataContext: PromptViewModel (Kind = Question) -->
-    <Border Background="{StaticResource CardBgBrush}" CornerRadius="10" Padding="14,12">
+    <Border Background="{DynamicResource CardBgBrush}"
+            BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
+            CornerRadius="{DynamicResource CardCornerRadius}" Padding="14,12">
         <StackPanel>
 
             <!-- Header -->
             <TextBlock Text="💬 Claude asks"
                        FontSize="11" FontWeight="SemiBold"
-                       Foreground="{StaticResource AccentTealBrush}"/>
+                       Foreground="{DynamicResource AccentTealBrush}"/>
 
             <!-- Question header + text -->
             <TextBlock Text="{Binding Header, FallbackValue=''}"
                        Margin="0,6,0,0" FontSize="13" FontWeight="SemiBold"
-                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
                        TextWrapping="Wrap"
                        Visibility="{Binding Header, Converter={StaticResource StringToVisibility}}"/>
             <TextBlock Text="{Binding QuestionText, FallbackValue=''}"
                        Margin="0,4,0,0" FontSize="12.5"
-                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
                        TextWrapping="Wrap"
                        Visibility="{Binding QuestionText, Converter={StaticResource StringToVisibility}}"/>
 
             <!-- Subtitle: "project · permission_mode" -->
             <TextBlock Text="{Binding Subtitle, FallbackValue=''}"
                        Margin="0,3,0,0" FontSize="11"
-                       Foreground="{StaticResource TextTertiaryBrush}"
+                       Foreground="{DynamicResource TextTertiaryBrush}"
                        TextTrimming="CharacterEllipsis"
                        Visibility="{Binding Subtitle, Converter={StaticResource StringToVisibility}}"/>
 
@@ -49,11 +51,11 @@
                                 </Border>
                                 <StackPanel Grid.Column="1" Margin="10,0,0,0">
                                     <TextBlock Text="{Binding Label}" FontSize="12.5"
-                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
                                                TextWrapping="Wrap"/>
                                     <TextBlock Text="{Binding Description}" FontSize="11"
                                                Margin="0,2,0,0"
-                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                TextWrapping="Wrap"
                                                Visibility="{Binding Description, Converter={StaticResource StringToVisibility}}"/>
                                 </StackPanel>
@@ -66,7 +68,7 @@
             <!-- Multi-select note (MVP: first pick resolves) -->
             <TextBlock Text="multiple selections allowed — your first pick is sent"
                        FontSize="10" Margin="2,0,0,0"
-                       Foreground="{StaticResource TextTertiaryBrush}"
+                       Foreground="{DynamicResource TextTertiaryBrush}"
                        Visibility="{Binding MultiSelect, Converter={StaticResource BoolToVis}}"/>
 
             <!-- Pass back to terminal -->

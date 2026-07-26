@@ -4,17 +4,19 @@
              Focusable="False">
 
     <!-- DataContext: PromptViewModel (Kind = Permission) -->
-    <Border Background="{StaticResource CardBgBrush}" CornerRadius="10" Padding="14,12">
+    <Border Background="{DynamicResource CardBgBrush}"
+            BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
+            CornerRadius="{DynamicResource CardCornerRadius}" Padding="14,12">
         <StackPanel>
 
             <!-- Header -->
             <TextBlock Text="● Permission Request"
                        FontSize="11" FontWeight="SemiBold"
-                       Foreground="{StaticResource AccentAmberBrush}"/>
+                       Foreground="{DynamicResource AccentAmberBrush}"/>
 
             <!-- Tool line: "⚠ Edit src\auth\middleware.ts" -->
             <TextBlock Margin="0,6,0,0" FontSize="13" FontWeight="SemiBold"
-                       Foreground="{StaticResource AccentAmberBrush}"
+                       Foreground="{DynamicResource AccentAmberBrush}"
                        TextTrimming="CharacterEllipsis">
                 <Run Text="⚠ "/><Run Text="{Binding Title, Mode=OneWay, FallbackValue=''}"/>
             </TextBlock>
@@ -22,12 +24,12 @@
             <!-- Subtitle: "project · permission_mode" -->
             <TextBlock Text="{Binding Subtitle, FallbackValue=''}"
                        Margin="0,2,0,0" FontSize="11"
-                       Foreground="{StaticResource TextTertiaryBrush}"
+                       Foreground="{DynamicResource TextTertiaryBrush}"
                        TextTrimming="CharacterEllipsis"
                        Visibility="{Binding Subtitle, Converter={StaticResource StringToVisibility}}"/>
 
             <!-- Diff (Edit / Write) -->
-            <Border Margin="0,10,0,0" Background="{StaticResource CodeBgBrush}" CornerRadius="6" Padding="4"
+            <Border Margin="0,10,0,0" Background="{DynamicResource CodeBgBrush}" CornerRadius="{DynamicResource CodeCornerRadius}" Padding="4"
                     Visibility="{Binding DiffLines, Converter={StaticResource CollectionToVisibility}}">
                 <ScrollViewer MaxHeight="260" Focusable="False"
                               VerticalScrollBarVisibility="Auto"
@@ -38,29 +40,29 @@
                                 <Border x:Name="lineBg" Background="Transparent" Padding="2,0">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Width="30" Text="{Binding OldNo}"
-                                                   FontFamily="{StaticResource MonoFontFamily}" FontSize="12"
-                                                   Foreground="{StaticResource DiffGutterBrush}"
+                                                   FontFamily="{DynamicResource MonoFontFamily}" FontSize="12"
+                                                   Foreground="{DynamicResource DiffGutterBrush}"
                                                    TextAlignment="Right" Margin="0,0,6,0"/>
                                         <TextBlock Width="30" Text="{Binding NewNo}"
-                                                   FontFamily="{StaticResource MonoFontFamily}" FontSize="12"
-                                                   Foreground="{StaticResource DiffGutterBrush}"
+                                                   FontFamily="{DynamicResource MonoFontFamily}" FontSize="12"
+                                                   Foreground="{DynamicResource DiffGutterBrush}"
                                                    TextAlignment="Right" Margin="0,0,10,0"/>
                                         <TextBlock x:Name="lineText" Text="{Binding Text}"
-                                                   FontFamily="{StaticResource MonoFontFamily}" FontSize="12"
-                                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                   FontFamily="{DynamicResource MonoFontFamily}" FontSize="12"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
                                     </StackPanel>
                                 </Border>
                                 <DataTemplate.Triggers>
                                     <DataTrigger Binding="{Binding Kind}" Value="add">
-                                        <Setter TargetName="lineBg" Property="Background" Value="{StaticResource DiffAddBgBrush}"/>
-                                        <Setter TargetName="lineText" Property="Foreground" Value="{StaticResource AccentGreenBrush}"/>
+                                        <Setter TargetName="lineBg" Property="Background" Value="{DynamicResource DiffAddBgBrush}"/>
+                                        <Setter TargetName="lineText" Property="Foreground" Value="{DynamicResource AccentGreenBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Kind}" Value="del">
-                                        <Setter TargetName="lineBg" Property="Background" Value="{StaticResource DiffDelBgBrush}"/>
-                                        <Setter TargetName="lineText" Property="Foreground" Value="{StaticResource AccentRedBrush}"/>
+                                        <Setter TargetName="lineBg" Property="Background" Value="{DynamicResource DiffDelBgBrush}"/>
+                                        <Setter TargetName="lineText" Property="Foreground" Value="{DynamicResource AccentRedBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Kind}" Value="gap">
-                                        <Setter TargetName="lineText" Property="Foreground" Value="{StaticResource TextTertiaryBrush}"/>
+                                        <Setter TargetName="lineText" Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
                                         <Setter TargetName="lineText" Property="FontStyle" Value="Italic"/>
                                     </DataTrigger>
                                 </DataTemplate.Triggers>
@@ -74,36 +76,36 @@
             <StackPanel Orientation="Horizontal" Margin="2,4,0,0"
                         Visibility="{Binding DiffStats, Converter={StaticResource StringToVisibility}}">
                 <TextBlock Text="{Binding DiffAdded, FallbackValue=''}"
-                           FontFamily="{StaticResource MonoFontFamily}" FontSize="11"
-                           Foreground="{StaticResource AccentGreenBrush}"/>
+                           FontFamily="{DynamicResource MonoFontFamily}" FontSize="11"
+                           Foreground="{DynamicResource AccentGreenBrush}"/>
                 <TextBlock Text="{Binding DiffRemoved, FallbackValue=''}"
                            Margin="6,0,0,0"
-                           FontFamily="{StaticResource MonoFontFamily}" FontSize="11"
-                           Foreground="{StaticResource AccentRedBrush}"/>
+                           FontFamily="{DynamicResource MonoFontFamily}" FontSize="11"
+                           Foreground="{DynamicResource AccentRedBrush}"/>
             </StackPanel>
 
             <!-- Bash command -->
-            <Border Margin="0,10,0,0" Background="{StaticResource CodeBgBrush}" CornerRadius="6" Padding="10,8"
+            <Border Margin="0,10,0,0" Background="{DynamicResource CodeBgBrush}" CornerRadius="{DynamicResource CodeCornerRadius}" Padding="10,8"
                     Visibility="{Binding CommandText, Converter={StaticResource StringToVisibility}}">
                 <ScrollViewer MaxHeight="120" Focusable="False"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <TextBlock Text="{Binding CommandText, FallbackValue=''}"
-                               FontFamily="{StaticResource MonoFontFamily}" FontSize="12"
-                               Foreground="{StaticResource TextPrimaryBrush}"
+                               FontFamily="{DynamicResource MonoFontFamily}" FontSize="12"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
                                TextWrapping="Wrap"/>
                 </ScrollViewer>
             </Border>
 
             <!-- Generic fallback (compact tool input JSON) -->
-            <Border Margin="0,10,0,0" Background="{StaticResource CodeBgBrush}" CornerRadius="6" Padding="10,8"
+            <Border Margin="0,10,0,0" Background="{DynamicResource CodeBgBrush}" CornerRadius="{DynamicResource CodeCornerRadius}" Padding="10,8"
                     Visibility="{Binding GenericJson, Converter={StaticResource StringToVisibility}}">
                 <ScrollViewer MaxHeight="140" Focusable="False"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <TextBlock Text="{Binding GenericJson, FallbackValue=''}"
-                               FontFamily="{StaticResource MonoFontFamily}" FontSize="11"
-                               Foreground="{StaticResource TextSecondaryBrush}"
+                               FontFamily="{DynamicResource MonoFontFamily}" FontSize="11"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                TextWrapping="Wrap"/>
                 </ScrollViewer>
             </Border>

@@ -10,7 +10,7 @@
         <!-- Empty state -->
         <TextBlock Text="No active agents — waiting."
                    FontSize="11" Margin="6,4,6,4"
-                   Foreground="{StaticResource TextTertiaryBrush}">
+                   Foreground="{DynamicResource TextTertiaryBrush}">
             <TextBlock.Style>
                 <Style TargetType="{x:Type TextBlock}">
                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -27,15 +27,21 @@
         <ItemsControl ItemsSource="{Binding Sessions}" Focusable="False">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Border x:Name="Row" Background="Transparent" CornerRadius="8"
-                            Padding="10,7" Margin="0,2,0,0" Cursor="Hand"
+                    <!-- The bottom hairline is what turns the console theme's rows into
+                         one table; the island theme paints it transparent. It eats the
+                         last pixel of padding rather than adding one, so row height is
+                         identical either way. -->
+                    <Border x:Name="Row" Background="Transparent"
+                            CornerRadius="{DynamicResource ButtonCornerRadius}"
+                            BorderBrush="{DynamicResource RowSeparatorBrush}" BorderThickness="0,0,0,1"
+                            Padding="10,7,10,6" Margin="0,2,0,0" Cursor="Hand"
                             MouseLeftButtonDown="OnSessionRowClick">
                         <Border.Style>
                             <Style TargetType="{x:Type Border}">
                                 <Setter Property="Background" Value="Transparent"/>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource CardHoverBrush}"/>
+                                        <Setter Property="Background" Value="{DynamicResource CardHoverBrush}"/>
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>
@@ -97,11 +103,11 @@
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Converter={StaticResource SessionTitle}}"
                                            FontSize="13"
-                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
                                            TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Text="{Binding Converter={StaticResource SessionSubtitle}}"
                                            FontSize="12" Margin="0,2,0,0"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                            TextTrimming="CharacterEllipsis">
                                     <TextBlock.Style>
                                         <Style TargetType="{x:Type TextBlock}">
@@ -115,7 +121,7 @@
                                 </TextBlock>
                                 <!-- Finished sessions advertise that the row is clickable. -->
                                 <TextBlock Text="Done — click to jump" FontSize="10" Margin="0,2,0,0"
-                                           Foreground="{StaticResource StatusFinishedBrush}">
+                                           Foreground="{DynamicResource StatusFinishedBrush}">
                                     <TextBlock.Style>
                                         <Style TargetType="{x:Type TextBlock}">
                                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -135,8 +141,8 @@
                                         VerticalAlignment="Center" Margin="8,0,0,0">
                                 <TextBlock Text="{Binding Converter={StaticResource SessionTokens}}"
                                            FontSize="10" Margin="0,0,2,0"
-                                           FontFamily="{StaticResource MonoFontFamily}"
-                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           FontFamily="{DynamicResource MonoFontFamily}"
+                                           Foreground="{DynamicResource TextTertiaryBrush}"
                                            VerticalAlignment="Center"/>
                                 <Border>
                                     <Border.Style>
@@ -166,20 +172,20 @@
                                 </Border>
                                 <TextBlock Text="{Binding Converter={StaticResource SessionAge}}"
                                            FontSize="10" Margin="6,0,0,0"
-                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           Foreground="{DynamicResource TextTertiaryBrush}"
                                            VerticalAlignment="Center"/>
                             </StackPanel>
 
                             <!-- Jump glyph (revealed on hover) -->
                             <TextBlock Grid.Column="3" x:Name="JumpGlyph" Text="↗"
                                        FontSize="12" Margin="8,0,2,0" Opacity="0"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                        VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
                     <DataTemplate.Triggers>
                         <Trigger SourceName="Row" Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Row" Property="Background" Value="{StaticResource CardHoverBrush}"/>
+                            <Setter TargetName="Row" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
                             <Setter TargetName="JumpGlyph" Property="Opacity" Value="1"/>
                         </Trigger>
                     </DataTemplate.Triggers>

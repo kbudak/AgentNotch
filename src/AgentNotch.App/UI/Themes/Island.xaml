@@ -1,0 +1,85 @@
+<!--
+    Island — the original VibeIsland dark look: a soft-black rounded capsule that
+    hangs off the top edge, Segoe UI for prose and Cascadia for numbers.
+
+    This file is ONLY the palette + the shape/type tokens. Every style lives in
+    UI/Theme.xaml and reaches these keys through DynamicResource, so swapping
+    which of Themes/*.xaml sits in MergedDictionaries[0] repaints the whole notch
+    live (see UI/ThemeManager.cs). Both theme files must define the SAME key set —
+    ThemeParityTests pins that.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ===================== Fonts ===================== -->
+    <FontFamily x:Key="UiFontFamily">Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="MonoFontFamily">Cascadia Mono, Consolas, Courier New</FontFamily>
+
+    <!-- ===================== Shape ===================== -->
+    <CornerRadius x:Key="PanelCornerRadius">0,0,18,18</CornerRadius>
+    <CornerRadius x:Key="CardCornerRadius">10</CornerRadius>
+    <CornerRadius x:Key="ButtonCornerRadius">8</CornerRadius>
+    <CornerRadius x:Key="ChipCornerRadius">4</CornerRadius>
+    <CornerRadius x:Key="CodeCornerRadius">6</CornerRadius>
+    <CornerRadius x:Key="CountChipCornerRadius">6</CornerRadius>
+    <CornerRadius x:Key="PillCornerRadius">11</CornerRadius>
+
+    <!-- ===================== Palette ===================== -->
+    <SolidColorBrush x:Key="PanelBgBrush" Color="#F70B0B0E"/>
+    <SolidColorBrush x:Key="PanelBorderBrush" Color="#14FFFFFF"/>
+    <SolidColorBrush x:Key="CardBgBrush" Color="#FF131316"/>
+    <!-- Island cards read by their fill alone; the console theme adds a hairline. -->
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#00000000"/>
+    <SolidColorBrush x:Key="CardHoverBrush" Color="#FF1D1D22"/>
+    <SolidColorBrush x:Key="CodeBgBrush" Color="#FF0F0F12"/>
+    <SolidColorBrush x:Key="RowSeparatorBrush" Color="#00000000"/>
+
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFF4F4F5"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF9CA3AF"/>
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#FF6B7280"/>
+
+    <SolidColorBrush x:Key="AccentAmberBrush" Color="#FFF59E0B"/>
+    <!-- Middle stops of the usage ramp: plenty ▸ getting low ▸ nearly out ▸ out. -->
+    <SolidColorBrush x:Key="AccentYellowBrush" Color="#FFFACC15"/>
+    <SolidColorBrush x:Key="AccentOrangeBrush" Color="#FFFB923C"/>
+    <SolidColorBrush x:Key="AccentTealBrush" Color="#FF2DD4BF"/>
+    <SolidColorBrush x:Key="AccentGreenBrush" Color="#FF4ADE80"/>
+    <SolidColorBrush x:Key="AccentRedBrush" Color="#FFF87171"/>
+
+    <!-- ===================== Status palette =====================
+         The notch reads as "shape = which agent, colour = what state".
+         One distinct colour per state, warm = wants you, cool = doesn't. -->
+    <SolidColorBrush x:Key="StatusWorkingBrush"  Color="#FF3B82F6"/> <!-- blue   · running now      -->
+    <SolidColorBrush x:Key="StatusNeedsYouBrush" Color="#FFFB923C"/> <!-- orange · a question waits  -->
+    <SolidColorBrush x:Key="StatusFinishedBrush" Color="#FF4ADE80"/> <!-- green  · finished, done    -->
+    <SolidColorBrush x:Key="StatusPromptBrush"   Color="#FFFB923C"/> <!-- orange · approval blocking-->
+    <SolidColorBrush x:Key="StatusIdleBrush"     Color="#FF6B7280"/> <!-- grey   · nothing running  -->
+
+    <SolidColorBrush x:Key="DiffAddBgBrush" Color="#1F4ADE80"/>
+    <SolidColorBrush x:Key="DiffDelBgBrush" Color="#1FF87171"/>
+    <SolidColorBrush x:Key="DiffGutterBrush" Color="#FF6B7280"/>
+
+    <SolidColorBrush x:Key="BtnDenyBgBrush" Color="#FF26262B"/>
+    <SolidColorBrush x:Key="BtnDenyBorderBrush" Color="#00000000"/>
+    <SolidColorBrush x:Key="BtnDenyHoverBrush" Color="#FF2E2E34"/>
+    <SolidColorBrush x:Key="BtnDenyPressedBrush" Color="#FF35353C"/>
+    <SolidColorBrush x:Key="BtnAllowBgBrush" Color="#FFFAFAFA"/>
+    <SolidColorBrush x:Key="BtnAllowHoverBrush" Color="#FFECECEC"/>
+    <SolidColorBrush x:Key="BtnAllowPressedBrush" Color="#FFDBDBDB"/>
+    <SolidColorBrush x:Key="BtnAllowFgBrush" Color="#FF0A0A0A"/>
+
+    <SolidColorBrush x:Key="KbdBgBrush" Color="#12FFFFFF"/>
+    <SolidColorBrush x:Key="KbdBorderBrush" Color="#1FFFFFFF"/>
+    <SolidColorBrush x:Key="KbdOnLightBgBrush" Color="#14000000"/>
+    <SolidColorBrush x:Key="KbdOnLightBorderBrush" Color="#26000000"/>
+    <SolidColorBrush x:Key="KbdOnLightFgBrush" Color="#FF3F3F46"/>
+
+    <SolidColorBrush x:Key="OptionBgBrush" Color="#FF18181B"/>
+    <SolidColorBrush x:Key="OptionHoverBrush" Color="#FF27272A"/>
+    <SolidColorBrush x:Key="OptionPressedBrush" Color="#FF2F2F33"/>
+    <SolidColorBrush x:Key="SegmentCheckedBgBrush" Color="#FF2F2F33"/>
+    <SolidColorBrush x:Key="SegmentCheckedFgBrush" Color="#FFF4F4F5"/>
+
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#33FFFFFF"/>
+
+</ResourceDictionary>

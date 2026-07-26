@@ -18,6 +18,9 @@ public sealed class AppConfig
     /// <summary>Where the notch sits along the top edge: "left" | "center" | "right".</summary>
     public string Position { get; set; } = "center";
 
+    /// <summary>Which palette to paint with: "island" | "console" (see <see cref="UI.ThemeManager"/>).</summary>
+    public string Theme { get; set; } = UI.ThemeManager.Island;
+
     private static string FilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "AgentNotch", "config.json");

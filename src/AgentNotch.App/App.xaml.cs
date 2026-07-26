@@ -60,6 +60,10 @@ public partial class App : Application
         if (e.Args.Contains("--demo"))
         {
             _vm = new MainViewModel();
+            // --theme <id> overrides the saved palette for this run only, so both
+            // skins can be shot side by side without touching the user's config.
+            for (int i = 0; i < e.Args.Length - 1; i++)
+                if (e.Args[i] == "--theme") ThemeManager.Apply(e.Args[i + 1]);
             _overlay = new OverlayWindow { DataContext = _vm };
             _overlay.Show();
             RunDemo(e.Args);
