@@ -223,12 +223,35 @@ internal static class StatusBrushes
     public static Brush Caution => Lookup("AccentYellowBrush", 0xFA, 0xCC, 0x15);
     public static Brush Alert => Lookup("AccentOrangeBrush", 0xFB, 0x92, 0x3C);
 
+    /// <summary>Reserved: the only colour that ever means "blocked on you".</summary>
+    public static Brush You => Lookup("AccentYouBrush", 0xFF, 0xB0, 0x20);
+
+    public static Brush Muted => Lookup("TextSecondaryBrush", 0x8E, 0x8E, 0x8E);
+    public static Brush Dim => Lookup("TextTertiaryBrush", 0x5E, 0x5E, 0x5E);
+    public static Brush Body => Lookup("TextPrimaryBrush", 0xE4, 0xE4, 0xE4);
+
+    /// <summary>
+    /// An agent's IDENTITY colour — which agent, never what state. Used as the ink
+    /// of its mark and of its own name; it never fills a background.
+    /// </summary>
+    public static Brush AgentInk(string? agent) => agent?.Trim().ToLowerInvariant() switch
+    {
+        "claude" => Lookup("AgentClaudeBrush", 0xE8, 0x81, 0x4A),
+        "codex" => Lookup("AgentCodexBrush", 0xFF, 0xFF, 0xFF),
+        "antigravity" => Lookup("AgentAntigravityBrush", 0x4E, 0x8C, 0xF7),
+        "cursor" => Lookup("AgentCursorBrush", 0x6E, 0xE7, 0xD7),
+        _ => Lookup("AgentGenericBrush", 0x8E, 0x8E, 0x8E),
+    };
+
     public static Brush Of(SessionStatus status) => status switch
     {
         SessionStatus.Working => Working,
         SessionStatus.NeedsYou => NeedsYou,
         _ => Finished,
     };
+
+    /// <summary>Any themed brush by key, for the handful the console theme needs by name.</summary>
+    public static Brush Named(string key, byte r, byte g, byte b) => Lookup(key, r, g, b);
 
     private static Brush Lookup(string key, byte r, byte g, byte b)
     {

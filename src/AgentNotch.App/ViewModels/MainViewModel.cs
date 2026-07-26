@@ -15,6 +15,10 @@ namespace AgentNotch.App.ViewModels;
 /// "prompt"). The colour is the label — there is no wording.</summary>
 public sealed record StatusPart(string Count, string Kind);
 
+/// <summary>One agent's mark on the console collapsed line. Colour is identity —
+/// which agent — never state, so this carries the agent id and nothing else.</summary>
+public sealed record AgentMark(string Agent);
+
 /// <summary>
 /// The single view model behind the notch. All mutation happens on the UI thread
 /// (the composition root marshals pipe/watcher events before calling in); the
@@ -104,20 +108,40 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    /// <summary>Which palette the notch wears: "island" | "console".</summary>
+    private string? _themeOverride; // --theme for a self-test run; never persisted
+
+    /// <summary>
+    /// Which skin the notch wears: "island" | "console". It selects the palette AND
+    /// which of the two view trees is live, so anything that changes it has to go
+    /// through here — swapping only the palette leaves one theme wearing the other's
+    /// layout.
+    /// </summary>
     public string Theme
     {
-        get => UI.ThemeManager.Normalize(_config.Theme);
+        get => _themeOverride ?? UI.ThemeManager.Normalize(_config.Theme);
         set
         {
             var next = UI.ThemeManager.Normalize(value);
             if (string.Equals(next, Theme, StringComparison.Ordinal)) return;
+            _themeOverride = null;
             _config.Theme = next;
             _config.Save();
-            UI.ThemeManager.Apply(next);
-            RepaintConverterBindings();
-            Raise(nameof(Theme));
+            ApplyTheme(next);
         }
+    }
+
+    /// <summary>Self-test only (--demo --theme): switch skin for this run, leaving config.json alone.</summary>
+    public void PreviewTheme(string name)
+    {
+        _themeOverride = UI.ThemeManager.Normalize(name);
+        ApplyTheme(_themeOverride);
+    }
+
+    private void ApplyTheme(string name)
+    {
+        UI.ThemeManager.Apply(name);
+        RepaintConverterBindings();
+        Raise(nameof(Theme));
     }
 
     /// <summary>
@@ -140,6 +164,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         Raise(nameof(CollapsedParts));
         Raise(nameof(ToastKind));
+        Raise(nameof(TightestUsage));
+        Raise(nameof(AgentMarks));
     }
 
     /// <summary>Open/close the settings flyout; keeps the notch expanded while open.</summary>
@@ -226,6 +252,109 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    // ------------------------------------------------- console shell (theme 2)
+    // The console theme states things in words where the island theme uses shape
+    // and colour, so it needs a headline, a four-way shell state (the island
+    // pill's StateKind cannot tell "everything finished" from "nothing running"),
+    // and the single constraining quota window.
+
+    /// <summary>"blocked" | "working" | "done" | "empty" — picks the shell glyph and its ink.</summary>
+    public string ShellState
+    {
+        get
+        {
+            if (_queue.Count > 0) return "blocked";
+            bool needs = false, working = false;
+            foreach (var s in Sessions)
+            {
+                if (s.Status == SessionStatus.NeedsYou) needs = true;
+                else if (s.Status == SessionStatus.Working) working = true;
+            }
+            if (needs) return "blocked";
+            if (working) return "working";
+            return Sessions.Count > 0 ? "done" : "empty";
+        }
+    }
+
+    /// <summary>True while something is waiting on you — the only thing allowed to turn the shell amber.</summary>
+    public bool BlockedOnYou => ShellState == "blocked";
+
+    /// <summary>The console shell's one line: "claude needs you", "2 running · 1 done", "watching · 0 agents".</summary>
+    public string Headline
+    {
+        get
+        {
+            if (ActivePrompt is { } prompt)
+            {
+                var agent = AgentOf(prompt);
+                return prompt.Kind == PromptKind.Question ? $"{agent} is asking" : $"{agent} needs you";
+            }
+
+            int needs = 0, working = 0, done = 0;
+            foreach (var s in Sessions)
+            {
+                switch (s.Status)
+                {
+                    case SessionStatus.NeedsYou: needs++; break;
+                    case SessionStatus.Working: working++; break;
+                    default: done++; break;
+                }
+            }
+            if (Sessions.Count == 0) return "watching · 0 agents";
+
+            var parts = new List<string>(3);
+            if (needs > 0) parts.Add(needs == 1 ? "1 needs you" : $"{needs} need you");
+            if (working > 0) parts.Add($"{working} running");
+            if (done > 0) parts.Add($"{done} done");
+            return string.Join(" · ", parts);
+        }
+    }
+
+    /// <summary>Agent behind a prompt. Only Claude Code hooks in today, so that is the fallback.</summary>
+    private string AgentOf(PromptViewModel prompt)
+    {
+        try
+        {
+            var id = prompt.Request.SessionId;
+            if (!string.IsNullOrEmpty(id))
+                foreach (var s in Sessions)
+                    if (string.Equals(s.SessionId, id, StringComparison.Ordinal) && s.Agent is { Length: > 0 })
+                        return s.Agent;
+        }
+        catch { /* headline must never throw */ }
+        return "claude";
+    }
+
+    /// <summary>
+    /// The window that will cut you off first — the console header shows only this
+    /// one, by design; the full set is a separate view in the spec.
+    /// </summary>
+    public UsageWindow? TightestUsage
+    {
+        get
+        {
+            UsageWindow? tightest = null;
+            foreach (var w in Usage)
+                if (tightest is null || w.UsedPct > tightest.UsedPct) tightest = w;
+            return tightest;
+        }
+    }
+
+    /// <summary>One mark per live session for the collapsed line; capped so the line stays short.</summary>
+    public IReadOnlyList<AgentMark> AgentMarks
+    {
+        get
+        {
+            var marks = new List<AgentMark>(8);
+            foreach (var s in Sessions)
+            {
+                if (marks.Count == 8) break;
+                marks.Add(new AgentMark(s.Agent));
+            }
+            return marks;
+        }
+    }
+
     // ---------------------------------------------------------------- intake
 
     public void AddHookRequest(HookRequest request)
@@ -274,6 +403,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             AppLog.Write("UpdateUsage: " + ex.Message);
         }
         Raise(nameof(Usage));
+        Raise(nameof(TightestUsage));
     }
 
     /// <summary>Flashes a confirmation in the notch for a couple of seconds.</summary>
@@ -331,9 +461,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             AppLog.Write("UpdateSessions: " + ex.Message);
         }
-        Raise(nameof(CollapsedParts));
-        Raise(nameof(StateKind));
-        Raise(nameof(LeadAgent));
+        RaiseShellChanged();
     }
 
     /// <summary>Incoming rows re-ordered to match what is already on screen; new ones land last.</summary>
@@ -471,9 +599,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Raise(nameof(QueueCount));
         Raise(nameof(QueueBadgeText));
         Raise(nameof(IsExpanded));
+        RaiseShellChanged();
+    }
+
+    /// <summary>Everything the collapsed line and the console header derive from the session list and queue.</summary>
+    private void RaiseShellChanged()
+    {
         Raise(nameof(CollapsedParts));
         Raise(nameof(StateKind));
         Raise(nameof(LeadAgent));
+        Raise(nameof(ShellState));
+        Raise(nameof(BlockedOnYou));
+        Raise(nameof(Headline));
+        Raise(nameof(AgentMarks));
     }
 
     private void Raise(string name)

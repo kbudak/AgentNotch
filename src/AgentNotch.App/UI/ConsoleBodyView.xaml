@@ -1,0 +1,723 @@
+<UserControl x:Class="AgentNotch.App.UI.ConsoleBodyView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:AgentNotch.App.UI"
+             Focusable="False" Width="812"
+             FontFamily="{DynamicResource MonoFontFamily}">
+
+    <!-- The expanded console panel, per the AgentNotch Console handoff: one
+         monospace grid, hairline rules, colour as ink. Geometry is literal —
+         header 28, column head 22, rows 28, kicker 24, footer 22, 12px inset.
+
+         DataContext: MainViewModel (inherited from OverlayWindow). -->
+
+    <UserControl.Resources>
+        <!-- Every tracked capital in the design is a short label, so faking CSS
+             letter-spacing with thin spaces (see TrackedConverter) is enough. -->
+        <Style x:Key="KickerChip" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="{DynamicResource TextBrightBrush}"/>
+            <Setter Property="Padding" Value="7,3"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="KickerChipText" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontSize" Value="9.5"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#FF000000"/>
+        </Style>
+        <Style x:Key="ColumnHead" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <!-- Actions: one solid block, one outline, one bare word. Nothing else. -->
+        <Style x:Key="BlockButton" TargetType="{x:Type Button}">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#FF000000"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="bd" Background="{DynamicResource TextBrightBrush}" Padding="20,9">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource BtnAllowHoverBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="OutlineButton" TargetType="{x:Type Button}">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSubtleBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="bd" Background="Transparent" Padding="20,9"
+                                BorderBrush="{DynamicResource BtnDenyBorderBrush}" BorderThickness="1,1,1,1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource BtnDenyHoverBrush}"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentRedBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource DangerTextBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="BareButton" TargetType="{x:Type Button}">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border Background="Transparent" Padding="18,9">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource TextSubtleBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <!-- Settings: a segment is either inverse video or nothing. -->
+        <Style x:Key="ConsoleSegment" TargetType="{x:Type RadioButton}">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RadioButton}">
+                        <Border x:Name="bd" Background="{DynamicResource OptionHoverBrush}" Padding="11,4" Margin="1,0,0,0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource TextBrightBrush}"/>
+                                <Setter Property="Foreground" Value="#FF000000"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+
+        <!-- ═══════════ HEADER · 28 ═══════════ -->
+        <Border Height="28" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource InnerRuleBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock FontSize="10" VerticalAlignment="Center"
+                               Text="{Binding ShellState, Converter={StaticResource ShellGlyph}}"
+                               Foreground="{Binding ShellState, Converter={StaticResource ShellInk}}">
+                        <TextBlock.Triggers>
+                            <EventTrigger RoutedEvent="TextBlock.Loaded">
+                                <BeginStoryboard>
+                                    <!-- 20fps: the window is layered, so every frame is a CPU blit. -->
+                                    <Storyboard Timeline.DesiredFrameRate="20">
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                         From="1" To="0.25" Duration="0:0:0.8"
+                                                         AutoReverse="True" RepeatBehavior="Forever"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </TextBlock.Triggers>
+                    </TextBlock>
+                    <TextBlock Text="{Binding Headline}" FontSize="11.5" Margin="8,0,0,0" VerticalAlignment="Center"
+                               Foreground="{Binding ShellState, Converter={StaticResource ShellInk}}"/>
+                </StackPanel>
+
+                <!-- Only the constraining window lives here, and it reads what is LEFT. -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,12,0" VerticalAlignment="Center"
+                            DataContext="{Binding TightestUsage}"
+                            Visibility="{Binding Converter={StaticResource NullToVisibility}}">
+                    <TextBlock Text="{Binding Label}" FontSize="10.5" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <TextBlock Text="{Binding UsedPct, Converter={StaticResource UsageRemaining}}"
+                               FontSize="10.5" FontWeight="Bold" Margin="6,0,0,0" VerticalAlignment="Center"
+                               Foreground="{Binding UsedPct, Converter={StaticResource UsageSpecBrush}}"/>
+                    <TextBlock Text="{Binding ResetText}" FontSize="10.5" Margin="6,0,0,0" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+
+                <!-- 34x28 rail cell. Glyph doubles as state: gear closed, ▴ to come back. -->
+                <Button Grid.Column="2" Width="34" Height="28" Click="OnSettingsClick"
+                        Focusable="False" IsTabStop="False" Cursor="Hand">
+                    <Button.Template>
+                        <ControlTemplate TargetType="{x:Type Button}">
+                            <Border x:Name="bd" Background="Transparent"
+                                    BorderBrush="{DynamicResource InnerRuleBrush}" BorderThickness="1,0,0,0">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <TextBlock FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" Text="⚙">
+                        <TextBlock.Style>
+                            <Style TargetType="{x:Type TextBlock}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SettingsOpen}" Value="True">
+                                        <Setter Property="Text" Value="▴"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- ═══════════ SESSION TABLE ═══════════ -->
+        <!-- The spec hides the table in the SETTINGS view; so do we. -->
+        <StackPanel>
+            <StackPanel.Style>
+                <Style TargetType="{x:Type StackPanel}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding SettingsOpen}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Sessions.Count, FallbackValue=0}" Value="0">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </StackPanel.Style>
+
+            <Border Height="22" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource RowSeparatorBrush}">
+                <Grid Margin="12,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="98"/>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="52"/>
+                        <ColumnDefinition Width="88"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="1" Style="{StaticResource ColumnHead}"
+                               Text="{Binding Source=AGENT, Converter={StaticResource Tracked}}"/>
+                    <TextBlock Grid.Column="2" Style="{StaticResource ColumnHead}"
+                               Text="{Binding Source=SESSION, Converter={StaticResource Tracked}}"/>
+                    <TextBlock Grid.Column="3" Style="{StaticResource ColumnHead}"
+                               Text="{Binding Source=ACTIVITY, Converter={StaticResource Tracked}}"/>
+                    <TextBlock Grid.Column="4" Style="{StaticResource ColumnHead}" TextAlignment="Right"
+                               Margin="0,0,12,0"
+                               Text="{Binding Source=TIME, Converter={StaticResource Tracked}}"/>
+                    <TextBlock Grid.Column="5" Style="{StaticResource ColumnHead}" TextAlignment="Right"
+                               Text="{Binding Source=WHERE, Converter={StaticResource Tracked}}"/>
+                </Grid>
+            </Border>
+
+            <ItemsControl ItemsSource="{Binding Sessions}" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border x:Name="Row" Height="28" Cursor="Hand"
+                                Background="{Binding Converter={StaticResource SessionRowBg}}"
+                                MouseLeftButtonDown="OnSessionRowClick">
+                            <Grid Margin="12,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="98"/>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="52"/>
+                                    <ColumnDefinition Width="88"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" FontSize="10" VerticalAlignment="Center"
+                                           Text="{Binding Converter={StaticResource SessionGlyph}}"
+                                           Foreground="{Binding Converter={StaticResource SessionGlyphInk}}"/>
+
+                                <!-- The agent's own mark, kept from the island theme, inked with the
+                                     agent's identity colour rather than its state. -->
+                                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Path Grid.Column="0" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center"
+                                          Data="{Binding Converter={StaticResource SessionAgentIcon}}"
+                                          Fill="{Binding Converter={StaticResource SessionAgentInk}}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Converter={StaticResource SessionAgentName}}"
+                                               FontSize="11.5" Margin="7,0,0,0" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               Foreground="{Binding Converter={StaticResource SessionAgentInk}}"/>
+                                </Grid>
+
+                                <TextBlock Grid.Column="2" Text="{Binding Converter={StaticResource SessionTitle}}"
+                                           FontSize="11.5" Margin="0,0,10,0" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{DynamicResource TextSubtleBrush}"/>
+
+                                <TextBlock Grid.Column="3" Text="{Binding Converter={StaticResource SessionSubtitle}}"
+                                           FontSize="11" Margin="0,0,12,0" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{Binding Converter={StaticResource SessionActivityInk}}"/>
+
+                                <TextBlock Grid.Column="4" Text="{Binding Converter={StaticResource SessionAge}}"
+                                           FontSize="10.5" TextAlignment="Right" VerticalAlignment="Center"
+                                           Margin="0,0,12,0"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+                                <TextBlock Grid.Column="5" Text="{Binding Converter={StaticResource SessionHost}}"
+                                           FontSize="10.5" TextAlignment="Right" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </Grid>
+                        </Border>
+                        <DataTemplate.Triggers>
+                            <Trigger SourceName="Row" Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
+                            </Trigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <!-- ═══════════ EMPTY ═══════════ -->
+        <StackPanel Margin="12,34,12,32" HorizontalAlignment="Center">
+            <StackPanel.Style>
+                <Style TargetType="{x:Type StackPanel}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding Sessions.Count, FallbackValue=0}" Value="0"/>
+                                <Condition Binding="{Binding SettingsOpen}" Value="False"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </StackPanel.Style>
+
+            <ui:EqualiserBars Width="41" Height="14" HorizontalAlignment="Center"/>
+            <TextBlock Text="no agents running" FontSize="12" Margin="0,14,0,0" HorizontalAlignment="Center"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+            <TextBlock Text="start one in any terminal — hooks are already wired"
+                       FontSize="11" Margin="0,8,0,0" HorizontalAlignment="Center"
+                       Foreground="{DynamicResource TextTertiaryBrush}"/>
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0" HorizontalAlignment="Center">
+                <TextBlock Text="claude" FontSize="10.5" Foreground="{DynamicResource AgentClaudeBrush}"/>
+                <TextBlock Text="codex" FontSize="10.5" Margin="16,0,0,0" Foreground="{DynamicResource AgentCodexBrush}"/>
+                <TextBlock Text="antigravity" FontSize="10.5" Margin="16,0,0,0" Foreground="{DynamicResource AgentAntigravityBrush}"/>
+                <TextBlock Text="cursor" FontSize="10.5" Margin="16,0,0,0" Foreground="{DynamicResource AgentCursorBrush}"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- ═══════════ PROMPT BLOCK ═══════════ -->
+        <StackPanel Visibility="{Binding ActivePrompt, Converter={StaticResource NullToVisibility}}">
+            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PanelBorderBrush}">
+                <StackPanel DataContext="{Binding ActivePrompt}">
+
+                    <!-- Kicker -->
+                    <Border Height="24" Background="{DynamicResource KickerBgBrush}">
+                        <Grid Margin="12,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Style="{StaticResource KickerChip}">
+                                <TextBlock Style="{StaticResource KickerChipText}"
+                                           Text="{Binding Kind, Converter={StaticResource PromptKicker}}"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding Subtitle}" FontSize="10.5" Margin="10,0,0,0"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                       Foreground="{DynamicResource AccentYouBrush}"/>
+                            <Border Grid.Column="2" Height="1" Margin="10,0,0,0" VerticalAlignment="Center"
+                                    Background="{DynamicResource InnerRuleBrush}"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- ── PERMISSION body ── -->
+                    <StackPanel Margin="12,11,12,12">
+                        <StackPanel.Style>
+                            <Style TargetType="{x:Type StackPanel}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Permission">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock FontSize="11.5" FontWeight="Bold"
+                                           Text="{Binding Title, Converter={StaticResource PromptVerb}}"
+                                           Foreground="{DynamicResource AccentYouBrush}"/>
+                                <TextBlock FontSize="11.5" Margin="12,0,0,0"
+                                           Text="{Binding Title, Converter={StaticResource PromptTarget}}"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{DynamicResource TextSubtleBrush}"/>
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding DiffAdded}" FontSize="11.5" Margin="12,0,0,0"
+                                       Foreground="{DynamicResource AccentGreenBrush}"/>
+                            <TextBlock Grid.Column="2" Text="{Binding DiffRemoved}" FontSize="11.5" Margin="8,0,0,0"
+                                       Foreground="{DynamicResource AccentRedBrush}"/>
+                        </Grid>
+
+                        <!-- Diff: no background tint anywhere — the sign column and the ink carry it. -->
+                        <Border Margin="0,10,0,0" BorderThickness="1,0,0,0" BorderBrush="{DynamicResource InnerRuleBrush}"
+                                Padding="12,0,0,0"
+                                Visibility="{Binding DiffLines, Converter={StaticResource CollectionToVisibility}}">
+                            <ScrollViewer MaxHeight="260" Focusable="False" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding DiffLines}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Width="30" TextAlignment="Right" FontSize="11" LineHeight="20"
+                                                           Text="{Binding Converter={StaticResource DiffNumber}}"
+                                                           Foreground="{DynamicResource TextFaintBrush}"/>
+                                                <TextBlock x:Name="sign" Width="14" TextAlignment="Center" FontSize="11" LineHeight="20"
+                                                           Text="{Binding Kind, Converter={StaticResource DiffSign}}"
+                                                           Foreground="{DynamicResource TextFaintBrush}"/>
+                                                <TextBlock x:Name="code" Text="{Binding Text}" FontSize="11" LineHeight="20"
+                                                           Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                            </StackPanel>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding Kind}" Value="add">
+                                                    <Setter TargetName="sign" Property="Foreground" Value="{DynamicResource AccentGreenBrush}"/>
+                                                    <Setter TargetName="code" Property="Foreground" Value="{DynamicResource SuccessTextBrush}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}" Value="del">
+                                                    <Setter TargetName="sign" Property="Foreground" Value="{DynamicResource AccentRedBrush}"/>
+                                                    <Setter TargetName="code" Property="Foreground" Value="{DynamicResource DangerTextBrush}"/>
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+
+                        <!-- Bash / generic bodies keep the same hairline gutter as the diff. -->
+                        <Border Margin="0,10,0,0" BorderThickness="1,0,0,0" BorderBrush="{DynamicResource InnerRuleBrush}"
+                                Padding="12,0,0,0"
+                                Visibility="{Binding CommandText, Converter={StaticResource StringToVisibility}}">
+                            <ScrollViewer MaxHeight="120" Focusable="False" VerticalScrollBarVisibility="Auto">
+                                <TextBlock Text="{Binding CommandText}" FontSize="11" LineHeight="20" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSubtleBrush}"/>
+                            </ScrollViewer>
+                        </Border>
+                        <Border Margin="0,10,0,0" BorderThickness="1,0,0,0" BorderBrush="{DynamicResource InnerRuleBrush}"
+                                Padding="12,0,0,0"
+                                Visibility="{Binding GenericJson, Converter={StaticResource StringToVisibility}}">
+                            <ScrollViewer MaxHeight="140" Focusable="False" VerticalScrollBarVisibility="Auto">
+                                <TextBlock Text="{Binding GenericJson}" FontSize="11" LineHeight="20" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </ScrollViewer>
+                        </Border>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Style="{StaticResource BlockButton}" Click="OnAllow"
+                                    Content="{Binding Source='[Y] ALLOW', Converter={StaticResource Tracked}}"/>
+                            <Button Style="{StaticResource OutlineButton}" Click="OnDeny"
+                                    Content="{Binding Source='[N] DENY', Converter={StaticResource Tracked}}"/>
+                            <Button Style="{StaticResource BareButton}" Click="OnPass"
+                                    Content="[T] decide in the terminal instead"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- ── ASKING body ── -->
+                    <StackPanel Margin="12,11,12,12">
+                        <StackPanel.Style>
+                            <Style TargetType="{x:Type StackPanel}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Question">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <TextBlock Text="{Binding QuestionText}" FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextBrightBrush}"
+                                   Visibility="{Binding QuestionText, Converter={StaticResource StringToVisibility}}"/>
+
+                        <!-- WHY: the header the agent supplied is the closest thing it gives us
+                             to a reason, so it fills the spec's WHY row instead of being dropped. -->
+                        <StackPanel Orientation="Horizontal" Margin="0,9,0,0"
+                                    Visibility="{Binding Header, Converter={StaticResource StringToVisibility}}">
+                            <TextBlock Width="54" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Top"
+                                       Text="{Binding Source=WHY, Converter={StaticResource Tracked}}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding Header}" FontSize="11" TextWrapping="Wrap" MaxWidth="700"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+
+                        <ItemsControl ItemsSource="{Binding Options}" Margin="0,9,0,0" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border x:Name="Choice" Background="Transparent" Padding="10,7" Cursor="Hand"
+                                            MouseLeftButtonDown="OnOption">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="16"/>
+                                                <ColumnDefinition Width="26"/>
+                                                <ColumnDefinition Width="Auto" MinWidth="150"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="caret" Grid.Column="0" Text="›" FontSize="11.5" Opacity="0"
+                                                       Foreground="{DynamicResource TextBrightBrush}"/>
+                                            <TextBlock x:Name="key" Grid.Column="1"
+                                                       Text="{Binding Converter={StaticResource OptionKey}}"
+                                                       FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                            <TextBlock x:Name="label" Grid.Column="2" Text="{Binding Label}" FontSize="11.5"
+                                                       Margin="0,0,14,0" TextTrimming="CharacterEllipsis"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="outcome" Grid.Column="3" Text="{Binding Description}"
+                                                       FontSize="10.5" VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        </Grid>
+                                    </Border>
+                                    <DataTemplate.Triggers>
+                                        <!-- Hover is full inverse video, the design's only emphasis. -->
+                                        <Trigger SourceName="Choice" Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Choice" Property="Background" Value="{DynamicResource TextBrightBrush}"/>
+                                            <Setter TargetName="caret" Property="Opacity" Value="1"/>
+                                            <Setter TargetName="caret" Property="Foreground" Value="#FF000000"/>
+                                            <Setter TargetName="key" Property="Foreground" Value="#FF000000"/>
+                                            <Setter TargetName="label" Property="Foreground" Value="#FF000000"/>
+                                            <Setter TargetName="outcome" Property="Foreground" Value="#FF000000"/>
+                                        </Trigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- The spec's typed-answer row. AgentNotch cannot send free text back,
+                             so the slot keeps its shape and hands the turn to the terminal
+                             rather than pretending to accept input. -->
+                        <Border Margin="0,9,0,0" Padding="10,7" Background="{DynamicResource CodeBgBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" Cursor="Hand"
+                                MouseLeftButtonDown="OnPassBorder">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="›" FontSize="11" Foreground="{DynamicResource TextBrightBrush}"/>
+                                <TextBlock Grid.Column="1" Text="answer in the terminal instead" FontSize="11" Margin="10,0,0,0"
+                                           Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                <TextBlock Grid.Column="2" Text="CTRL+N" FontSize="10"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- ═══════════ SETTINGS ═══════════ -->
+        <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PanelBorderBrush}"
+                Visibility="{Binding SettingsOpen, Converter={StaticResource BoolToVis}}">
+            <StackPanel>
+                <Border Height="24">
+                    <Grid Margin="12,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Style="{StaticResource KickerChip}">
+                            <TextBlock Style="{StaticResource KickerChipText}"
+                                       Text="{Binding Source=SETTINGS, Converter={StaticResource Tracked}}"/>
+                        </Border>
+                        <Border Grid.Column="1" Height="1" Margin="10,0" VerticalAlignment="Center"
+                                Background="{DynamicResource InnerRuleBrush}"/>
+                        <TextBlock Grid.Column="2" Text="stored at %APPDATA%\AgentNotch\config.json"
+                                   FontSize="10" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </Grid>
+                </Border>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left rail. Only the tabs AgentNotch actually has settings for —
+                         inventing the spec's other three would be five empty panes. -->
+                    <Border Grid.Column="0" BorderThickness="0,0,1,0" BorderBrush="{DynamicResource InnerRuleBrush}">
+                        <StackPanel Margin="0,6">
+                            <Border Height="24" Background="{DynamicResource TextBrightBrush}">
+                                <StackPanel Orientation="Horizontal" Margin="12,0" VerticalAlignment="Center">
+                                    <TextBlock Text="›" FontSize="11.5" Foreground="#FF000000"/>
+                                    <TextBlock Text="display" FontSize="11.5" Margin="9,0,0,0" Foreground="#FF000000"/>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="↑↓ MOVE · ⏎ TOGGLE" FontSize="9.5" Margin="12,44,12,0"
+                                       Foreground="{DynamicResource TextTertiaryBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" Margin="12,9,12,12" MinHeight="140">
+                        <!-- row: label 186 · note flex · segments right -->
+                        <Grid Height="26">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="186"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="›" FontSize="10" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextTertiaryBrush}"/>
+                            <TextBlock Grid.Column="1" Text="theme" FontSize="11.5" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Grid.Column="2" Text="rounded island, or this console" FontSize="10.5"
+                                       Margin="0,0,14,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                <RadioButton GroupName="ctheme" Content="island" Style="{StaticResource ConsoleSegment}"
+                                             IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=island, Mode=TwoWay}"/>
+                                <RadioButton GroupName="ctheme" Content="console" Style="{StaticResource ConsoleSegment}"
+                                             IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=console, Mode=TwoWay}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Height="26">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="186"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="›" FontSize="10" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextTertiaryBrush}"/>
+                            <TextBlock Grid.Column="1" Text="dock position" FontSize="11.5" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Grid.Column="2" Text="where the line sits along the top edge" FontSize="10.5"
+                                       Margin="0,0,14,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                <RadioButton GroupName="cpos" Content="left" Style="{StaticResource ConsoleSegment}"
+                                             IsChecked="{Binding Position, Converter={StaticResource EqualsParam}, ConverterParameter=left, Mode=TwoWay}"/>
+                                <RadioButton GroupName="cpos" Content="center" Style="{StaticResource ConsoleSegment}"
+                                             IsChecked="{Binding Position, Converter={StaticResource EqualsParam}, ConverterParameter=center, Mode=TwoWay}"/>
+                                <RadioButton GroupName="cpos" Content="right" Style="{StaticResource ConsoleSegment}"
+                                             IsChecked="{Binding Position, Converter={StaticResource EqualsParam}, ConverterParameter=right, Mode=TwoWay}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Height="26">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="186"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="›" FontSize="10" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextTertiaryBrush}"/>
+                            <TextBlock Grid.Column="1" Text="quota readout" FontSize="11.5" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Grid.Column="2" Text="the constraining window, in the header" FontSize="10.5"
+                                       Margin="0,0,14,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                <RadioButton Content="on" Style="{StaticResource ConsoleSegment}"
+                                             IsChecked="{Binding ShowUsage, Converter={StaticResource BoolEqualsParam}, ConverterParameter=true, Mode=TwoWay}"/>
+                                <RadioButton Content="off" Style="{StaticResource ConsoleSegment}"
+                                             IsChecked="{Binding ShowUsage, Converter={StaticResource BoolEqualsParam}, ConverterParameter=false, Mode=TwoWay}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Height="26">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="186"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="›" FontSize="10" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextTertiaryBrush}"/>
+                            <TextBlock Grid.Column="1" Text="launch at login" FontSize="11.5" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Grid.Column="2" Text="start AgentNotch when Windows starts" FontSize="10.5"
+                                       Margin="0,0,14,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                <RadioButton Content="on" Style="{StaticResource ConsoleSegment}"
+                                             IsChecked="{Binding LaunchAtLogin, Converter={StaticResource BoolEqualsParam}, ConverterParameter=true, Mode=TwoWay}"/>
+                                <RadioButton Content="off" Style="{StaticResource ConsoleSegment}"
+                                             IsChecked="{Binding LaunchAtLogin, Converter={StaticResource BoolEqualsParam}, ConverterParameter=false, Mode=TwoWay}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Height="1" Margin="0,9,0,0" Background="{DynamicResource InnerRuleBrush}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,9,0,0">
+                            <TextBlock Text="●" FontSize="10.5" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource AccentGreenBrush}"/>
+                            <TextBlock Text="changes apply instantly — nothing leaves this machine"
+                                       FontSize="10.5" Margin="10,0,0,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ═══════════ FOOTER · 22 ═══════════ -->
+        <Border Height="22" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource InnerRuleBrush}">
+            <Grid Margin="12,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <TextBlock FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="{Binding Source='WIN+SHIFT+A PANEL', Converter={StaticResource Tracked}}"/>
+                    <TextBlock FontSize="9.5" Margin="18,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="{Binding Source='CTRL+Y ALLOW', Converter={StaticResource Tracked}}"/>
+                    <TextBlock FontSize="9.5" Margin="18,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="{Binding Source='CTRL+N DENY', Converter={StaticResource Tracked}}"/>
+                </StackPanel>
+                <TextBlock FontSize="9.5" VerticalAlignment="Center" HorizontalAlignment="Right"
+                           Foreground="{DynamicResource AccentGreenBrush}"
+                           Text="{Binding Source='● LOCAL ONLY', Converter={StaticResource Tracked}}"/>
+            </Grid>
+        </Border>
+
+    </StackPanel>
+</UserControl>

@@ -23,6 +23,7 @@
     <CornerRadius x:Key="CodeCornerRadius">6</CornerRadius>
     <CornerRadius x:Key="CountChipCornerRadius">6</CornerRadius>
     <CornerRadius x:Key="PillCornerRadius">11</CornerRadius>
+    <Thickness x:Key="PanelPaddingThickness">8,0,8,8</Thickness>
 
     <!-- ===================== Palette ===================== -->
     <SolidColorBrush x:Key="PanelBgBrush" Color="#F70B0B0E"/>
@@ -81,5 +82,29 @@
     <SolidColorBrush x:Key="SegmentCheckedFgBrush" Color="#FFF4F4F5"/>
 
     <SolidColorBrush x:Key="ScrollThumbBrush" Color="#33FFFFFF"/>
+
+    <!-- ===================== Agent identity =====================
+         Identity, never status: these tint the agent's own mark and name.
+         The island theme keeps tinting marks by STATE, so it only carries these
+         so both palettes declare the same keys. -->
+    <SolidColorBrush x:Key="AgentClaudeBrush" Color="#FFE8814A"/>
+    <SolidColorBrush x:Key="AgentCodexBrush" Color="#FFF4F4F5"/>
+    <SolidColorBrush x:Key="AgentAntigravityBrush" Color="#FF4E8CF7"/>
+    <SolidColorBrush x:Key="AgentCursorBrush" Color="#FF6EE7D7"/>
+    <SolidColorBrush x:Key="AgentGenericBrush" Color="#FF9CA3AF"/>
+
+    <!-- Reserved: only ever means "blocked on you". -->
+    <SolidColorBrush x:Key="AccentYouBrush" Color="#FFFB923C"/>
+
+    <SolidColorBrush x:Key="TextBrightBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#FFD4D4D8"/>
+    <SolidColorBrush x:Key="TextFaintBrush" Color="#FF3F3F46"/>
+
+    <SolidColorBrush x:Key="InnerRuleBrush" Color="#1AFFFFFF"/>
+    <SolidColorBrush x:Key="KickerBgBrush" Color="#FF1D1D22"/>
+    <SolidColorBrush x:Key="RowWaitingBrush" Color="#FF1D1D22"/>
+
+    <SolidColorBrush x:Key="SuccessTextBrush" Color="#FF5FE39C"/>
+    <SolidColorBrush x:Key="DangerTextBrush" Color="#FFFF7B6D"/>
 
 </ResourceDictionary>

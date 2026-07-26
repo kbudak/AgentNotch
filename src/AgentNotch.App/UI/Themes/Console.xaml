@@ -25,14 +25,17 @@
     <CornerRadius x:Key="CodeCornerRadius">0</CornerRadius>
     <CornerRadius x:Key="CountChipCornerRadius">0</CornerRadius>
     <CornerRadius x:Key="PillCornerRadius">0</CornerRadius>
+    <!-- The console panel has no inset of its own: every block inside it
+         carries the design's own 12px gutter. -->
+    <Thickness x:Key="PanelPaddingThickness">0</Thickness>
 
     <!-- ===================== Palette ===================== -->
     <SolidColorBrush x:Key="PanelBgBrush" Color="#FA000000"/>
     <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF262626"/>
     <!-- Cards are the same black as the panel; the hairline is what separates them. -->
-    <SolidColorBrush x:Key="CardBgBrush" Color="#FF050505"/>
+    <SolidColorBrush x:Key="CardBgBrush" Color="#FF000000"/>
     <SolidColorBrush x:Key="CardBorderBrush" Color="#FF1C1C1C"/>
-    <SolidColorBrush x:Key="CardHoverBrush" Color="#FF141414"/>
+    <SolidColorBrush x:Key="CardHoverBrush" Color="#FF101010"/>
     <SolidColorBrush x:Key="CodeBgBrush" Color="#FF000000"/>
     <SolidColorBrush x:Key="RowSeparatorBrush" Color="#FF131313"/>
 
@@ -49,9 +52,9 @@
 
     <!-- ===================== Status palette ===================== -->
     <SolidColorBrush x:Key="StatusWorkingBrush"  Color="#FF4E8CF7"/> <!-- blue   · running now      -->
-    <SolidColorBrush x:Key="StatusNeedsYouBrush" Color="#FFE8814A"/> <!-- orange · a question waits  -->
+    <SolidColorBrush x:Key="StatusNeedsYouBrush" Color="#FFFFB020"/> <!-- orange · a question waits  -->
     <SolidColorBrush x:Key="StatusFinishedBrush" Color="#FF3DDC84"/> <!-- green  · finished, done    -->
-    <SolidColorBrush x:Key="StatusPromptBrush"   Color="#FFE8814A"/> <!-- orange · approval blocking-->
+    <SolidColorBrush x:Key="StatusPromptBrush"   Color="#FFFFB020"/> <!-- orange · approval blocking-->
     <SolidColorBrush x:Key="StatusIdleBrush"     Color="#FF5E5E5E"/> <!-- grey   · nothing running  -->
 
     <SolidColorBrush x:Key="DiffAddBgBrush" Color="#143DDC84"/>
@@ -82,5 +85,28 @@
     <SolidColorBrush x:Key="SegmentCheckedFgBrush" Color="#FF000000"/>
 
     <SolidColorBrush x:Key="ScrollThumbBrush" Color="#FF2E2E2E"/>
+
+    <!-- ===================== Agent identity =====================
+         Colour is identity, not status: it inks the agent's own mark and name and
+         never fills a background. -->
+    <SolidColorBrush x:Key="AgentClaudeBrush" Color="#FFE8814A"/>
+    <SolidColorBrush x:Key="AgentCodexBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="AgentAntigravityBrush" Color="#FF4E8CF7"/>
+    <SolidColorBrush x:Key="AgentCursorBrush" Color="#FF6EE7D7"/>
+    <SolidColorBrush x:Key="AgentGenericBrush" Color="#FF8E8E8E"/>
+
+    <!-- Reserved: amber ONLY ever means "blocked on you". Nothing else may use it. -->
+    <SolidColorBrush x:Key="AccentYouBrush" Color="#FFFFB020"/>
+
+    <SolidColorBrush x:Key="TextBrightBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#FFD4D4D4"/>
+    <SolidColorBrush x:Key="TextFaintBrush" Color="#FF3A3A3A"/>
+
+    <SolidColorBrush x:Key="InnerRuleBrush" Color="#FF1C1C1C"/>
+    <SolidColorBrush x:Key="KickerBgBrush" Color="#FF101010"/>
+    <SolidColorBrush x:Key="RowWaitingBrush" Color="#FF141414"/>
+
+    <SolidColorBrush x:Key="SuccessTextBrush" Color="#FF5FE39C"/>
+    <SolidColorBrush x:Key="DangerTextBrush" Color="#FFFF7B6D"/>
 
 </ResourceDictionary>

@@ -60,10 +60,10 @@ public partial class App : Application
         if (e.Args.Contains("--demo"))
         {
             _vm = new MainViewModel();
-            // --theme <id> overrides the saved palette for this run only, so both
-            // skins can be shot side by side without touching the user's config.
+            // --theme <id> overrides the skin for this run only, so both can be shot
+            // side by side without touching the user's config.
             for (int i = 0; i < e.Args.Length - 1; i++)
-                if (e.Args[i] == "--theme") ThemeManager.Apply(e.Args[i + 1]);
+                if (e.Args[i] == "--theme") _vm.PreviewTheme(e.Args[i + 1]);
             _overlay = new OverlayWindow { DataContext = _vm };
             _overlay.Show();
             RunDemo(e.Args);
@@ -205,10 +205,25 @@ public partial class App : Application
 
     private void RunDemo(string[] args)
     {
-        string? shotBase = null;
+        string? shotBase = null, scene = null;
         for (int i = 0; i < args.Length - 1; i++)
-            if (args[i] == "--shot")
-                shotBase = args[i + 1];
+        {
+            if (args[i] == "--shot") shotBase = args[i + 1];
+            else if (args[i] == "--scene") scene = args[i + 1];
+        }
+
+        // --scene empty|settings: the two states the normal script never reaches,
+        // so both themes can be checked without a live agent or a real click.
+        if (scene is "empty" or "settings")
+        {
+            _vm!.UpdateSessions(Array.Empty<Sessions.AgentSession>());
+            if (scene == "settings") _vm.ToggleSettings();
+            else _vm.SetHover(true);
+            if (shotBase is null) return;
+            _overlay!.IsHitTestVisible = false;
+            RunSceneShotAsync(shotBase + "-" + scene + ".png");
+            return;
+        }
 
         var now = DateTime.UtcNow;
         _vm!.UpdateSessions(new[]
@@ -271,6 +286,17 @@ public partial class App : Application
         _overlay!.IsHitTestVisible = false;
 
         RunShotSequenceAsync(shotBase);
+    }
+
+    private async void RunSceneShotAsync(string path)
+    {
+        try
+        {
+            await Task.Delay(1400); // let the panel finish opening
+            SaveShot(_overlay!, path);
+        }
+        catch (Exception ex) { AppLog.Write("demo scene shot failed: " + ex); }
+        Shutdown();
     }
 
     private async void RunShotSequenceAsync(string shotBase)

@@ -38,14 +38,33 @@
         <Border x:Name="NotchPanel"
                 Width="248"
                 Background="{DynamicResource PanelBgBrush}"
-                BorderBrush="{DynamicResource PanelBorderBrush}"
                 BorderThickness="1,0,1,1"
                 CornerRadius="{DynamicResource PanelCornerRadius}"
-                Padding="8,0,8,8">
+                Padding="{DynamicResource PanelPaddingThickness}">
+            <Border.Style>
+                <Style TargetType="{x:Type Border}">
+                    <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}"/>
+                    <Style.Triggers>
+                        <!-- Console only: the collapsed line's edge turns amber when
+                             something is blocked on you. Never during a confirmation
+                             flash, and never while the panel is open. -->
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding Theme}" Value="console"/>
+                                <Condition Binding="{Binding BlockedOnYou}" Value="True"/>
+                                <Condition Binding="{Binding IsExpanded}" Value="False"/>
+                                <Condition Binding="{Binding HasToast}" Value="False"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="BorderBrush" Value="{DynamicResource AccentYouBrush}"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <StackPanel>
 
-                <!-- ============ Top header + collapsed pill ============ -->
-                <Grid MinWidth="210">
+                <!-- ============ Top header + collapsed pill (island) ============ -->
+                <Grid MinWidth="210"
+                      Visibility="{Binding Theme, Converter={StaticResource ThemeVisibility}, ConverterParameter=island}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -237,18 +256,104 @@
                     </Grid>
                 </Grid>
 
+
+                <!-- ============ Collapsed status line (console) ============
+                     When collapsed the panel IS the line: 26px tall, wearing the
+                     panel's own black and hairline edge, segments split by
+                     full-height rules. No quota, no chevron, no hover hint — the
+                     spec cut all three as noise; do not re-add them. -->
+                <Grid x:Name="ConsoleLine" Height="26" HorizontalAlignment="Left">
+                    <Grid.Style>
+                        <Style TargetType="{x:Type Grid}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding Theme}" Value="console"/>
+                                        <Condition Binding="{Binding IsExpanded}" Value="False"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+
+                    <!-- Confirmation flash: centred, 40px of air either side, the
+                         kind's colour and nothing else. -->
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40,0"
+                               FontSize="11.5" FontWeight="Bold"
+                               Foreground="{Binding ToastKind, Converter={StaticResource ToastBrush}}"
+                               Visibility="{Binding HasToast, Converter={StaticResource BoolToVis}}">
+                        <Run Text="{Binding ToastKind, Converter={StaticResource ToastGlyph}, Mode=OneWay}"/>
+                        <Run Text="{Binding ToastText, Mode=OneWay}"/>
+                    </TextBlock>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                                Visibility="{Binding HasToast, Converter={StaticResource BoolToCollapsed}}">
+                        <StackPanel Orientation="Horizontal" Margin="11,0" VerticalAlignment="Center">
+                            <TextBlock FontSize="10" VerticalAlignment="Center"
+                                       Text="{Binding ShellState, Converter={StaticResource ShellGlyph}}"
+                                       Foreground="{Binding ShellState, Converter={StaticResource ShellInk}}">
+                                <TextBlock.Triggers>
+                                    <EventTrigger RoutedEvent="TextBlock.Loaded">
+                                        <BeginStoryboard>
+                                            <!-- 20fps: layered window, every frame is a CPU blit. -->
+                                            <Storyboard Timeline.DesiredFrameRate="20">
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                 From="1" To="0.25" Duration="0:0:0.8"
+                                                                 AutoReverse="True" RepeatBehavior="Forever"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                </TextBlock.Triggers>
+                            </TextBlock>
+                            <TextBlock Text="{Binding Headline}" FontSize="11.5" Margin="7,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{Binding ShellState, Converter={StaticResource ShellInk}}"/>
+                        </StackPanel>
+
+                        <Border Width="1" Background="{DynamicResource PanelBorderBrush}"
+                                Visibility="{Binding AgentMarks, Converter={StaticResource CollectionToVisibility}}"/>
+
+                        <ItemsControl ItemsSource="{Binding AgentMarks}" Focusable="False"
+                                      Margin="6,0,11,0" VerticalAlignment="Center"
+                                      Visibility="{Binding AgentMarks, Converter={StaticResource CollectionToVisibility}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- The spec's 6x6 swatch, drawn as the agent's own mark:
+                                         it still reads as a coloured tick at this size and
+                                         keeps the agents recognisable at a glance. -->
+                                    <Path Width="11" Height="11" Stretch="Uniform" Margin="5,0,0,0"
+                                          VerticalAlignment="Center"
+                                          Data="{Binding Agent, Converter={StaticResource AgentIcon}}"
+                                          Fill="{Binding Agent, Converter={StaticResource AgentInk}}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Grid>
+
                 <!-- ============ Expanded content ============ -->
                 <!-- Curtain reveal: RevealHost's Height is animated from code-behind
                      (0 ⇄ content height) while ClipToBounds hides the rest — the content
                      itself never scales or squashes; it slides down a touch and fades.
                      Content height changes while open (prompt card swaps) are morphed. -->
                 <Grid x:Name="RevealHost" ClipToBounds="True" Height="0" Visibility="Collapsed">
-                    <StackPanel x:Name="ExpandedContent" Width="560"
+                    <StackPanel x:Name="ExpandedContent"
                                 VerticalAlignment="Top" HorizontalAlignment="Center"
                                 Opacity="0">
                         <StackPanel.RenderTransform>
                             <TranslateTransform x:Name="ContentSlide" Y="-14"/>
                         </StackPanel.RenderTransform>
+
+                    <!-- Island body. The console body is a sibling below it; only one
+                         is ever visible, and a Collapsed subtree is skipped by both
+                         layout and render. -->
+                    <StackPanel Width="560"
+                                Visibility="{Binding Theme, Converter={StaticResource ThemeVisibility}, ConverterParameter=island}">
 
                     <!-- Plan limits now live in the pill header (top line); nothing here. -->
 
@@ -393,6 +498,10 @@
 
                         <!-- Sessions list (always shown while expanded) -->
                         <ui:SessionsView Margin="4,6,4,2"/>
+                    </StackPanel>
+
+                    <ui:ConsoleBodyView
+                        Visibility="{Binding Theme, Converter={StaticResource ThemeVisibility}, ConverterParameter=console}"/>
                     </StackPanel>
                 </Grid>
 

@@ -36,6 +36,28 @@
     <ui:StateVisibilityConverter x:Key="StateVisibility"/>
     <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
+    <!-- Console theme only (see ConsoleConverters.cs for why its rules differ). -->
+    <ui:AgentInkConverter x:Key="AgentInk"/>
+    <ui:SessionAgentInkConverter x:Key="SessionAgentInk"/>
+    <ui:SessionAgentNameConverter x:Key="SessionAgentName"/>
+    <ui:SessionGlyphConverter x:Key="SessionGlyph"/>
+    <ui:SessionGlyphInkConverter x:Key="SessionGlyphInk"/>
+    <ui:SessionActivityInkConverter x:Key="SessionActivityInk"/>
+    <ui:SessionRowBgConverter x:Key="SessionRowBg"/>
+    <ui:ShellGlyphConverter x:Key="ShellGlyph"/>
+    <ui:ShellInkConverter x:Key="ShellInk"/>
+    <ui:UsageRemainingConverter x:Key="UsageRemaining"/>
+    <ui:UsageSpecBrushConverter x:Key="UsageSpecBrush"/>
+    <ui:TrackedConverter x:Key="Tracked"/>
+    <ui:ThemeVisibilityConverter x:Key="ThemeVisibility"/>
+    <ui:DiffSignConverter x:Key="DiffSign"/>
+    <ui:DiffNumberConverter x:Key="DiffNumber"/>
+    <ui:PromptKickerConverter x:Key="PromptKicker"/>
+    <ui:OptionKeyConverter x:Key="OptionKey"/>
+    <ui:BoolEqualsParamConverter x:Key="BoolEqualsParam"/>
+    <ui:PromptVerbConverter x:Key="PromptVerb"/>
+    <ui:PromptTargetConverter x:Key="PromptTarget"/>
+
     <!-- Chip on a session row: which agent, and which app it runs in. -->
     <Style x:Key="RowChipStyle" TargetType="{x:Type Border}">
         <Setter Property="Background" Value="{DynamicResource KbdBgBrush}"/>

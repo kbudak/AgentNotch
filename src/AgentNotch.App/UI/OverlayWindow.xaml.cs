@@ -24,8 +24,14 @@ namespace AgentNotch.App.UI;
 /// </summary>
 public partial class OverlayWindow
 {
-    private const double CollapsedPanelWidth = 248;
-    private const double ExpandedPanelWidth = 576; // 560 content + 8+8 panel padding
+    // Geometry is per theme. The island is a 248px pill that opens to a 576px
+    // capsule; the console is a status LINE that fits its own text and opens to the
+    // handoff's 812px panel, which needs a wider surface to sit in.
+    private const double IslandCollapsedWidth = 248;
+    private const double IslandExpandedWidth = 576;  // 560 content + 8+8 panel padding
+    private const double ConsoleExpandedWidth = 812; // the spec's panel width; it has no padding
+    private const double IslandWindowWidth = 640;
+    private const double ConsoleWindowWidth = 900;   // 812 + the 28+28 shadow margins, rounded up
 
     // AllowsTransparency makes this a layered window: WPF hands the ENTIRE window
     // surface to UpdateLayeredWindow on every frame, so idle cost scales with the
@@ -38,11 +44,21 @@ public partial class OverlayWindow
     private MainViewModel? _vm;
     private bool _open;
 
+    private bool IsConsole => ThemeManager.Normalize(_vm?.Theme) == ThemeManager.Console;
+    private double ExpandedPanelWidth => IsConsole ? ConsoleExpandedWidth : IslandExpandedWidth;
+
+    /// <summary>
+    /// Collapsed width. The island pill is a fixed 248 and morphs; the console line
+    /// is "as wide as its own text and marks", which no animation target can know
+    /// ahead of time — NaN hands that width back to layout.
+    /// </summary>
+    private double CollapsedPanelWidth => IsConsole ? double.NaN : IslandCollapsedWidth;
+
     public OverlayWindow()
     {
         InitializeComponent();
 
-        Loaded += (_, _) => { Recenter(); if (_open) AnimateOpen(); };
+        Loaded += (_, _) => { ApplyThemeGeometry(); if (_open) AnimateOpen(); };
         MouseEnter += (_, _) => _vm?.SetHover(true);
         MouseLeave += (_, _) => _vm?.SetHover(false);
         DataContextChanged += OnDataContextChanged;
@@ -89,6 +105,34 @@ public partial class OverlayWindow
             SyncExpansion();
         else if (e.PropertyName == nameof(MainViewModel.Position))
             Recenter();
+        else if (e.PropertyName == nameof(MainViewModel.Theme))
+            ApplyThemeGeometry();
+    }
+
+    /// <summary>
+    /// Re-sizes the surface and the panel for the active theme. The two themes do
+    /// not merely repaint — the console panel is 812 wide against the island's 576,
+    /// so the window itself has to grow and re-centre.
+    /// </summary>
+    private void ApplyThemeGeometry()
+    {
+        try
+        {
+            Width = IsConsole ? ConsoleWindowWidth : IslandWindowWidth;
+            if (IsLoaded)
+            {
+                UpdateLayout(); // the other theme's tree has to lay out before it can be measured
+                NotchPanel.BeginAnimation(WidthProperty, null); // drop any in-flight width animation
+                NotchPanel.Width = _open ? ExpandedPanelWidth : CollapsedPanelWidth;
+                if (_open)
+                {
+                    RevealHost.BeginAnimation(HeightProperty, null);
+                    RevealHost.Height = ContentHeight();
+                }
+            }
+            Recenter();
+        }
+        catch (Exception ex) { AppLog.Write("overlay theme geometry: " + ex.Message); }
     }
 
     private void SyncExpansion()
@@ -128,6 +172,9 @@ public partial class OverlayWindow
     private void AnimateOpen()
     {
         Height = ExpandedWindowHeight;              // grow the surface first, then animate inside it
+        // A DoubleAnimation with only a To needs a real base value, and the collapsed
+        // console panel is auto-sized (NaN) — pin it to what it currently measures.
+        if (double.IsNaN(NotchPanel.Width)) NotchPanel.Width = NotchPanel.ActualWidth;
         RevealHost.Visibility = Visibility.Visible; // before measuring — a collapsed element measures 0
         Animate(RevealHost, HeightProperty, ContentHeight(), 240, Ease.Morph);
         Animate(NotchPanel, WidthProperty, ExpandedPanelWidth, 240, Ease.Morph);
@@ -151,16 +198,26 @@ public partial class OverlayWindow
         };
         RevealHost.BeginAnimation(HeightProperty, height, HandoffBehavior.SnapshotAndReplace);
 
-        Animate(NotchPanel, WidthProperty, CollapsedPanelWidth, 200, Ease.Morph);
+        if (IsConsole)
+        {
+            NotchPanel.BeginAnimation(WidthProperty, null);
+            NotchPanel.Width = double.NaN; // back to auto: the line is its own width
+        }
+        else
+        {
+            Animate(NotchPanel, WidthProperty, IslandCollapsedWidth, 200, Ease.Morph);
+        }
         // Fade the content out a touch faster than the shape closes, so it's gone
         // before the panel finishes shrinking (also masks the prompt card unloading).
         Animate(ExpandedContent, OpacityProperty, 0, 110, Ease.Out);
         AnimateSlide(-12, 200, Ease.Morph);
     }
 
+    // Unconstrained: each theme's body carries its own width (island 560, console
+    // 812), so the measure must not impose one.
     private double ContentHeight()
     {
-        ExpandedContent.Measure(new Size(560, double.PositiveInfinity));
+        ExpandedContent.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         return Math.Ceiling(ExpandedContent.DesiredSize.Height);
     }
 
