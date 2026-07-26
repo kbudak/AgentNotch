@@ -5,9 +5,9 @@ using Xunit;
 namespace AgentNotch.Tests;
 
 /// <summary>
-/// The collapsed pill is 248px wide and the summary shares that row with the
-/// agent marks on its left, so the segment list has to stay short. These pin the
-/// priority order and the cap — three segments at once used to run into the marks.
+/// The collapsed pill shows one chip per state — a count wearing that state's
+/// colour, no wording. These pin the grouping and the most-urgent-first order
+/// the chips are laid out in.
 /// </summary>
 public class CollapsedPartsTests
 {
@@ -26,30 +26,29 @@ public class CollapsedPartsTests
         => Assert.Empty(new MainViewModel().CollapsedParts);
 
     [Fact]
-    public void CountsAreGroupedAndColouredByState()
+    public void SessionsAreGroupedIntoOneChipPerState()
     {
         var parts = With(SessionStatus.Working, SessionStatus.Working, SessionStatus.Finished).CollapsedParts;
 
         Assert.Collection(parts,
-            p => { Assert.Equal("2", p.Count); Assert.Equal("working", p.Word); Assert.Equal("working", p.Kind); },
-            p => { Assert.Equal("1", p.Count); Assert.Equal("done", p.Word); Assert.Equal("finished", p.Kind); });
+            p => { Assert.Equal("2", p.Count); Assert.Equal("working", p.Kind); },
+            p => { Assert.Equal("1", p.Count); Assert.Equal("finished", p.Kind); });
     }
 
     [Fact]
-    public void SingleNeedsYouReadsAsSingular()
-    {
-        var parts = With(SessionStatus.NeedsYou).CollapsedParts;
-        Assert.Equal("needs you", Assert.Single(parts).Word);
-    }
-
-    [Fact]
-    public void AllThreeStatesKeepTheTwoMostUrgent()
+    public void AllThreeStatesAreKept()
     {
         var parts = With(SessionStatus.NeedsYou, SessionStatus.Working, SessionStatus.Finished).CollapsedParts;
 
-        Assert.Equal(2, parts.Count);
-        Assert.Equal("needsyou", parts[0].Kind);
-        Assert.Equal("working", parts[1].Kind);
-        Assert.DoesNotContain(parts, p => p.Kind == "finished"); // dropped: least actionable
+        // Most urgent first — bare counts fit the pill, so nothing is dropped.
+        Assert.Equal(new[] { "needsyou", "working", "finished" }, parts.Select(p => p.Kind));
+    }
+
+    [Fact]
+    public void OnlyOneStatePresentYieldsOneChip()
+    {
+        var chip = Assert.Single(With(SessionStatus.NeedsYou, SessionStatus.NeedsYou).CollapsedParts);
+        Assert.Equal("2", chip.Count);
+        Assert.Equal("needsyou", chip.Kind);
     }
 }
