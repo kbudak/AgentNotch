@@ -2,7 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="clr-namespace:AgentNotch.App.UI"
-             Focusable="False" Width="812"
+             Focusable="False" Width="700"
              FontFamily="{DynamicResource MonoFontFamily}">
 
     <!-- The expanded console panel, per the AgentNotch Console handoff: one
@@ -127,7 +127,7 @@
     <StackPanel>
 
         <!-- ═══════════ HEADER · 28 ═══════════ -->
-        <Border Height="28" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource InnerRuleBrush}">
+        <Border Height="32" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource InnerRuleBrush}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -170,7 +170,7 @@
                 </StackPanel>
 
                 <!-- 34x28 rail cell. Glyph doubles as state: gear closed, ▴ to come back. -->
-                <Button Grid.Column="2" Width="34" Height="28" Click="OnSettingsClick"
+                <Button Grid.Column="2" Width="36" Height="32" Click="OnSettingsClick"
                         Focusable="False" IsTabStop="False" Cursor="Hand">
                     <Button.Template>
                         <ControlTemplate TargetType="{x:Type Button}">
@@ -216,15 +216,15 @@
                 </Style>
             </StackPanel.Style>
 
-            <Border Height="22" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource RowSeparatorBrush}">
+            <Border Height="26" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource RowSeparatorBrush}">
                 <Grid Margin="12,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="14"/>
-                        <ColumnDefinition Width="98"/>
-                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="96"/>
+                        <ColumnDefinition Width="130"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="52"/>
-                        <ColumnDefinition Width="88"/>
+                        <ColumnDefinition Width="48"/>
+                        <ColumnDefinition Width="80"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="1" Style="{StaticResource ColumnHead}"
                                Text="{Binding Source=AGENT, Converter={StaticResource Tracked}}"/>
@@ -243,17 +243,17 @@
             <ItemsControl ItemsSource="{Binding Sessions}" Focusable="False">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border x:Name="Row" Height="28" Cursor="Hand"
+                        <Border x:Name="Row" Height="34" Cursor="Hand"
                                 Background="{Binding Converter={StaticResource SessionRowBg}}"
                                 MouseLeftButtonDown="OnSessionRowClick">
                             <Grid Margin="12,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="14"/>
-                                    <ColumnDefinition Width="98"/>
-                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="96"/>
+                                    <ColumnDefinition Width="130"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="52"/>
-                                    <ColumnDefinition Width="88"/>
+                                    <ColumnDefinition Width="48"/>
+                                    <ColumnDefinition Width="80"/>
                                 </Grid.ColumnDefinitions>
 
                                 <TextBlock Grid.Column="0" FontSize="10" VerticalAlignment="Center"
@@ -344,7 +344,7 @@
                 <StackPanel DataContext="{Binding ActivePrompt}">
 
                     <!-- Kicker -->
-                    <Border Height="24" Background="{DynamicResource KickerBgBrush}">
+                    <Border Height="26" Background="{DynamicResource KickerBgBrush}">
                         <Grid Margin="12,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -557,7 +557,7 @@
         <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PanelBorderBrush}"
                 Visibility="{Binding SettingsOpen, Converter={StaticResource BoolToVis}}">
             <StackPanel>
-                <Border Height="24">
+                <Border Height="26">
                     <Grid Margin="12,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -700,23 +700,6 @@
                     </StackPanel>
                 </Grid>
             </StackPanel>
-        </Border>
-
-        <!-- ═══════════ FOOTER · 22 ═══════════ -->
-        <Border Height="22" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource InnerRuleBrush}">
-            <Grid Margin="12,0">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
-                    <TextBlock FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}"
-                               Text="{Binding Source='WIN+SHIFT+A PANEL', Converter={StaticResource Tracked}}"/>
-                    <TextBlock FontSize="9.5" Margin="18,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}"
-                               Text="{Binding Source='CTRL+Y ALLOW', Converter={StaticResource Tracked}}"/>
-                    <TextBlock FontSize="9.5" Margin="18,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}"
-                               Text="{Binding Source='CTRL+N DENY', Converter={StaticResource Tracked}}"/>
-                </StackPanel>
-                <TextBlock FontSize="9.5" VerticalAlignment="Center" HorizontalAlignment="Right"
-                           Foreground="{DynamicResource AccentGreenBrush}"
-                           Text="{Binding Source='● LOCAL ONLY', Converter={StaticResource Tracked}}"/>
-            </Grid>
         </Border>
 
     </StackPanel>

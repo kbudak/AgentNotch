@@ -29,20 +29,27 @@ public partial class OverlayWindow
     // handoff's 812px panel, which needs a wider surface to sit in.
     private const double IslandCollapsedWidth = 248;
     private const double IslandExpandedWidth = 576;  // 560 content + 8+8 panel padding
-    private const double ConsoleExpandedWidth = 812; // the spec's panel width; it has no padding
+    private const double ConsoleExpandedWidth = 700; // 700 content, no panel padding
     private const double IslandWindowWidth = 640;
-    private const double ConsoleWindowWidth = 900;   // 812 + the 28+28 shadow margins, rounded up
+    private const double ConsoleWindowWidth = 780;   // 700 + the 28+28 shadow margins, rounded up
 
     // AllowsTransparency makes this a layered window: WPF hands the ENTIRE window
-    // surface to UpdateLayeredWindow on every frame, so idle cost scales with the
-    // window's area, not with what actually changed. At 640x800 the collapsed
-    // pill's spinner was repainting 2 MB per frame. The HWND still never resizes
-    // *during* an animation — it is sized once at each end.
-    private const double ExpandedWindowHeight = 800;
-    private const double CollapsedWindowHeight = 120; // pill (38) + room for the drop shadow
+    // surface to UpdateLayeredWindow on every frame, so cost scales with the
+    // window's AREA, not with what actually changed — during an open/close that is
+    // a full-surface CPU blit per frame, which is what made the morph stutter. So
+    // the surface is sized to the content it is about to hold rather than to a
+    // worst case, and it is still only ever resized at the ends, never mid-flight.
+    private const double MaxWindowHeight = 800;
+    // What the surface needs on top of the curtain: the 32px shadow gutter, plus
+    // (island only) the quota/gear header row and the panel's own padding.
+    private double WindowChrome => IsConsole ? 44 : 104;
+    private const double IslandCollapsedHeight = 120; // pill (38) + room for the drop shadow
+    private const double ConsoleCollapsedHeight = 80; // the line is only 26 tall
 
     private MainViewModel? _vm;
     private bool _open;
+    private bool _opening;               // suppress content-driven re-targeting mid-open
+    private double _consoleLineWidth = 240; // the collapsed line's natural width, for a smooth close
 
     private bool IsConsole => ThemeManager.Normalize(_vm?.Theme) == ThemeManager.Console;
     private double ExpandedPanelWidth => IsConsole ? ConsoleExpandedWidth : IslandExpandedWidth;
@@ -54,6 +61,8 @@ public partial class OverlayWindow
     /// </summary>
     private double CollapsedPanelWidth => IsConsole ? double.NaN : IslandCollapsedWidth;
 
+    private double CollapsedWindowHeight => IsConsole ? ConsoleCollapsedHeight : IslandCollapsedHeight;
+
     public OverlayWindow()
     {
         InitializeComponent();
@@ -63,6 +72,11 @@ public partial class OverlayWindow
         MouseLeave += (_, _) => _vm?.SetHover(false);
         DataContextChanged += OnDataContextChanged;
         ExpandedContent.SizeChanged += OnContentSizeChanged;
+        ConsoleLine.SizeChanged += (_, e) =>
+        {
+            if (double.IsNaN(NotchPanel.Width) && e.NewSize.Width > 1)
+                _consoleLineWidth = Math.Ceiling(e.NewSize.Width);
+        };
 
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         Closed += (_, _) =>
@@ -148,8 +162,19 @@ public partial class OverlayWindow
     /// <summary>Content grew or shrank while open (prompt card swapped) — morph the curtain.</summary>
     private void OnContentSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        if (_open && IsLoaded)
-            Animate(RevealHost, HeightProperty, ContentHeight(), 200, Ease.Morph);
+        if (!_open || !IsLoaded) return;
+        double content = ContentHeight();
+        GrowWindowFor(content);
+        // Mid-open, re-target on the open's own duration and curve: swapping in a
+        // shorter animation halfway through is what read as a hitch.
+        Animate(RevealHost, HeightProperty, content, _opening ? 240 : 200, Ease.Morph);
+    }
+
+    /// <summary>Keeps the surface just big enough for the panel it is about to show.</summary>
+    private void GrowWindowFor(double contentHeight)
+    {
+        double wanted = Math.Min(MaxWindowHeight, Math.Ceiling(contentHeight) + WindowChrome);
+        if (wanted > Height) Height = wanted;
     }
 
     // -------------------------------------------------------------- settings
@@ -171,12 +196,19 @@ public partial class OverlayWindow
     // single smooth shape rather than three loosely-synced parts.
     private void AnimateOpen()
     {
-        Height = ExpandedWindowHeight;              // grow the surface first, then animate inside it
+        RevealHost.Visibility = Visibility.Visible; // before measuring — a collapsed element measures 0
+        ExpandedContent.UpdateLayout();             // ...and a just-shown subtree measures short until it arranges
+        double content = ContentHeight();
+        Height = Math.Min(MaxWindowHeight, Math.Ceiling(content) + WindowChrome);
         // A DoubleAnimation with only a To needs a real base value, and the collapsed
         // console panel is auto-sized (NaN) — pin it to what it currently measures.
         if (double.IsNaN(NotchPanel.Width)) NotchPanel.Width = NotchPanel.ActualWidth;
-        RevealHost.Visibility = Visibility.Visible; // before measuring — a collapsed element measures 0
-        Animate(RevealHost, HeightProperty, ContentHeight(), 240, Ease.Morph);
+
+        _opening = true;
+        var curtain = new DoubleAnimation(content, TimeSpan.FromMilliseconds(240)) { EasingFunction = Ease.Morph };
+        curtain.Completed += (_, _) => _opening = false;
+        RevealHost.BeginAnimation(HeightProperty, curtain, HandoffBehavior.SnapshotAndReplace);
+
         Animate(NotchPanel, WidthProperty, ExpandedPanelWidth, 240, Ease.Morph);
         Animate(ExpandedContent, OpacityProperty, 1, 190, Ease.Out, beginMs: 40);
         AnimateSlide(0, 240, Ease.Morph);
@@ -189,24 +221,25 @@ public partial class OverlayWindow
         // compositing), so the row spinners kept burning CPU while collapsed.
         // Collapsing once the curtain is shut takes the whole subtree out of the
         // render pass; the notch spends nearly all its life in this state.
+        _opening = false;
         var height = new DoubleAnimation(0, TimeSpan.FromMilliseconds(200)) { EasingFunction = Ease.Morph };
         height.Completed += (_, _) =>
         {
             if (_open) return; // re-opened mid-close — leave the surface alone
             RevealHost.Visibility = Visibility.Collapsed;
             Height = CollapsedWindowHeight;
+            // Hand the console line's width back to layout only once the morph has
+            // landed on it — dropping to auto up front made the panel snap instead
+            // of close.
+            if (IsConsole)
+            {
+                NotchPanel.BeginAnimation(WidthProperty, null);
+                NotchPanel.Width = double.NaN;
+            }
         };
         RevealHost.BeginAnimation(HeightProperty, height, HandoffBehavior.SnapshotAndReplace);
 
-        if (IsConsole)
-        {
-            NotchPanel.BeginAnimation(WidthProperty, null);
-            NotchPanel.Width = double.NaN; // back to auto: the line is its own width
-        }
-        else
-        {
-            Animate(NotchPanel, WidthProperty, IslandCollapsedWidth, 200, Ease.Morph);
-        }
+        Animate(NotchPanel, WidthProperty, IsConsole ? _consoleLineWidth : IslandCollapsedWidth, 200, Ease.Morph);
         // Fade the content out a touch faster than the shape closes, so it's gone
         // before the panel finishes shrinking (also masks the prompt card unloading).
         Animate(ExpandedContent, OpacityProperty, 0, 110, Ease.Out);
