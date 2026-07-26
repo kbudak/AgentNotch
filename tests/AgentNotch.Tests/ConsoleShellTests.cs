@@ -158,6 +158,22 @@ public class ConsoleShellTests
     }
 
     [Fact]
+    public void OneMarkPerAgentNotPerSession()
+    {
+        // The marks answer "which agents", not "how many" — the headline beside
+        // them already carries the counts.
+        var vm = new MainViewModel();
+        vm.UpdateSessions(new[]
+        {
+            Row(SessionStatus.Working, "claude"),
+            Row(SessionStatus.Working, "claude"),
+            Row(SessionStatus.Finished, "claude"),
+            Row(SessionStatus.Working, "codex"),
+        });
+        Assert.Equal(new[] { "claude", "codex" }, vm.AgentMarks.Select(m => m.Agent));
+    }
+
+    [Fact]
     public void TrackedSpacesOutCapitalsWithoutChangingThem()
     {
         var tracked = (string)new TrackedConverter()

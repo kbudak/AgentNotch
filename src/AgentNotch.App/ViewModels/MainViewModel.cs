@@ -340,16 +340,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    /// <summary>One mark per live session for the collapsed line; capped so the line stays short.</summary>
+    /// <summary>
+    /// One mark per AGENT on the collapsed line, not per session — the marks say
+    /// which agents are on the machine, and the headline beside them already
+    /// carries the counts. Three Claude sessions is one Claude mark.
+    /// </summary>
     public IReadOnlyList<AgentMark> AgentMarks
     {
         get
         {
-            var marks = new List<AgentMark>(8);
+            var marks = new List<AgentMark>(4);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var s in Sessions)
             {
-                if (marks.Count == 8) break;
-                marks.Add(new AgentMark(s.Agent));
+                var agent = s.Agent ?? "";
+                if (seen.Add(agent)) marks.Add(new AgentMark(agent));
             }
             return marks;
         }
