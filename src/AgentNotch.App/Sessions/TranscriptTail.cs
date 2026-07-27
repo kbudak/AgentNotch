@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Buffers;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -29,6 +30,9 @@ public static class TranscriptTail
 {
     /// <summary>How much of a transcript we read from the end.</summary>
     public const int TailBytes = 256 * 1024;
+
+    /// <summary>Fixed window AddSpend streams through, whatever the file's size.</summary>
+    private const int SpendWindowBytes = 256 * 1024;
 
     /// <summary>
     /// A busy/waiting registry status older than this is a leftover from a hung or
@@ -76,9 +80,13 @@ public static class TranscriptTail
             int len = (int)Math.Min(size, TailBytes);
             if (len <= 0) return new List<JsonElement>();
             fs.Position = Math.Max(0, size - len);
-            var buf = new byte[len];
-            fs.ReadExactly(buf, 0, len);
-            return ParseLines(Encoding.UTF8.GetString(buf));
+            var buf = ArrayPool<byte>.Shared.Rent(len);
+            try
+            {
+                fs.ReadExactly(buf, 0, len);
+                return ParseLines(buf, 0, len);
+            }
+            finally { ArrayPool<byte>.Shared.Return(buf); }
         }
         catch
         {
@@ -89,23 +97,49 @@ public static class TranscriptTail
     /// <summary>Parses NDJSON text; unparseable lines (e.g. a cut-off first line) are skipped.</summary>
     public static List<JsonElement> ParseLines(string text)
     {
+        var bytes = Encoding.UTF8.GetBytes(text);
+        return ParseLines(bytes, 0, bytes.Length);
+    }
+
+    /// <summary>
+    /// Parses NDJSON straight out of a UTF-8 buffer. Deliberately never builds a
+    /// string for the window or an array of its lines: at a 256 KB tail on a 2s
+    /// poll both land on the large object heap, which is not compacted, so the
+    /// churn showed up as steadily climbing private bytes rather than as garbage.
+    /// JsonDocument reads each line in place; only the surviving elements are
+    /// cloned out.
+    /// </summary>
+    public static List<JsonElement> ParseLines(byte[] buffer, int offset, int count)
+    {
         var events = new List<JsonElement>();
-        foreach (var raw in text.Split('\n'))
+        int end = offset + count, start = offset;
+        while (start < end)
         {
-            var line = raw.Trim();
-            if (line.Length == 0) continue;
-            try
+            int nl = Array.IndexOf(buffer, (byte)'\n', start, end - start);
+            int stop = nl < 0 ? end : nl;
+            int len = stop - start;
+            while (len > 0 && IsBlank(buffer[start + len - 1])) len--;      // trailing \r / space
+            int from = start;
+            while (len > 0 && IsBlank(buffer[from])) { from++; len--; }     // leading space
+            if (len > 0)
             {
-                using var doc = JsonDocument.Parse(line);
-                events.Add(doc.RootElement.Clone());
+                try
+                {
+                    using var doc = JsonDocument.Parse(new ReadOnlyMemory<byte>(buffer, from, len));
+                    events.Add(doc.RootElement.Clone());
+                }
+                catch (JsonException)
+                {
+                    // partial or malformed line — tolerated by design
+                }
             }
-            catch (JsonException)
-            {
-                // partial or malformed line — tolerated by design
-            }
+            if (nl < 0) break;
+            start = nl + 1;
         }
         return events;
     }
+
+    private static bool IsBlank(byte b) => b == (byte)' ' || b == (byte)'\r' || b == (byte)'\t';
 
     // ---------- event inspection ----------
 
@@ -283,44 +317,82 @@ public static class TranscriptTail
             if (need <= 0) return start;
             if (need > int.MaxValue) return start; // absurd; refuse to allocate
 
-            var buf = new byte[need];
             fs.Position = start.Offset;
-            fs.ReadExactly(buf, 0, buf.Length);
-
-            int lastNl = Array.LastIndexOf(buf, (byte)'\n');
-            if (lastNl < 0) return start; // no complete new line yet
-
             long tokens = start.Tokens;
-            var text = Encoding.UTF8.GetString(buf, 0, lastNl);
-            foreach (var line in text.Split('\n'))
+            long consumed = start.Offset;
+
+            // Streamed through one pooled window rather than materialised. The old
+            // path allocated byte[need] + a UTF-16 string + a Split array of every
+            // line — about five times the file's size, all of it on the large object
+            // heap. On a first pass over a 55 MB transcript that alone is ~275 MB
+            // that the GC never hands back, and this runs for every tracked session.
+            var buf = ArrayPool<byte>.Shared.Rent(SpendWindowBytes);
+            try
             {
-                // Cheap pre-filter: only assistant turns carry a usage object, so skip
-                // the (often huge) tool-result/user lines without paying to parse them.
-                if (!line.Contains("\"output_tokens\"", StringComparison.Ordinal)) continue;
-                try
+                int held = 0; // bytes of an incomplete trailing line, carried forward
+                while (true)
                 {
-                    using var doc = JsonDocument.Parse(line);
-                    var root = doc.RootElement;
-                    if (root.ValueKind == JsonValueKind.Object &&
-                        root.TryGetProperty("message", out var msg) && msg.ValueKind == JsonValueKind.Object &&
-                        msg.TryGetProperty("usage", out var usage) && usage.ValueKind == JsonValueKind.Object)
+                    int read = fs.Read(buf, held, buf.Length - held);
+                    if (read <= 0) break;
+                    int end = held + read;
+                    int lineStart = 0;
+                    while (true)
                     {
-                        tokens += GetLong(usage, "input_tokens")
-                                + GetLong(usage, "cache_creation_input_tokens")
-                                + GetLong(usage, "output_tokens");
+                        int nl = Array.IndexOf(buf, (byte)'\n', lineStart, end - lineStart);
+                        if (nl < 0) break;
+                        tokens += TokensInLine(buf, lineStart, nl - lineStart);
+                        consumed += nl - lineStart + 1;
+                        lineStart = nl + 1;
+                    }
+                    held = end - lineStart;
+                    if (held > 0 && lineStart > 0) Buffer.BlockCopy(buf, lineStart, buf, 0, held);
+                    if (held == buf.Length)
+                    {
+                        // A single line longer than the window can never complete.
+                        // Skip it rather than growing the buffer without bound; usage
+                        // lines are small, the giant ones are tool results.
+                        consumed += held;
+                        held = 0;
                     }
                 }
-                catch (JsonException)
-                {
-                }
             }
-            return new SpendState(start.Offset + lastNl + 1, tokens);
+            finally { ArrayPool<byte>.Shared.Return(buf); }
+
+            return new SpendState(consumed, tokens);
         }
         catch
         {
             return previous;
         }
     }
+
+    /// <summary>Token total on one transcript line, or 0 when it carries no usage block.</summary>
+    private static long TokensInLine(byte[] buffer, int offset, int length)
+    {
+        // Cheap pre-filter on the raw bytes: only assistant turns carry a usage
+        // object, so the (often huge) tool-result and user lines cost one scan
+        // instead of a parse — and no string.
+        if (length <= 0 || buffer.AsSpan(offset, length).IndexOf(UsageKey) < 0) return 0;
+        try
+        {
+            using var doc = JsonDocument.Parse(new ReadOnlyMemory<byte>(buffer, offset, length));
+            var root = doc.RootElement;
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("message", out var msg) && msg.ValueKind == JsonValueKind.Object &&
+                msg.TryGetProperty("usage", out var usage) && usage.ValueKind == JsonValueKind.Object)
+            {
+                return GetLong(usage, "input_tokens")
+                     + GetLong(usage, "cache_creation_input_tokens")
+                     + GetLong(usage, "output_tokens");
+            }
+        }
+        catch (JsonException)
+        {
+        }
+        return 0;
+    }
+
+    private static readonly byte[] UsageKey = Encoding.UTF8.GetBytes("\"output_tokens\"");
 
     // ---------- registry + transcript discovery ----------
 

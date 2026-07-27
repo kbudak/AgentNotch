@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Buffers;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -158,11 +159,21 @@ public static class CodexTail
             while (true)
             {
                 if (len <= 0) return new List<JsonElement>();
-                var buf = new byte[(int)Math.Min(len, MaxGrowBytes)];
-                fs.Position = Math.Max(0, size - buf.Length);
-                fs.ReadExactly(buf, 0, buf.Length);
-                var events = TranscriptTail.ParseLines(Encoding.UTF8.GetString(buf));
-                if (events.Any(IsLifecycle) || buf.Length >= size || len >= MaxGrowBytes)
+                int want = (int)Math.Min(len, MaxGrowBytes);
+                // Pooled, and parsed straight from the bytes: the widening retry means
+                // this window can reach MaxGrowBytes, and a fresh array plus a UTF-16
+                // copy of it per poll is exactly the large-object churn that grew the
+                // process. See TranscriptTail.ParseLines.
+                var buf = ArrayPool<byte>.Shared.Rent(want);
+                List<JsonElement> events;
+                try
+                {
+                    fs.Position = Math.Max(0, size - want);
+                    fs.ReadExactly(buf, 0, want);
+                    events = TranscriptTail.ParseLines(buf, 0, want);
+                }
+                finally { ArrayPool<byte>.Shared.Return(buf); }
+                if (events.Any(IsLifecycle) || want >= size || len >= MaxGrowBytes)
                     return events;
                 len = Math.Min(size, len * 2);
             }
