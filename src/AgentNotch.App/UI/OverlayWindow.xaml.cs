@@ -27,7 +27,7 @@ public partial class OverlayWindow
     // Geometry is per theme. The island is a 248px pill that opens to a 576px
     // capsule; the console is a status LINE that fits its own text and opens to the
     // handoff's 812px panel, which needs a wider surface to sit in.
-    private const double IslandCollapsedWidth = 248;
+    private const double IslandCollapsedWidth = 220;
     private const double IslandExpandedWidth = 576;  // 560 content + 8+8 panel padding
     private const double ConsoleExpandedWidth = 700; // 700 content, no panel padding
     private const double IslandWindowWidth = 640;
@@ -43,7 +43,7 @@ public partial class OverlayWindow
     // What the surface needs on top of the curtain: the 32px shadow gutter, plus
     // (island only) the quota/gear header row and the panel's own padding.
     private double WindowChrome => IsConsole ? 44 : 104;
-    private const double IslandCollapsedHeight = 120; // pill (38) + room for the drop shadow
+    private const double IslandCollapsedHeight = 108; // pill (34) + room for the drop shadow
     private const double ConsoleCollapsedHeight = 80; // the line is only 26 tall
 
     private MainViewModel? _vm;
