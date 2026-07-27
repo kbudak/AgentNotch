@@ -14,8 +14,8 @@
         Width="640" Height="120"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
-        TextOptions.TextFormattingMode="Display"
-        TextOptions.TextRenderingMode="ClearType"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="Grayscale"
         FontFamily="{DynamicResource UiFontFamily}"
         FontSize="12.5"
         Foreground="{DynamicResource TextPrimaryBrush}">

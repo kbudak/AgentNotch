@@ -13,7 +13,7 @@
 
     <!-- ===================== Fonts ===================== -->
     <!-- One grid, one face: prose gets the same mono as the numbers. -->
-    <FontFamily x:Key="UiFontFamily">Cascadia Mono, JetBrains Mono, Consolas, Courier New</FontFamily>
+    <FontFamily x:Key="UiFontFamily">Cascadia Mono SemiLight, Cascadia Mono, JetBrains Mono, Consolas</FontFamily>
     <FontFamily x:Key="MonoFontFamily">Cascadia Mono, JetBrains Mono, Consolas, Courier New</FontFamily>
 
     <!-- ===================== Shape ===================== -->

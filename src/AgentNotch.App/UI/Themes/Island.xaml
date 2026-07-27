@@ -12,7 +12,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ===================== Fonts ===================== -->
-    <FontFamily x:Key="UiFontFamily">Segoe UI Variable Text, Segoe UI</FontFamily>
+    <!-- SemiLight is the soft cut; the regular weight reads hard at these sizes. -->
+    <FontFamily x:Key="UiFontFamily">Cascadia Mono SemiLight, Cascadia Mono, Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="MonoFontFamily">Cascadia Mono, Consolas, Courier New</FontFamily>
 
     <!-- ===================== Shape ===================== -->
