@@ -162,7 +162,11 @@ public partial class OverlayWindow
     /// <summary>Content grew or shrank while open (prompt card swapped) — morph the curtain.</summary>
     private void OnContentSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        if (!_open || !IsLoaded) return;
+        // HEIGHT only. The panel's width animates while opening, and ExpandedContent
+        // is centre-aligned, so its arranged width changes every frame — reacting to
+        // that re-started the curtain from wherever it had got to, on every frame,
+        // and it crawled to 4px instead of opening.
+        if (!_open || !IsLoaded || !e.HeightChanged) return;
         double content = ContentHeight();
         GrowWindowFor(content);
         // Mid-open, re-target on the open's own duration and curve: swapping in a
@@ -192,17 +196,21 @@ public partial class OverlayWindow
         public static readonly IEasingFunction Out = new SineEase { EasingMode = EasingMode.EaseOut };
     }
 
-    // Width, height and slide share one duration and one curve so the panel moves as a
-    // single smooth shape rather than three loosely-synced parts.
+    // Width and height share one duration and one curve, and the content neither
+    // travels nor waits — the panel opens as one shape in both axes at once.
     private void AnimateOpen()
     {
+        // Pin the width BEFORE anything can lay the panel out again. The collapsed
+        // console panel is auto-sized, so the moment the 700-wide body becomes
+        // visible any layout pass snaps the panel straight to 700 — and the width
+        // animation below then had nothing left to travel. That snap, followed by
+        // the curtain, is what read as "widens first, then opens downward".
+        if (double.IsNaN(NotchPanel.Width)) NotchPanel.Width = _consoleLineWidth;
+
         RevealHost.Visibility = Visibility.Visible; // before measuring — a collapsed element measures 0
         ExpandedContent.UpdateLayout();             // ...and a just-shown subtree measures short until it arranges
         double content = ContentHeight();
         Height = Math.Min(MaxWindowHeight, Math.Ceiling(content) + WindowChrome);
-        // A DoubleAnimation with only a To needs a real base value, and the collapsed
-        // console panel is auto-sized (NaN) — pin it to what it currently measures.
-        if (double.IsNaN(NotchPanel.Width)) NotchPanel.Width = NotchPanel.ActualWidth;
 
         _opening = true;
         var curtain = new DoubleAnimation(content, TimeSpan.FromMilliseconds(240)) { EasingFunction = Ease.Morph };
@@ -210,8 +218,9 @@ public partial class OverlayWindow
         RevealHost.BeginAnimation(HeightProperty, curtain, HandoffBehavior.SnapshotAndReplace);
 
         Animate(NotchPanel, WidthProperty, ExpandedPanelWidth, 240, Ease.Morph);
-        Animate(ExpandedContent, OpacityProperty, 1, 190, Ease.Out, beginMs: 40);
-        AnimateSlide(0, 240, Ease.Morph);
+        // No delay and no travel: the panel growing IS the animation, so the content
+        // has to already be there as the curtain uncovers it.
+        Animate(ExpandedContent, OpacityProperty, 1, 140, Ease.Out);
     }
 
     private void AnimateClose()
@@ -243,7 +252,6 @@ public partial class OverlayWindow
         // Fade the content out a touch faster than the shape closes, so it's gone
         // before the panel finishes shrinking (also masks the prompt card unloading).
         Animate(ExpandedContent, OpacityProperty, 0, 110, Ease.Out);
-        AnimateSlide(-12, 200, Ease.Morph);
     }
 
     // Unconstrained: each theme's body carries its own width (island 560, console
@@ -263,12 +271,6 @@ public partial class OverlayWindow
             BeginTime = TimeSpan.FromMilliseconds(beginMs),
         };
         target.BeginAnimation(property, animation, HandoffBehavior.SnapshotAndReplace);
-    }
-
-    private void AnimateSlide(double to, int ms, IEasingFunction ease)
-    {
-        var animation = new DoubleAnimation(to, TimeSpan.FromMilliseconds(ms)) { EasingFunction = ease };
-        ContentSlide.BeginAnimation(TranslateTransform.YProperty, animation, HandoffBehavior.SnapshotAndReplace);
     }
 
     // ------------------------------------------------------------- placement

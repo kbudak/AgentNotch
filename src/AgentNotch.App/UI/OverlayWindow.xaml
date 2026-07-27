@@ -345,9 +345,6 @@
                     <StackPanel x:Name="ExpandedContent"
                                 VerticalAlignment="Top" HorizontalAlignment="Center"
                                 Opacity="0">
-                        <StackPanel.RenderTransform>
-                            <TranslateTransform x:Name="ContentSlide" Y="-14"/>
-                        </StackPanel.RenderTransform>
 
                     <!-- Island body. The console body is a sibling below it; only one
                          is ever visible, and a Collapsed subtree is skipped by both
