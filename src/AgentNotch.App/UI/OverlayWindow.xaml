@@ -240,20 +240,22 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <!-- A capsule, not a box: the island radius is half the
-                                         height, so a count reads as one round token beside
-                                         the agent marks instead of a slab.
-                                         Two layers — Border.Opacity would wash out the
-                                         number along with the tint, so the fill sits
-                                         behind it and the digit keeps full strength. -->
-                                    <Grid Margin="5,0,0,0" MinWidth="19" Height="16">
-                                        <Border CornerRadius="{DynamicResource CountChipCornerRadius}" Opacity="0.18"
+                                    <!-- Dot + count, no container. The chip's tinted box was
+                                         drawing more attention than the agent marks it sits
+                                         next to; a 6px dot carries the state colour just as
+                                         well and the number can then be plain text.
+                                         The pip takes the theme's radius, so it is a dot on
+                                         the island and a square pip on the console. -->
+                                    <StackPanel Orientation="Horizontal" Margin="11,0,0,0"
+                                                VerticalAlignment="Center">
+                                        <Border Width="6" Height="6" VerticalAlignment="Center"
+                                                CornerRadius="{DynamicResource CountChipCornerRadius}"
                                                 Background="{Binding Kind, Converter={StaticResource StateKindBrush}}"/>
-                                        <TextBlock Text="{Binding Count}" FontSize="10.5" FontWeight="SemiBold"
-                                                   Margin="6,0,6,0"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   Foreground="{Binding Kind, Converter={StaticResource StateKindBrush}}"/>
-                                    </Grid>
+                                        <TextBlock Text="{Binding Count}" Margin="5,0,0,0"
+                                                   FontSize="11" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
