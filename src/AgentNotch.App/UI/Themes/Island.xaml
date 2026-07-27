@@ -22,7 +22,8 @@
     <CornerRadius x:Key="ButtonCornerRadius">8</CornerRadius>
     <CornerRadius x:Key="ChipCornerRadius">4</CornerRadius>
     <CornerRadius x:Key="CodeCornerRadius">6</CornerRadius>
-    <CornerRadius x:Key="CountChipCornerRadius">6</CornerRadius>
+    <!-- Half the count chip's 16px height: a capsule, not a rounded box. -->
+    <CornerRadius x:Key="CountChipCornerRadius">8</CornerRadius>
     <CornerRadius x:Key="PillCornerRadius">11</CornerRadius>
     <Thickness x:Key="PanelPaddingThickness">8,0,8,8</Thickness>
 
