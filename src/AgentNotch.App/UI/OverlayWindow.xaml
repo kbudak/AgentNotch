@@ -251,10 +251,21 @@
                                         <Border Width="6" Height="6" VerticalAlignment="Center"
                                                 CornerRadius="{DynamicResource CountChipCornerRadius}"
                                                 Background="{Binding Kind, Converter={StaticResource StateKindBrush}}"/>
+                                        <!-- Nudged down 1px. Box-centring lines the digit's
+                                             INK centroid up with the dot, but "1" in Cascadia
+                                             carries a wide base serif that drags that centroid
+                                             below where the eye reads the glyph's middle, so
+                                             the dot looked high. A render transform, not a
+                                             margin, so it shifts by exactly 1px instead of
+                                             being halved by the centring. -->
                                         <TextBlock Text="{Binding Count}" Margin="5,0,0,0"
                                                    FontSize="11" FontWeight="SemiBold"
                                                    VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                   Foreground="{DynamicResource TextPrimaryBrush}">
+                                            <TextBlock.RenderTransform>
+                                                <TranslateTransform Y="1"/>
+                                            </TextBlock.RenderTransform>
+                                        </TextBlock>
                                     </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
