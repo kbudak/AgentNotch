@@ -26,7 +26,11 @@
     <Thickness x:Key="PanelPaddingThickness">8,0,8,8</Thickness>
 
     <!-- ===================== Palette ===================== -->
-    <SolidColorBrush x:Key="PanelBgBrush" Color="#F70B0B0E"/>
+    <!-- Near-black, and a touch more opaque than it was: at #F70B0B0E enough of a
+         light desktop bled through to read as charcoal rather than black. The cards
+         on top keep their old value, so darkening this deepens the layering rather
+         than flattening it. -->
+    <SolidColorBrush x:Key="PanelBgBrush" Color="#FB040406"/>
     <SolidColorBrush x:Key="PanelBorderBrush" Color="#14FFFFFF"/>
     <SolidColorBrush x:Key="CardBgBrush" Color="#FF131316"/>
     <!-- Island cards read by their fill alone; the console theme adds a hairline. -->
