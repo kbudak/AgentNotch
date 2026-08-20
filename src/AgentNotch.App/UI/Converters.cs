@@ -61,13 +61,16 @@ public static class AgentIcons
         "M12,6.2 C12.39,9.43 14.57,11.61 17.8,12 C14.57,12.39 12.39,14.57 12,17.8 " +
         "C11.61,14.57 9.43,12.39 6.2,12 C9.43,11.61 11.61,9.43 12,6.2Z");
 
-    /// <summary>Cursor-style wireframe cube (host marker / future agent source).</summary>
+    /// <summary>
+    /// Cursor cube. Nonzero fill (F1) — an even-odd outer+inner path used to punch a
+    /// hollow hole that vanished to a hairline at 15px on the pill, so Working looked
+    /// like an empty notch. Solid silhouette stays readable next to the spinner.
+    /// </summary>
     public static readonly Geometry Cursor = Frozen(
-        "M12,1.8 L21.3,7.2 L21.3,16.8 L12,22.2 L2.7,16.8 L2.7,7.2Z " +
-        "M12,4.7 L18.8,8.65 L18.8,15.35 L12,19.3 L5.2,15.35 L5.2,8.65Z");
+        "F1 M12,2.2 L20.8,7.3 L20.8,16.7 L12,21.8 L3.2,16.7 L3.2,7.3Z");
 
     /// <summary>Neutral dot — unknown agent, or the idle pill.</summary>
-    public static readonly Geometry Generic = Frozen("M7,12 A5,5 0 1 0 17,12 A5,5 0 1 0 7,12Z");
+    public static readonly Geometry Generic = Frozen("M0,0 M24,24 M7.5,12 A4.5,4.5 0 1 0 16.5,12 A4.5,4.5 0 1 0 7.5,12Z");
 
     // ---- Pixel-art STATUS glyphs (shape = what state) --------------------------
     // Built from an ASCII bitmap so they read as chunky retro pixels and stay easy
@@ -553,13 +556,13 @@ internal static class ToolPhrase
 {
     public static string Of(string tool) => tool switch
     {
-        "exec_command" or "shell" or "local_shell" => "Running a command",
-        "apply_patch" or "edit_file" or "str_replace" => "Editing files",
-        "read_file" or "view" => "Reading a file",
-        "search" or "grep" or "ripgrep" => "Searching the code",
-        "web_search" or "browser" => "Searching the web",
+        "exec" or "exec_command" or "run_command" or "shell" or "local_shell" => "Running a command",
+        "apply_patch" or "edit_file" or "str_replace" or "replace_file_content" or "multi_replace_file_content" or "write_to_file" => "Editing files",
+        "read_file" or "view" or "view_file" => "Reading a file",
+        "search" or "grep" or "ripgrep" or "grep_search" => "Searching the code",
+        "web_search" or "browser" or "read_url_content" => "Searching the web",
         "update_plan" or "todo" => "Updating the plan",
-        "request_user_input" => "Asking you a question",
+        "request_user_input" or "ask_question" => "Asking you a question",
         _ => tool,
     };
 }
@@ -576,6 +579,7 @@ public sealed class SessionBrandConverter : IValueConverter
                 {
                     "codex" => "Codex",
                     "antigravity" => "Antigravity",
+                    "cursor" => "Cursor",
                     "claude" => "Claude",
                     _ => s.Agent ?? "",
                 };

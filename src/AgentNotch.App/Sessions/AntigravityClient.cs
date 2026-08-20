@@ -32,7 +32,7 @@ public sealed class AntigravityClient : IDisposable
     private const int MaxTasks = 4;
 
     /// <summary>Floor between actual refresh attempts — callers may invoke <see cref="RefreshIfDue"/> freely.</summary>
-    private static readonly TimeSpan MinRefreshInterval = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan MinRefreshInterval = TimeSpan.FromSeconds(1.5);
 
     /// <summary>How long a discovered (token, ports) endpoint is trusted before re-discovery.</summary>
     private static readonly TimeSpan ServerTtl = TimeSpan.FromSeconds(60);
@@ -53,9 +53,12 @@ public sealed class AntigravityClient : IDisposable
     /// <summary>Result of the last successful fetch; empty while Antigravity isn't running.</summary>
     public IReadOnlyList<AgentSession> Latest => _latest;
 
+    /// <summary>Fired whenever Antigravity sessions are updated.</summary>
+    public event Action? Refreshed;
+
     /// <summary>
     /// Requests a refresh. Non-blocking and safe to call as often as convenient:
-    /// at most one refresh runs at a time, actual attempts are ≥10s apart, and the
+    /// at most one refresh runs at a time, actual attempts are ≥1.5s apart, and the
     /// work happens on a fire-and-forget threadpool task. Never throws.
     /// </summary>
     public void RefreshIfDue()
@@ -88,26 +91,40 @@ public sealed class AntigravityClient : IDisposable
         try
         {
             var server = GetServer();
-            if (server is not { } srv)
+            if (server is { } srv)
             {
-                // Antigravity closed (or unreachable enough that we can't even
-                // discover it) — no live trajectories to show.
-                _latest = Array.Empty<AgentSession>();
-                return;
+                foreach (var port in srv.Ports)
+                {
+                    if (_disposed) return;
+                    if (await FetchTrajectoriesAsync(port, srv.Token).ConfigureAwait(false) is { } response)
+                    {
+                        var tasks = MapTrajectories(response, DateTime.UtcNow);
+                        if (tasks.Count > 0)
+                        {
+                            _latest = tasks;
+                            Refreshed?.Invoke();
+                            return;
+                        }
+                    }
+                }
             }
 
-            foreach (var port in srv.Ports)
+            // Fallback: if RPC returned empty or was unreachable, scan recent local brain transcripts.
+            if (Interop.ProcessTree.AnyRunning("antigravity", "language_server"))
             {
-                if (_disposed) return;
-                if (await FetchTrajectoriesAsync(port, srv.Token).ConfigureAwait(false) is { } response)
+                var fallbackTasks = CollectFromBrainDir(DateTime.UtcNow);
+                if (fallbackTasks.Count > 0)
                 {
-                    _latest = MapTrajectories(response, DateTime.UtcNow);
+                    _latest = fallbackTasks;
+                    Refreshed?.Invoke();
                     return;
                 }
             }
 
-            // Cached endpoint stopped answering (app restarted?) — keep the last
-            // good snapshot for now and force re-discovery on the next attempt.
+            // Antigravity closed or idle with no tasks.
+            var wasNotEmpty = _latest.Count > 0;
+            _latest = Array.Empty<AgentSession>();
+            if (wasNotEmpty) Refreshed?.Invoke();
             lock (_gate)
             {
                 _server = null;
@@ -239,7 +256,7 @@ public sealed class AntigravityClient : IDisposable
     }
 
     private static readonly Regex CsrfTokenPattern = new(
-        "csrf_token\\s+([0-9a-fA-F-]+)", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+        @"(?:--)?csrf_token[\s=]+([0-9a-fA-F-]+)", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     /// <summary>
     /// Latest CSRF token from Antigravity's own startup logs: newest log first,
@@ -249,31 +266,26 @@ public sealed class AntigravityClient : IDisposable
     {
         var logs = new List<FileInfo>();
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-        try
+        void TryAddLogs(string dir)
         {
-            var hubLog = new FileInfo(Path.Combine(appData, "Antigravity", "logs", "main.log"));
-            if (hubLog.Exists) logs.Add(hubLog);
-        }
-        catch { }
-
-        try
-        {
-            var ideLogs = Path.Combine(appData, "Antigravity IDE", "logs");
-            if (Directory.Exists(ideLogs))
+            if (!Directory.Exists(dir)) return;
+            try
             {
-                foreach (var file in Directory.EnumerateFiles(ideLogs, "*.log", SearchOption.AllDirectories))
+                foreach (var file in Directory.EnumerateFiles(dir, "*.log", SearchOption.AllDirectories))
                 {
-                    var name = Path.GetFileName(file);
-                    if (name.Equals("main.log", StringComparison.OrdinalIgnoreCase) ||
-                        name.Equals("ls-main.log", StringComparison.OrdinalIgnoreCase))
-                    {
-                        try { logs.Add(new FileInfo(file)); } catch { }
-                    }
+                    try { logs.Add(new FileInfo(file)); } catch { }
                 }
             }
+            catch { }
         }
-        catch { }
+
+        TryAddLogs(Path.Combine(appData, "Antigravity", "logs"));
+        TryAddLogs(Path.Combine(appData, "Antigravity IDE", "logs"));
+        TryAddLogs(Path.Combine(localAppData, "Antigravity", "logs"));
+        TryAddLogs(Path.Combine(userProfile, ".gemini", "antigravity", "logs"));
 
         foreach (var log in logs.OrderByDescending(SafeLastWriteUtc))
         {
@@ -426,6 +438,273 @@ public sealed class AntigravityClient : IDisposable
     private static readonly Regex Whitespace = new(
         "\\s+", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    public struct TranscriptInfo
+    {
+        public SessionStatus? Status;
+        public string? Tool;
+        public string? Target;
+        public string? Message;
+        public string? Cwd;
+        public DateTime? TimestampUtc;
+    }
+
+    private static readonly string BrainDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".gemini", "antigravity", "brain");
+
+    /// <summary>
+    /// Reads the tail of a conversation's transcript.jsonl to discover the live step:
+    /// questions asked by the model (ask_question -> NeedsYou), pending tool calls,
+    /// or final answers.
+    /// </summary>
+    public static TranscriptInfo InspectTranscript(string? conversationId)
+    {
+        if (string.IsNullOrEmpty(conversationId)) return default;
+        var transcriptPath = Path.Combine(BrainDir, conversationId, ".system_generated", "logs", "transcript.jsonl");
+        if (!File.Exists(transcriptPath)) return default;
+
+        try
+        {
+            var tail = ReadTailText(transcriptPath);
+            if (string.IsNullOrEmpty(tail)) return default;
+
+            var lines = tail.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (lines.Length == 0) return default;
+
+            string? detectedCwd = null;
+
+            for (int i = lines.Length - 1; i >= 0; i--)
+            {
+                var line = lines[i];
+                if (!line.StartsWith('{') || !line.EndsWith('}')) continue;
+
+                using var doc = JsonDocument.Parse(line);
+                var root = doc.RootElement;
+
+                var type = FirstString(root, "type") ?? "";
+                var source = FirstString(root, "source") ?? "";
+                var createdStr = FirstString(root, "created_at", "timestamp");
+                DateTime? timeUtc = null;
+                if (!string.IsNullOrEmpty(createdStr) &&
+                    DateTimeOffset.TryParse(createdStr, CultureInfo.InvariantCulture,
+                        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dto))
+                {
+                    timeUtc = dto.UtcDateTime;
+                }
+
+                if (detectedCwd is null)
+                {
+                    if (root.TryGetProperty("tool_calls", out var tc) && tc.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var call in tc.EnumerateArray())
+                        {
+                            if (call.TryGetProperty("args", out var args))
+                                detectedCwd = FirstString(args, "Cwd", "cwd", "workdir");
+                            if (detectedCwd is not null) break;
+                        }
+                    }
+                }
+
+                if (type == "USER_INPUT" || source == "USER_EXPLICIT")
+                {
+                    return new TranscriptInfo
+                    {
+                        Status = SessionStatus.Working,
+                        Message = "Thinking…",
+                        Cwd = detectedCwd,
+                        TimestampUtc = timeUtc,
+                    };
+                }
+
+                if (type != "PLANNER_RESPONSE")
+                {
+                    // A tool execution step (RUN_COMMAND, REPLACE_FILE_CONTENT, VIEW_FILE, etc.)
+                    // means the agent is in the middle of executing actions in its turn.
+                    var toolName = type.ToLowerInvariant();
+                    return new TranscriptInfo
+                    {
+                        Status = SessionStatus.Working,
+                        Tool = toolName,
+                        Target = "Working…",
+                        Message = "Working…",
+                        Cwd = detectedCwd,
+                        TimestampUtc = timeUtc,
+                    };
+                }
+
+                if (type == "PLANNER_RESPONSE")
+                {
+                    if (root.TryGetProperty("tool_calls", out var toolCalls) &&
+                        toolCalls.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var call in toolCalls.EnumerateArray())
+                        {
+                            if (call.ValueKind != JsonValueKind.Object) continue;
+                            var toolName = FirstString(call, "name");
+                            if (string.IsNullOrEmpty(toolName)) continue;
+
+                            if (toolName.Equals("ask_question", StringComparison.OrdinalIgnoreCase))
+                            {
+                                string? qText = null;
+                                if (call.TryGetProperty("args", out var args) &&
+                                    args.TryGetProperty("questions", out var qs) &&
+                                    qs.ValueKind == JsonValueKind.Array)
+                                {
+                                    foreach (var q in qs.EnumerateArray())
+                                    {
+                                        qText = FirstString(q, "question", "title", "text");
+                                        if (!string.IsNullOrEmpty(qText)) break;
+                                    }
+                                }
+                                var msg = CollapseExcerpt(qText, 100) ?? "Asking you a question";
+                                return new TranscriptInfo
+                                {
+                                    Status = SessionStatus.NeedsYou,
+                                    Tool = "ask_question",
+                                    Target = msg,
+                                    Message = msg,
+                                    Cwd = detectedCwd,
+                                    TimestampUtc = timeUtc,
+                                };
+                            }
+
+                            string? target = null;
+                            if (call.TryGetProperty("args", out var toolArgs))
+                            {
+                                if (toolName.Equals("run_command", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var cmd = FirstString(toolArgs, "CommandLine", "command", "cmd");
+                                    if (!string.IsNullOrEmpty(cmd))
+                                        target = "Running " + ShortCommand(cmd);
+                                }
+                                else if (toolName.Contains("file", StringComparison.OrdinalIgnoreCase) ||
+                                         toolName.Contains("replace", StringComparison.OrdinalIgnoreCase) ||
+                                         toolName.Contains("write", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var path = FirstString(toolArgs, "TargetFile", "path", "AbsolutePath", "file_path");
+                                    if (!string.IsNullOrEmpty(path))
+                                        target = "Editing " + Path.GetFileName(path);
+                                }
+                            }
+
+                            target ??= "Running " + toolName;
+                            return new TranscriptInfo
+                            {
+                                Status = SessionStatus.Working,
+                                Tool = toolName,
+                                Target = target,
+                                Message = target,
+                                Cwd = detectedCwd,
+                                TimestampUtc = timeUtc,
+                            };
+                        }
+                    }
+
+                    var content = FirstString(root, "content");
+                    if (!string.IsNullOrEmpty(content))
+                    {
+                        var asks = AsksQuestion(content);
+                        var msg = CollapseExcerpt(content, 100) ?? (asks ? "Waiting for you" : "Task complete");
+                        return new TranscriptInfo
+                        {
+                            Status = asks ? SessionStatus.NeedsYou : SessionStatus.Finished,
+                            Message = msg,
+                            Cwd = detectedCwd,
+                            TimestampUtc = timeUtc,
+                        };
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("antigravity: transcript tail parse failed: " + ex.Message);
+        }
+
+        return default;
+    }
+
+    /// <summary>Fallback: scans recent conversation directories in ~/.gemini/antigravity/brain.</summary>
+    public static List<AgentSession> CollectFromBrainDir(DateTime nowUtc)
+    {
+        var tasks = new List<AgentSession>();
+        if (!Directory.Exists(BrainDir)) return tasks;
+
+        try
+        {
+            var dirs = Directory.GetDirectories(BrainDir);
+            foreach (var dir in dirs)
+            {
+                var dirInfo = new DirectoryInfo(dir);
+                var id = dirInfo.Name;
+                if (id.StartsWith('.')) continue;
+
+                var transcriptPath = Path.Combine(dir, ".system_generated", "logs", "transcript.jsonl");
+                if (!File.Exists(transcriptPath)) continue;
+
+                var mtimeUtc = File.GetLastWriteTimeUtc(transcriptPath);
+                if (nowUtc - mtimeUtc > TaskKeep) continue;
+
+                var info = InspectTranscript(id);
+                if (info.Status is not { } status) continue;
+
+                var updatedAtUtc = info.TimestampUtc ?? mtimeUtc;
+                if (status != SessionStatus.Working && nowUtc - updatedAtUtc > TaskKeep) continue;
+
+                var cwd = info.Cwd ?? "";
+                tasks.Add(new AgentSession
+                {
+                    SessionId = "antigravity:" + id,
+                    Agent = "antigravity",
+                    Host = "antigravity",
+                    Model = "Gemini",
+                    HostLabel = "Antigravity",
+                    Cwd = cwd,
+                    ProjectName = ProjectNameOf(cwd),
+                    Entrypoint = "",
+                    StartedUtc = updatedAtUtc,
+                    Pid = 0,
+                    Status = status,
+                    CurrentTool = status == SessionStatus.Working || status == SessionStatus.NeedsYou ? info.Tool : null,
+                    CurrentTarget = status == SessionStatus.Working || status == SessionStatus.NeedsYou ? info.Target : null,
+                    LastMessage = info.Message ?? (status == SessionStatus.Working ? "Working…" : "Task complete"),
+                    TokensSpent = 0,
+                    LastActivityUtc = updatedAtUtc,
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("antigravity: brain scan failed: " + ex.Message);
+        }
+
+        return tasks.OrderByDescending(t => t.LastActivityUtc).Take(MaxTasks).ToList();
+    }
+
+    private static string? ExtractConversationId(JsonElement t)
+    {
+        if (FirstString(t, "rootConversationId", "conversationId", "trajectoryId", "trajectory_id", "id") is { } s)
+            return s;
+        if (t.TryGetProperty("trajectoryMetadata", out var meta) && meta.ValueKind == JsonValueKind.Object)
+        {
+            if (FirstString(meta, "rootConversationId", "conversationId", "trajectoryId", "trajectory_id", "id") is { } ms)
+                return ms;
+        }
+        return null;
+    }
+
+    private static string ShortCommand(string command)
+    {
+        var line = command.Split('\n')[0].Trim();
+        line = string.Join(' ', line.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        if (line.Length <= 34) return line;
+
+        var first = line.Split(' ')[0];
+        bool readable = first.Length is > 0 and <= 18 &&
+                        first.All(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' or '/' or '\\');
+        return readable ? first + "…" : "a command";
+    }
+
     /// <summary>
     /// Maps a GetAllCascadeTrajectories response to display sessions — the pure,
     /// unit-tested core. Tolerates any response shape: the trajectory list is the
@@ -444,20 +723,35 @@ public sealed class AntigravityClient : IDisposable
             {
                 var rawStatus = (FirstString(t, StatusKeys) ?? "").ToLowerInvariant();
                 var summary = CollapseExcerpt(FirstString(t, SummaryKeys), 100);
+                var convId = ExtractConversationId(t);
+                var transcript = InspectTranscript(convId);
 
                 SessionStatus? mapped = null;
-                if (NeedsYouStatus.IsMatch(rawStatus)) mapped = SessionStatus.NeedsYou;
+                if (transcript.Status is { } tsStatus)
+                {
+                    mapped = tsStatus;
+                }
+                else if (NeedsYouStatus.IsMatch(rawStatus)) mapped = SessionStatus.NeedsYou;
                 else if (WorkingStatus.IsMatch(rawStatus)) mapped = SessionStatus.Working;
                 else if (FinishedStatus.IsMatch(rawStatus))
                     mapped = AsksQuestion(summary) ? SessionStatus.NeedsYou : SessionStatus.Finished;
                 if (mapped is not { } status) continue;
 
-                var updatedAtUtc = CoerceTimestamp(FirstTruthy(t, TimeKeys), nowUtc);
+                var updatedAtUtc = transcript.TimestampUtc ?? CoerceTimestamp(FirstTruthy(t, TimeKeys), nowUtc);
                 if (status != SessionStatus.Working && nowUtc - updatedAtUtc > TaskKeep) continue;
 
-                var cwd = ExtractCwd(t);
-                var id = FirstIdString(t) ??
+                var cwd = ExtractCwd(t) ?? transcript.Cwd;
+                var id = FirstIdString(t) ?? convId ??
                          (cwd ?? "agent") + ":" + ToEpochMs(updatedAtUtc).ToString(CultureInfo.InvariantCulture);
+
+                var message = transcript.Message ?? summary ?? status switch
+                {
+                    SessionStatus.Working => "Working…",
+                    SessionStatus.Finished => "Task complete",
+                    _ => "Waiting for you",
+                };
+                var tool = (status == SessionStatus.Working || status == SessionStatus.NeedsYou) ? transcript.Tool : null;
+                var target = (status == SessionStatus.Working || status == SessionStatus.NeedsYou) ? transcript.Target : null;
 
                 tasks.Add(new AgentSession
                 {
@@ -472,12 +766,9 @@ public sealed class AntigravityClient : IDisposable
                     StartedUtc = CoerceTimestamp(FirstTruthy(t, CreatedKeys), updatedAtUtc),
                     Pid = 0,
                     Status = status,
-                    LastMessage = summary ?? status switch
-                    {
-                        SessionStatus.Working => "Working…",
-                        SessionStatus.Finished => "Task complete",
-                        _ => "Waiting for you",
-                    },
+                    CurrentTool = tool,
+                    CurrentTarget = target,
+                    LastMessage = message,
                     TokensSpent = 0,
                     LastActivityUtc = updatedAtUtc,
                 });

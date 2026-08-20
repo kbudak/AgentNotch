@@ -72,6 +72,8 @@ public static class TerminalJump
                 return FocusCodex(session);
             case "antigravity":
                 return FocusAntigravity(session);
+            case "cursor":
+                return FocusCursor(session);
         }
 
         // claude (and unknown agents): a session known to live inside a
@@ -291,6 +293,22 @@ public static class TerminalJump
         if (hwnd == IntPtr.Zero)
         {
             AppLog.Write($"jump: no window found for codex session (folder='{folder}')");
+            return false;
+        }
+        return Activate(hwnd);
+    }
+
+    /// <summary>Visible Cursor window, preferring one titled for the project.</summary>
+    private static bool FocusCursor(AgentSession session)
+    {
+        static bool IsCursor(string name) =>
+            name.Equals("Cursor", StringComparison.OrdinalIgnoreCase);
+
+        string folder = FolderOf(session);
+        IntPtr hwnd = FindProcessWindowPreferTitle(IsCursor, folder);
+        if (hwnd == IntPtr.Zero)
+        {
+            AppLog.Write($"jump: no visible Cursor window (folder='{folder}')");
             return false;
         }
         return Activate(hwnd);

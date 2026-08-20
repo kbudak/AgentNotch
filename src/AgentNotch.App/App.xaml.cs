@@ -97,7 +97,9 @@ public partial class App : Application
         _pipe.Start(_cts.Token);
 
         _watcher = new SessionWatcher();
-        _watcher.SessionsChanged += list => Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+        // Normal (not Background): Cursor Working/NeedsYou must beat Claude IO and
+        // other low-priority work or the pill stays visually idle while logs say Working.
+        _watcher.SessionsChanged += list => Dispatcher.BeginInvoke(DispatcherPriority.Normal, () =>
         {
             _vm!.UpdateSessions(list);
             // Piggyback on the session poll: refresh limits (throttled internally)
@@ -212,13 +214,13 @@ public partial class App : Application
             else if (args[i] == "--scene") scene = args[i + 1];
         }
 
-        // --scene empty|settings: the two states the normal script never reaches,
-        // so both themes can be checked without a live agent or a real click.
-        if (scene is "empty" or "settings")
+        // --scene empty|settings|idle: states to verify without live agents.
+        if (scene is "empty" or "settings" or "idle")
         {
             _vm!.UpdateSessions(Array.Empty<Sessions.AgentSession>());
             if (scene == "settings") _vm.ToggleSettings();
-            else _vm.SetHover(true);
+            else if (scene == "empty") _vm.SetHover(true);
+            else _vm.SetHover(false);
             if (shotBase is null) return;
             _overlay!.IsHitTestVisible = false;
             RunSceneShotAsync(shotBase + "-" + scene + ".png");
@@ -231,6 +233,7 @@ public partial class App : Application
             new Sessions.AgentSession { SessionId = "s1", Cwd = @"C:\work\api", ProjectName = "api", Entrypoint = "cli", Pid = 1111, HostLabel = "Windows Terminal", Status = Sessions.SessionStatus.NeedsYou, CurrentTool = "Bash", CurrentTarget = "Deploy the API to staging", LastMessage = "Which deployment target?", TokensSpent = 48_200, StartedUtc = now.AddMinutes(-27), LastActivityUtc = now },
             new Sessions.AgentSession { SessionId = "s2", Agent = "codex", Model = "GPT-5.2", Cwd = @"C:\work\shop", ProjectName = "shop", HostLabel = "Cursor", Status = Sessions.SessionStatus.Working, CurrentTool = "exec_command", LastMessage = "Running exec_command", StartedUtc = now.AddHours(-1), LastActivityUtc = now },
             new Sessions.AgentSession { SessionId = "s3", Host = "cursor", HostLabel = "Cursor", Cwd = @"C:\work\web", ProjectName = "web", Entrypoint = "claude-vscode", Pid = 2222, Status = Sessions.SessionStatus.Working, CurrentTool = "Edit", CurrentTarget = "Editing schema.prisma", TokensSpent = 1_240_000, StartedUtc = now.AddMinutes(-9), LastActivityUtc = now },
+            new Sessions.AgentSession { SessionId = "s3b", Agent = "cursor", Host = "cursor", HostLabel = "Cursor", Cwd = @"C:\work\web", ProjectName = "web", Status = Sessions.SessionStatus.NeedsYou, CurrentTool = "AskQuestion", CurrentTarget = "Which theme should the notch use?", LastMessage = "Which theme should the notch use?", StartedUtc = now.AddMinutes(-4), LastActivityUtc = now },
             new Sessions.AgentSession { SessionId = "s4", Agent = "antigravity", Model = "Gemini", HostLabel = "Antigravity", Cwd = @"C:\work\bot", ProjectName = "bot", Status = Sessions.SessionStatus.Finished, LastMessage = "Task complete.", StartedUtc = now.AddHours(-5), LastActivityUtc = now },
         });
 

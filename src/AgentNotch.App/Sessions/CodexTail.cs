@@ -202,7 +202,7 @@ public static class CodexTail
         var id = FileId(path);
         string? cwd = null, model = null, threadSource = null;
         string? source = null, originator = null;
-        string? lastMessage = null, lastTool = null;
+        string? lastMessage = null, lastTool = null, lastTarget = null;
         JsonElement? stateEvent = null;
         var pending = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
 
@@ -236,7 +236,11 @@ public static class CodexTail
                 var pt = GetString(p, "type");
                 if (pt == "function_call" || pt == "custom_tool_call")
                 {
-                    lastTool = Keep(GetString(p, "name"), lastTool);
+                    var rawTool = GetString(p, "name");
+                    var rawInput = GetString(p, "input") ?? GetString(p, "arguments");
+                    var (parsedTool, parsedTarget) = ExtractActivity(rawTool, rawInput);
+                    lastTool = Keep(parsedTool, lastTool);
+                    lastTarget = Keep(parsedTarget, lastTarget);
                     var callId = Keep(GetString(p, "call_id"), GetString(p, "id"));
                     if (callId is not null) pending[callId] = p;
                 }
@@ -282,7 +286,7 @@ public static class CodexTail
 
         string summary;
         if (status == SessionStatus.Working)
-            summary = string.IsNullOrEmpty(lastTool) ? "Working…" : "Running " + lastTool;
+            summary = lastTarget ?? (string.IsNullOrEmpty(lastTool) ? "Working…" : "Running " + lastTool);
         else if (status == SessionStatus.NeedsYou && stateType == "task_started")
             summary = "Waiting for your approval or answer";
         else if (status == SessionStatus.NeedsYou)
@@ -306,12 +310,68 @@ public static class CodexTail
             Pid = 0,
             Status = status,
             CurrentTool = status == SessionStatus.Working ? lastTool : null,
-            CurrentTarget = null,
+            CurrentTarget = status == SessionStatus.Working ? lastTarget : null,
             LastMessage = summary,
             TokensSpent = 0,
             StartedUtc = StartedFromName(path, mtimeUtc),
             LastActivityUtc = mtimeUtc,
         };
+    }
+
+    private static readonly Regex CmdRegex = new(@"cmd\s*[:=]\s*""([^""]+)""", RegexOptions.Compiled);
+    private static readonly Regex UpdateFileRegex = new(@"Update File:\s*([^\r\n""]+)", RegexOptions.Compiled);
+
+    private static (string? tool, string? target) ExtractActivity(string? rawTool, string? rawInput)
+    {
+        if (string.IsNullOrEmpty(rawTool)) return (null, null);
+
+        if (string.Equals(rawTool, "exec", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(rawInput))
+        {
+            if (rawInput.Contains("exec_command", StringComparison.OrdinalIgnoreCase))
+            {
+                var m = CmdRegex.Match(rawInput);
+                var cmd = m.Success ? m.Groups[1].Value.Replace(@"\\", @"\") : "";
+                var target = cmd.Length > 0 ? "Running " + ShortCommand(cmd) : "Running a command";
+                return ("exec_command", target);
+            }
+            if (rawInput.Contains("apply_patch", StringComparison.OrdinalIgnoreCase))
+            {
+                var m = UpdateFileRegex.Match(rawInput);
+                string file = "";
+                if (m.Success)
+                {
+                    var raw = m.Groups[1].Value;
+                    int escN = raw.IndexOf(@"\n", StringComparison.Ordinal);
+                    if (escN >= 0) raw = raw[..escN];
+                    int escR = raw.IndexOf(@"\r", StringComparison.Ordinal);
+                    if (escR >= 0) raw = raw[..escR];
+                    raw = raw.Replace(@"\\", @"\").Trim();
+                    file = Path.GetFileName(raw);
+                }
+                var target = file.Length > 0 ? "Editing " + file : "Editing files";
+                return ("apply_patch", target);
+            }
+            if (rawInput.Contains("read_file", StringComparison.OrdinalIgnoreCase))
+                return ("read_file", "Reading a file");
+            if (rawInput.Contains("web_search", StringComparison.OrdinalIgnoreCase))
+                return ("web_search", "Searching the web");
+            if (rawInput.Contains("search", StringComparison.OrdinalIgnoreCase))
+                return ("search", "Searching the code");
+        }
+
+        return (rawTool, null);
+    }
+
+    private static string ShortCommand(string command)
+    {
+        var line = command.Split('\n')[0].Trim();
+        line = string.Join(' ', line.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        if (line.Length <= 34) return line;
+
+        var first = line.Split(' ')[0];
+        bool readable = first.Length is > 0 and <= 18 &&
+                        first.All(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' or '/' or '\\');
+        return readable ? first + "…" : "a command";
     }
 
     // ---------- text helpers ----------

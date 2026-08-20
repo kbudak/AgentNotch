@@ -23,7 +23,7 @@ public sealed class AgentSession
 {
     public string SessionId { get; set; } = "";
 
-    /// <summary>Which agent produced this session: "claude" | "codex" | "antigravity".</summary>
+    /// <summary>Which agent produced this session: "claude" | "codex" | "antigravity" | "cursor".</summary>
     public string Agent { get; set; } = "claude";
 
     /// <summary>

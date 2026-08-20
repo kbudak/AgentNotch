@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using AgentNotch.App.Diagnostics;
 
 namespace AgentNotch.App.Interop;
@@ -161,7 +161,7 @@ public static class ProcessTree
     private static readonly HashSet<string> EditorNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "Orca", "orca-terminal-daemon", "Code", "Code - Insiders",
-        "Cursor", "Antigravity", "Windsurf", "devenv",
+        "Cursor", "Antigravity", "Windsurf", "devenv", "ChatGPT", "Codex",
     };
 
     /// <summary>Exe name (no extension) of a pid's parent, or null when orphaned/unknown.</summary>
@@ -226,6 +226,8 @@ public static class ProcessTree
         // Orca's integrated terminal spawns sessions under its daemon (claude ← cmd ←
         // orca-terminal-daemon) — that chain is still "hosted by Orca".
         if (name.Equals("orca-terminal-daemon", StringComparison.OrdinalIgnoreCase)) return "orca";
+        if (name.Equals("ChatGPT", StringComparison.OrdinalIgnoreCase)) return "chatgpt";
+        if (name.Equals("Codex", StringComparison.OrdinalIgnoreCase)) return "codex";
         return null;
     }
 
@@ -246,6 +248,8 @@ public static class ProcessTree
         ["Code - Insiders"] = "VS Code",
         ["windsurf"] = "Windsurf",
         ["devenv"] = "Visual Studio",
+        ["ChatGPT"] = "ChatGPT",
+        ["Codex"] = "Codex",
         ["WindowsTerminal"] = "Windows Terminal",
         ["wt"] = "Windows Terminal",
         ["powershell"] = "PowerShell",

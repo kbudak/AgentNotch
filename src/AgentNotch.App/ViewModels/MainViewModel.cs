@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.ComponentModel;
 using System.Windows.Threading;
@@ -231,24 +231,30 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 if (s.Status == SessionStatus.NeedsYou) return s.Agent;
             foreach (var s in Sessions)
                 if (s.Status == SessionStatus.Working) return s.Agent;
-            // Idle (no sessions): show the Claude mark in the idle grey, not a bare dot.
-            return Sessions.Count > 0 ? Sessions[0].Agent : "claude";
+            // Finished-only: still show the agent's mark (Cursor cube, etc.) so the
+            // pill does not collapse to a generic grey idle dot while a session row exists.
+            foreach (var s in Sessions)
+                if (!string.IsNullOrEmpty(s.Agent)) return s.Agent;
+            return "";
         }
     }
 
-    /// <summary>"idle" | "working" | "needsyou" | "prompt" — drives the pill dot.</summary>
+    /// <summary>"idle" | "working" | "needsyou" | "prompt" | "finished" — drives the pill dot.</summary>
     public string StateKind
     {
         get
         {
             if (_queue.Count > 0) return "prompt";
-            bool needs = false, working = false;
+            bool needs = false, working = false, any = false;
             foreach (var s in Sessions)
             {
+                any = true;
                 if (s.Status == SessionStatus.NeedsYou) needs = true;
                 else if (s.Status == SessionStatus.Working) working = true;
             }
-            return needs ? "needsyou" : working ? "working" : "idle";
+            if (needs) return "needsyou";
+            if (working) return "working";
+            return any ? "finished" : "idle";
         }
     }
 
@@ -434,6 +440,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Raise(nameof(HasToast));
     }
 
+    private static string? _lastUiSessionLog;
+
     public void UpdateSessions(IReadOnlyList<AgentSession> sessions)
     {
         try
@@ -467,6 +475,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
             AppLog.Write("UpdateSessions: " + ex.Message);
         }
         RaiseShellChanged();
+
+        try
+        {
+            var summary = string.Join(", ", Sessions.Select(s => $"{s.Agent}:{s.Status}"));
+            var line = $"ui: sessions={Sessions.Count} kind={StateKind} lead={LeadAgent}"
+                       + (summary.Length > 0 ? " [" + summary + "]" : "");
+            if (line != _lastUiSessionLog)
+            {
+                _lastUiSessionLog = line;
+                AppLog.Write(line);
+            }
+        }
+        catch { /* logging must never break the pill */ }
     }
 
     /// <summary>Incoming rows re-ordered to match what is already on screen; new ones land last.</summary>

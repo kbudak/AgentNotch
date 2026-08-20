@@ -26,6 +26,14 @@ public class CollapsedPartsTests
         => Assert.Empty(new MainViewModel().CollapsedParts);
 
     [Fact]
+    public void IdleLeadAgentIsEmpty()
+    {
+        var vm = new MainViewModel();
+        Assert.Equal("", vm.LeadAgent);
+        Assert.Equal("idle", vm.StateKind);
+    }
+
+    [Fact]
     public void SessionsAreGroupedIntoOneChipPerState()
     {
         var parts = With(SessionStatus.Working, SessionStatus.Working, SessionStatus.Finished).CollapsedParts;

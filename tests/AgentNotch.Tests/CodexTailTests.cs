@@ -121,6 +121,62 @@ public sealed class CodexTailTests : IDisposable
     }
 
     [Fact]
+    public void ExecCommandActivityIsParsed()
+    {
+        var now = DateTime.UtcNow;
+        WriteRollout(
+            Path.Combine("2026", "08", "17", "rollout-2026-08-17T12-00-00-exec.jsonl"),
+            now.AddSeconds(-20),
+            Meta(id: "sess-exec", cwd: @"C:\Users\gym", model: "gpt-5.6-sol", source: "vscode", originator: "Codex Desktop"),
+            TaskStarted(),
+            JsonSerializer.Serialize(new
+            {
+                type = "response_item",
+                payload = new
+                {
+                    type = "custom_tool_call",
+                    name = "exec",
+                    call_id = "c_exec_1",
+                    input = "const r = await tools.exec_command({cmd:\"npm run build\"});",
+                },
+            }));
+
+        var s = Assert.Single(CodexTail.Collect(_dir, now));
+        Assert.Equal(SessionStatus.Working, s.Status);
+        Assert.Equal("exec_command", s.CurrentTool);
+        Assert.Equal("Running npm run build", s.CurrentTarget);
+        Assert.Equal("Running npm run build", s.LastMessage);
+    }
+
+    [Fact]
+    public void ApplyPatchActivityIsParsed()
+    {
+        var now = DateTime.UtcNow;
+        WriteRollout(
+            Path.Combine("2026", "08", "17", "rollout-2026-08-17T12-00-00-patch.jsonl"),
+            now.AddSeconds(-20),
+            Meta(id: "sess-patch", cwd: @"C:\Users\gym", model: "gpt-5.6-sol"),
+            TaskStarted(),
+            JsonSerializer.Serialize(new
+            {
+                type = "response_item",
+                payload = new
+                {
+                    type = "custom_tool_call",
+                    name = "exec",
+                    call_id = "c_patch_1",
+                    input = "const patch = \"*** Update File: C:\\\\app\\\\Dashboard.tsx\\n\"; text(await tools.apply_patch(patch));",
+                },
+            }));
+
+        var s = Assert.Single(CodexTail.Collect(_dir, now));
+        Assert.Equal(SessionStatus.Working, s.Status);
+        Assert.Equal("apply_patch", s.CurrentTool);
+        Assert.Equal("Editing Dashboard.tsx", s.CurrentTarget);
+        Assert.Equal("Editing Dashboard.tsx", s.LastMessage);
+    }
+
+    [Fact]
     public void PendingEscalationCallMeansNeedsYou()
     {
         var now = DateTime.UtcNow;

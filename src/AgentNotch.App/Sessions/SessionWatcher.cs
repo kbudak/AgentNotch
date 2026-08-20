@@ -19,7 +19,7 @@ namespace AgentNotch.App.Sessions;
 public sealed class SessionWatcher : IDisposable
 {
     private static readonly TimeSpan MinEmitInterval = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
 
     private readonly object _gate = new();
     private readonly object _snapshotGate = new();
@@ -31,8 +31,10 @@ public sealed class SessionWatcher : IDisposable
     private FileSystemWatcher? _sessionsWatcher;
     private FileSystemWatcher? _projectsWatcher;
     private FileSystemWatcher? _codexWatcher;
+    private FileSystemWatcher? _cursorWatcher;
     private AntigravityClient? _antigravity;
     private readonly string _codexDir;
+    private readonly string _cursorProjectsDir;
     // Non-claude sources and process probing are disabled when a test injects
     // its own claudeHome — unit tests must stay hermetic.
     private readonly bool _multiSource;
@@ -40,6 +42,9 @@ public sealed class SessionWatcher : IDisposable
     private bool _emitScheduled;
     private bool _started;
     private bool _disposed;
+    private volatile IReadOnlyList<AgentSession> _cursorLatest = Array.Empty<AgentSession>();
+    private volatile IReadOnlyList<AgentSession> _lastClaude = Array.Empty<AgentSession>();
+    private string _cursorSig = "";
 
     /// <summary>Fresh snapshot after any change. Any thread; emissions are ≥1s apart.</summary>
     public event Action<IReadOnlyList<AgentSession>>? SessionsChanged;
@@ -52,6 +57,8 @@ public sealed class SessionWatcher : IDisposable
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude")
             : claudeHome!;
         _codexDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "sessions");
+        _cursorProjectsDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cursor", "projects");
         _emitTimer = new Timer(_ => Emit(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
     }
 
@@ -61,7 +68,11 @@ public sealed class SessionWatcher : IDisposable
         {
             if (_started || _disposed) return;
             _started = true;
-            if (_multiSource) _antigravity = new AntigravityClient();
+            if (_multiSource)
+            {
+                _antigravity = new AntigravityClient();
+                _antigravity.Refreshed += Kick;
+            }
             // First tick fires immediately -> initial snapshot right after startup.
             _pollTimer = new Timer(_ => PollTick(), null, TimeSpan.Zero, PollInterval);
         }
@@ -79,6 +90,7 @@ public sealed class SessionWatcher : IDisposable
         try { _sessionsWatcher?.Dispose(); } catch { }
         try { _projectsWatcher?.Dispose(); } catch { }
         try { _codexWatcher?.Dispose(); } catch { }
+        try { _cursorWatcher?.Dispose(); } catch { }
         try { _antigravity?.Dispose(); } catch { }
     }
 
@@ -90,11 +102,45 @@ public sealed class SessionWatcher : IDisposable
         {
             TryAttachWatchers(); // dirs may appear after startup; watchers may have errored
             _antigravity?.RefreshIfDue(); // non-blocking; result lands in Latest for the next Emit
+            RefreshCursorFast(); // must not wait on Claude file IO — that can stall for minutes
             Kick();
         }
         catch (Exception ex)
         {
             AppLog.Write("SessionWatcher: poll tick failed: " + ex);
+        }
+    }
+
+    /// <summary>
+    /// Cursor transcripts are small and cache-friendly; Claude's BuildSnapshot can
+    /// stall on a large ~/.claude tree and would otherwise starve the pill of
+    /// Cursor Working/NeedsYou updates. Push a merged snapshot as soon as Cursor
+    /// changes, using the last known Claude list.
+    /// </summary>
+    private void RefreshCursorFast()
+    {
+        if (!_multiSource || !Directory.Exists(_cursorProjectsDir)) return;
+        try
+        {
+            var cursor = CursorTail.Collect(_cursorProjectsDir, DateTime.UtcNow);
+            _cursorLatest = cursor;
+            var sig = string.Join("|", cursor.Select(s => $"{s.SessionId}:{s.Status}:{s.LastMessage}"));
+            if (sig == _cursorSig) return;
+            _cursorSig = sig;
+            Publish(MergeSources(_lastClaude, DateTime.UtcNow));
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("SessionWatcher: cursor fast refresh: " + ex.Message);
+        }
+    }
+
+    private void Publish(IReadOnlyList<AgentSession> snapshot)
+    {
+        try { SessionsChanged?.Invoke(snapshot); }
+        catch (Exception ex)
+        {
+            AppLog.Write("SessionWatcher: SessionsChanged handler threw: " + ex);
         }
     }
 
@@ -126,6 +172,7 @@ public sealed class SessionWatcher : IDisposable
         {
             var now = DateTime.UtcNow;
             IReadOnlyList<AgentSession> claude;
+            var sw = Stopwatch.StartNew();
             lock (_snapshotGate) // protects _spend from overlapping rebuilds
             {
                 // Prefer the editor-hosted session when a project has several open
@@ -133,6 +180,9 @@ public sealed class SessionWatcher : IDisposable
                 Func<int, int>? hostPref = _multiSource ? Interop.ProcessTree.SessionHostRank : null;
                 claude = TranscriptTail.BuildSnapshot(_claudeHome, _spend, IsProcessAlive, now, hostPref);
             }
+            if (sw.ElapsedMilliseconds > 1500)
+                AppLog.Write($"SessionWatcher: Claude snapshot took {sw.ElapsedMilliseconds} ms");
+            _lastClaude = claude;
             snapshot = _multiSource ? MergeSources(claude, now) : claude;
         }
         catch (Exception ex)
@@ -141,22 +191,16 @@ public sealed class SessionWatcher : IDisposable
             return;
         }
 
-        try
-        {
-            SessionsChanged?.Invoke(snapshot);
-        }
-        catch (Exception ex)
-        {
-            AppLog.Write("SessionWatcher: SessionsChanged handler threw: " + ex);
-        }
+        Publish(snapshot);
     }
 
     // ---------- multi-agent merge ----------
 
     /// <summary>
-    /// Joins the Claude snapshot with Codex rollouts and Antigravity trajectories,
-    /// resolves which editor hosts each Claude session (Cursor / Antigravity /
-    /// VS Code) for labeling and window jumping, then re-sorts and caps the list.
+    /// Joins the Claude snapshot with Codex rollouts, Antigravity trajectories, and
+    /// Cursor agent transcripts; resolves which editor hosts each Claude session
+    /// (Cursor / Antigravity / VS Code) for labeling and window jumping, then
+    /// re-sorts and caps the list.
     /// </summary>
     private List<AgentSession> MergeSources(IReadOnlyList<AgentSession> claude, DateTime now)
     {
@@ -185,7 +229,7 @@ public sealed class SessionWatcher : IDisposable
         try
         {
             // Same gate the Electron collector used: closing Codex must clear its rows.
-            if (Interop.ProcessTree.AnyRunning("codex", "chatgpt", "codex-code-mode-host"))
+            if (Interop.ProcessTree.AnyRunning("codex", "chatgpt", "codex-code-mode-host", "OpenAI.Codex", "Codex Desktop", "ChatGPT Desktop"))
             {
                 var codex = CodexTail.Collect(_codexDir, now);
                 // A task and its reviewer sub-agents share a cwd and each get their own
@@ -199,12 +243,12 @@ public sealed class SessionWatcher : IDisposable
                 // A rollout only says "vscode" (some VS Code fork). Pin down the real
                 // editor by walking the running Codex process up to its host window
                 // app — the Codex extension is a child of Cursor.exe / Code.exe.
-                var codexHost = Interop.ProcessTree.HostOfRunningProcess("codex", "chatgpt");
-                var codexLabel = Interop.ProcessTree.HostLabelOfRunningProcess("codex", "chatgpt");
+                var codexHost = Interop.ProcessTree.HostOfRunningProcess("codex", "chatgpt", "OpenAI.Codex");
+                var codexLabel = Interop.ProcessTree.HostLabelOfRunningProcess("codex", "chatgpt", "OpenAI.Codex");
                 foreach (var session in codex)
                 {
                     if (session.Host == "vscode" && codexHost is not null) session.Host = codexHost;
-                    session.HostLabel ??= codexLabel;
+                    session.HostLabel ??= codexLabel ?? "Codex Desktop";
                 }
                 merged.AddRange(codex);
             }
@@ -224,16 +268,32 @@ public sealed class SessionWatcher : IDisposable
             AppLog.Write("SessionWatcher: antigravity merge: " + ex.Message);
         }
 
+        try
+        {
+            var cursor = _cursorLatest;
+            if (cursor.Count == 0 && Directory.Exists(_cursorProjectsDir))
+            {
+                // First full emit before a poll tick, or tests without PollTick.
+                cursor = CursorTail.Collect(_cursorProjectsDir, now);
+                _cursorLatest = cursor;
+            }
+            if (cursor.Count > 0) merged.AddRange(cursor);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("SessionWatcher: cursor collect: " + ex.Message);
+        }
+
         static int Rank(SessionStatus s) => s switch
         {
             SessionStatus.NeedsYou => 0,
-            SessionStatus.Finished => 1,
+            SessionStatus.Working => 1,
             _ => 2,
         };
         return merged
             .OrderBy(s => Rank(s.Status))
             .ThenByDescending(s => s.LastActivityUtc)
-            .Take(8)
+            .Take(10)
             .ToList();
     }
 
@@ -260,6 +320,8 @@ public sealed class SessionWatcher : IDisposable
                 }
                 if (_multiSource && _codexWatcher is null && Directory.Exists(_codexDir))
                     _codexWatcher = MakeWatcher(_codexDir, "*.jsonl", includeSubdirectories: true);
+                if (_multiSource && _cursorWatcher is null && Directory.Exists(_cursorProjectsDir))
+                    _cursorWatcher = MakeWatcher(_cursorProjectsDir, "*.jsonl", includeSubdirectories: true);
             }
             catch (Exception ex)
             {
@@ -295,6 +357,7 @@ public sealed class SessionWatcher : IDisposable
             if (ReferenceEquals(watcher, _sessionsWatcher)) _sessionsWatcher = null;
             else if (ReferenceEquals(watcher, _projectsWatcher)) _projectsWatcher = null;
             else if (ReferenceEquals(watcher, _codexWatcher)) _codexWatcher = null;
+            else if (ReferenceEquals(watcher, _cursorWatcher)) _cursorWatcher = null;
         }
         try { watcher.Dispose(); } catch { }
         Kick(); // a buffer overflow means events were lost — rebuild soon

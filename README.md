@@ -46,6 +46,7 @@ Shape says **which agent**, colour says **what state**:
 | ✳ sunburst | Claude |
 | ⬡ hex knot | Codex |
 | ✦ sparkle | Antigravity (Gemini) |
+| ▢ cube | Cursor agent |
 | 🟢 green | working right now |
 | 🟠 amber | waiting on you |
 | 🔵 blue | finished — click the row to jump there |
@@ -126,6 +127,9 @@ phase and would require signing + Program Files).
   - **Antigravity** — local `language_server` RPC (`GetAllCascadeTrajectories`;
     CSRF token from its logs, ports from the TCP table); jump targets the
     Antigravity window.
+  - **Cursor agent** — `%USERPROFILE%\.cursor\projects\*\agent-transcripts\*\*.jsonl`
+    tail parsing (working / needs-you / finished, AskQuestion text in the row);
+    gated on a running Cursor process; jump focuses Cursor.
   - **Cursor / VS Code / Antigravity as hosts** — Claude Code sessions running
     inside an editor are labeled with their host ("claude · cursor — web") via
     parent-process detection, and jump focuses that editor's window.

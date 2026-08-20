@@ -27,7 +27,7 @@ public partial class OverlayWindow
     // Geometry is per theme. The island is a 248px pill that opens to a 576px
     // capsule; the console is a status LINE that fits its own text and opens to the
     // handoff's 812px panel, which needs a wider surface to sit in.
-    private const double IslandCollapsedWidth = 220;
+    private const double IslandCollapsedWidth = 248; // matches OverlayWindow.xaml NotchPanel.Width
     private const double IslandExpandedWidth = 576;  // 560 content + 8+8 panel padding
     private const double ConsoleExpandedWidth = 700; // 700 content, no panel padding
     private const double IslandWindowWidth = 640;
