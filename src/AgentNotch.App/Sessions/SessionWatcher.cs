@@ -122,7 +122,12 @@ public sealed class SessionWatcher : IDisposable
         if (!_multiSource || !Directory.Exists(_cursorProjectsDir)) return;
         try
         {
-            var cursor = CursorTail.Collect(_cursorProjectsDir, DateTime.UtcNow);
+            // Same gate Codex gets: with Cursor closed there is no live agent, so
+            // skip the whole ~\.cursor\projects walk (one dir per project the user
+            // has ever opened) instead of paying for it every 2 s forever.
+            var cursor = CursorRunning()
+                ? CursorTail.Collect(_cursorProjectsDir, DateTime.UtcNow)
+                : (IReadOnlyList<AgentSession>)Array.Empty<AgentSession>();
             _cursorLatest = cursor;
             var sig = string.Join("|", cursor.Select(s => $"{s.SessionId}:{s.Status}:{s.LastMessage}"));
             if (sig == _cursorSig) return;
@@ -271,7 +276,7 @@ public sealed class SessionWatcher : IDisposable
         try
         {
             var cursor = _cursorLatest;
-            if (cursor.Count == 0 && Directory.Exists(_cursorProjectsDir))
+            if (cursor.Count == 0 && Directory.Exists(_cursorProjectsDir) && CursorRunning())
             {
                 // First full emit before a poll tick, or tests without PollTick.
                 cursor = CursorTail.Collect(_cursorProjectsDir, now);
@@ -296,6 +301,10 @@ public sealed class SessionWatcher : IDisposable
             .Take(10)
             .ToList();
     }
+
+    /// <summary>Is a Cursor window (or its headless CLI agent) actually running?</summary>
+    private static bool CursorRunning() =>
+        Interop.ProcessTree.AnyRunning("Cursor", "cursor-agent");
 
     // ---------- file system watchers ----------
 
@@ -339,10 +348,22 @@ public sealed class SessionWatcher : IDisposable
                            NotifyFilters.Size | NotifyFilters.CreationTime,
             InternalBufferSize = 64 * 1024, // transcripts append fast; avoid overflow
         };
+        // A create/delete/rename can mean a NEW session directory, which is the one
+        // thing CursorTail's cached directory structure cannot notice on its own.
+        // Appends (Changed) never change the structure, so they must not invalidate it.
+        void Structural()
+        {
+            // One watcher type per directory, but both caches key off "a file appeared
+            // or vanished", and rebuilding either is cheap — so drop both rather than
+            // thread the distinction through for no measurable gain.
+            CursorTail.InvalidateStructure();
+            TranscriptTail.InvalidateTranscriptMap();
+            Kick();
+        }
         watcher.Changed += (_, _) => Kick();
-        watcher.Created += (_, _) => Kick();
-        watcher.Deleted += (_, _) => Kick();
-        watcher.Renamed += (_, _) => Kick();
+        watcher.Created += (_, _) => Structural();
+        watcher.Deleted += (_, _) => Structural();
+        watcher.Renamed += (_, _) => Structural();
         watcher.Error += (_, e) => OnWatcherError(watcher, e);
         watcher.EnableRaisingEvents = true;
         return watcher;

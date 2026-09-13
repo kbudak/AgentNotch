@@ -281,7 +281,9 @@ public static class CodexTail
         else
         {
             lastMessage = Keep(GetString(state, "last_agent_message"), lastMessage);
-            status = IsAsking(lastMessage) ? SessionStatus.NeedsYou : SessionStatus.Finished;
+            // The task is over. A question in its final message is not an active ask —
+            // only a pending request_user_input / escalation call is (see above).
+            status = SessionStatus.Finished;
         }
 
         string summary;
@@ -289,8 +291,6 @@ public static class CodexTail
             summary = lastTarget ?? (string.IsNullOrEmpty(lastTool) ? "Working…" : "Running " + lastTool);
         else if (status == SessionStatus.NeedsYou && stateType == "task_started")
             summary = "Waiting for your approval or answer";
-        else if (status == SessionStatus.NeedsYou)
-            summary = Squash(Keep(lastMessage, "Waiting for you")!, 100);
         else
             summary = Squash(Keep(lastMessage, "Task complete")!, 100);
 
@@ -376,33 +376,6 @@ public static class CodexTail
 
     // ---------- text helpers ----------
 
-    /// <summary>
-    /// Is the agent's closing message asking the user something rather than
-    /// reporting it is done? Looks at the tail — that's where questions live.
-    /// (Codex variant of the phrase list, ported verbatim from the JS.)
-    /// </summary>
-    internal static bool IsAsking(string? text)
-    {
-        if (string.IsNullOrEmpty(text)) return false;
-        var trimmed = text.Trim();
-        var tail = trimmed.Length <= 600 ? trimmed : trimmed[^600..];
-        if (QuestionTail.IsMatch(tail)) return true;
-        if (TurkishQuestion.IsMatch(tail)) return true;
-        return AskingPhrases.IsMatch(tail);
-    }
-
-    private static readonly Regex QuestionTail =
-        new("[?？]\\s*$", RegexOptions.Compiled);
-
-    private static readonly Regex TurkishQuestion =
-        new("\\b(mı|mi|mu|mü)\\s*\\?",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
-    private static readonly Regex AskingPhrases =
-        new("\\b(approve|approval|confirm|confirmation|proceed|should i|shall i|do you want|" +
-            "would you like|which (one|option)|onay|izin|devam edeyim|ister misin|hangisini|" +
-            "seçer misin|karar ver)",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     /// <summary>A pending call that blocks on the user (approval or question).</summary>
     private static readonly Regex NeedsYouCall =

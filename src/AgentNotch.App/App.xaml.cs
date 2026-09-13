@@ -38,6 +38,11 @@ public partial class App : Application
                 {
                     ClaudeCodeInstaller.Uninstall();
                     AppLog.Write("cli: hooks uninstalled");
+                    if (CursorInstaller.IsCursorInstalled())
+                    {
+                        CursorInstaller.Uninstall();
+                        AppLog.Write("cli: cursor hooks uninstalled");
+                    }
                 }
                 else
                 {
@@ -45,6 +50,11 @@ public partial class App : Application
                         ?? throw new InvalidOperationException("agentnotch-hook.exe not found next to the app.");
                     ClaudeCodeInstaller.Install(helper);
                     AppLog.Write("cli: hooks installed -> " + helper);
+                    if (CursorInstaller.IsCursorInstalled())
+                    {
+                        CursorInstaller.Install(helper);
+                        AppLog.Write("cli: cursor hooks installed -> " + helper);
+                    }
                 }
             }
             catch (Exception ex)
@@ -151,6 +161,8 @@ public partial class App : Application
         var menu = new WinForms.ContextMenuStrip();
         var install = new WinForms.ToolStripMenuItem("Install Claude Code hooks");
         var uninstall = new WinForms.ToolStripMenuItem("Uninstall Claude Code hooks");
+        var cursorInstall = new WinForms.ToolStripMenuItem("Install Cursor hooks");
+        var cursorUninstall = new WinForms.ToolStripMenuItem("Uninstall Cursor hooks");
         var logs = new WinForms.ToolStripMenuItem("Open logs");
         var quit = new WinForms.ToolStripMenuItem("Quit AgentNotch");
 
@@ -184,6 +196,36 @@ public partial class App : Application
                 _tray!.ShowBalloonTip(4000, "AgentNotch", "Hook removal failed: " + ex.Message, WinForms.ToolTipIcon.Error);
             }
         };
+        cursorInstall.Click += (_, _) =>
+        {
+            try
+            {
+                var helper = ResolveHelperPath()
+                    ?? throw new InvalidOperationException("agentnotch-hook.exe not found next to the app.");
+                CursorInstaller.Install(helper);
+                _tray!.ShowBalloonTip(4000, "AgentNotch",
+                    "Cursor hooks installed. Shell and MCP approvals will route to the notch.",
+                    WinForms.ToolTipIcon.Info);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("cursor install failed: " + ex);
+                _tray!.ShowBalloonTip(4000, "AgentNotch", "Cursor hook install failed: " + ex.Message, WinForms.ToolTipIcon.Error);
+            }
+        };
+        cursorUninstall.Click += (_, _) =>
+        {
+            try
+            {
+                CursorInstaller.Uninstall();
+                _tray!.ShowBalloonTip(4000, "AgentNotch", "Cursor hooks removed.", WinForms.ToolTipIcon.Info);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("cursor uninstall failed: " + ex);
+                _tray!.ShowBalloonTip(4000, "AgentNotch", "Cursor hook removal failed: " + ex.Message, WinForms.ToolTipIcon.Error);
+            }
+        };
         logs.Click += (_, _) =>
         {
             try { System.Diagnostics.Process.Start("explorer.exe", AppLog.LogDirectory); }
@@ -194,8 +236,21 @@ public partial class App : Application
         var state = ClaudeCodeInstaller.GetState();
         install.Text = state == InstallState.Installed ? "Reinstall Claude Code hooks" : "Install Claude Code hooks";
 
+        // Cursor is optional: greyed out, and labelled, when it isn't on this machine.
+        bool cursorPresent = CursorInstaller.IsCursorInstalled();
+        var cursorState = cursorPresent ? CursorInstaller.GetState() : InstallState.NotInstalled;
+        cursorInstall.Text = !cursorPresent ? "Install Cursor hooks (Cursor not detected)"
+            : cursorState == InstallState.Installed ? "Reinstall Cursor hooks"
+            : "Install Cursor hooks";
+        cursorInstall.Enabled = cursorPresent;
+        cursorUninstall.Enabled = cursorPresent;
+        AppLog.Write($"tray: cursor detected={cursorPresent} hooks={cursorState}");
+
         menu.Items.Add(install);
         menu.Items.Add(uninstall);
+        menu.Items.Add(new WinForms.ToolStripSeparator());
+        menu.Items.Add(cursorInstall);
+        menu.Items.Add(cursorUninstall);
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add(logs);
         menu.Items.Add(new WinForms.ToolStripSeparator());
@@ -214,6 +269,18 @@ public partial class App : Application
             else if (args[i] == "--scene") scene = args[i + 1];
         }
 
+        // --scene sessions: the populated list — the surface the agent marks actually
+        // live on, and the only one none of the other scenes covered.
+        if (scene == "sessions")
+        {
+            DemoSessions();
+            _vm!.SetHover(true);
+            if (shotBase is null) return;
+            _overlay!.IsHitTestVisible = false;
+            RunSceneShotAsync(shotBase + "-sessions.png");
+            return;
+        }
+
         // --scene empty|settings|idle: states to verify without live agents.
         if (scene is "empty" or "settings" or "idle")
         {
@@ -227,17 +294,9 @@ public partial class App : Application
             return;
         }
 
+        DemoSessions();
         var now = DateTime.UtcNow;
-        _vm!.UpdateSessions(new[]
-        {
-            new Sessions.AgentSession { SessionId = "s1", Cwd = @"C:\work\api", ProjectName = "api", Entrypoint = "cli", Pid = 1111, HostLabel = "Windows Terminal", Status = Sessions.SessionStatus.NeedsYou, CurrentTool = "Bash", CurrentTarget = "Deploy the API to staging", LastMessage = "Which deployment target?", TokensSpent = 48_200, StartedUtc = now.AddMinutes(-27), LastActivityUtc = now },
-            new Sessions.AgentSession { SessionId = "s2", Agent = "codex", Model = "GPT-5.2", Cwd = @"C:\work\shop", ProjectName = "shop", HostLabel = "Cursor", Status = Sessions.SessionStatus.Working, CurrentTool = "exec_command", LastMessage = "Running exec_command", StartedUtc = now.AddHours(-1), LastActivityUtc = now },
-            new Sessions.AgentSession { SessionId = "s3", Host = "cursor", HostLabel = "Cursor", Cwd = @"C:\work\web", ProjectName = "web", Entrypoint = "claude-vscode", Pid = 2222, Status = Sessions.SessionStatus.Working, CurrentTool = "Edit", CurrentTarget = "Editing schema.prisma", TokensSpent = 1_240_000, StartedUtc = now.AddMinutes(-9), LastActivityUtc = now },
-            new Sessions.AgentSession { SessionId = "s3b", Agent = "cursor", Host = "cursor", HostLabel = "Cursor", Cwd = @"C:\work\web", ProjectName = "web", Status = Sessions.SessionStatus.NeedsYou, CurrentTool = "AskQuestion", CurrentTarget = "Which theme should the notch use?", LastMessage = "Which theme should the notch use?", StartedUtc = now.AddMinutes(-4), LastActivityUtc = now },
-            new Sessions.AgentSession { SessionId = "s4", Agent = "antigravity", Model = "Gemini", HostLabel = "Antigravity", Cwd = @"C:\work\bot", ProjectName = "bot", Status = Sessions.SessionStatus.Finished, LastMessage = "Task complete.", StartedUtc = now.AddHours(-5), LastActivityUtc = now },
-        });
-
-        _vm.UpdateUsage(new[]
+        _vm!.UpdateUsage(new[]
         {
             new UsageWindow("5h", 20, now.AddHours(2).AddMinutes(14)),
             new UsageWindow("7d", 4, now.AddDays(6).AddHours(14)),
@@ -274,7 +333,9 @@ public partial class App : Application
                         multiSelect = false,
                         options = new object[]
                         {
-                            new { label = "Production", description = "Deploy to the live environment" },
+                            // Deliberately long: the confirmation flash has to survive a
+                            // real-world answer on a 248px pill, not just the word "Production".
+                            new { label = "Backend'e hasSupported ekle (önerilen)", description = "Deploy to the live environment" },
                             new { label = "Staging", description = "Deploy to staging first" },
                             new { label = "Local only", description = "Skip remote deploy" },
                         },
@@ -289,6 +350,20 @@ public partial class App : Application
         _overlay!.IsHitTestVisible = false;
 
         RunShotSequenceAsync(shotBase);
+    }
+
+    /// <summary>The fake session list both the scripted run and --scene sessions use.</summary>
+    private void DemoSessions()
+    {
+        var now = DateTime.UtcNow;
+        _vm!.UpdateSessions(new[]
+        {
+            new Sessions.AgentSession { SessionId = "s1", Cwd = @"C:\work\api", ProjectName = "api", Entrypoint = "cli", Pid = 1111, HostLabel = "Windows Terminal", Status = Sessions.SessionStatus.NeedsYou, CurrentTool = "Bash", CurrentTarget = "Deploy the API to staging", LastMessage = "Which deployment target?", TokensSpent = 48_200, StartedUtc = now.AddMinutes(-27), LastActivityUtc = now },
+            new Sessions.AgentSession { SessionId = "s2", Agent = "codex", Model = "GPT-5.2", Cwd = @"C:\work\shop", ProjectName = "shop", HostLabel = "Cursor", Status = Sessions.SessionStatus.Working, CurrentTool = "exec_command", LastMessage = "Running exec_command", StartedUtc = now.AddHours(-1), LastActivityUtc = now },
+            new Sessions.AgentSession { SessionId = "s3", Host = "cursor", HostLabel = "Cursor", Cwd = @"C:\work\web", ProjectName = "web", Entrypoint = "claude-vscode", Pid = 2222, Status = Sessions.SessionStatus.Working, CurrentTool = "Edit", CurrentTarget = "Editing schema.prisma", TokensSpent = 1_240_000, StartedUtc = now.AddMinutes(-9), LastActivityUtc = now },
+            new Sessions.AgentSession { SessionId = "s3b", Agent = "cursor", Host = "cursor", HostLabel = "Cursor", Cwd = @"C:\work\web", ProjectName = "web", Status = Sessions.SessionStatus.NeedsYou, CurrentTool = "AskQuestion", CurrentTarget = "Which theme should the notch use?", LastMessage = "Which theme should the notch use?", StartedUtc = now.AddMinutes(-4), LastActivityUtc = now },
+            new Sessions.AgentSession { SessionId = "s4", Agent = "antigravity", Model = "Gemini", HostLabel = "Antigravity", Cwd = @"C:\work\bot", ProjectName = "bot", Status = Sessions.SessionStatus.Finished, LastMessage = "Task complete.", StartedUtc = now.AddHours(-5), LastActivityUtc = now },
+        });
     }
 
     private async void RunSceneShotAsync(string path)

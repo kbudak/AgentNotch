@@ -141,11 +141,11 @@ public sealed class SessionParsingTests : IDisposable
     }
 
     [Fact]
-    public void TrailingUserMessage_StaleTranscript_IsNeedsYou()
+    public void TrailingUserMessage_StaleTranscript_IsFinished_NotAQuestion()
     {
         var events = Events(AssistantToolUse("Bash"), UserToolResult());
         var status = TranscriptTail.DeriveStatus(events, TimeSpan.FromMinutes(25), null, null);
-        Assert.Equal(SessionStatus.NeedsYou, status);
+        Assert.Equal(SessionStatus.Finished, status);
     }
 
     [Fact]
@@ -188,19 +188,22 @@ public sealed class SessionParsingTests : IDisposable
     }
 
     [Fact]
-    public void EndTurnEndingWithQuestion_IsNeedsYou()
+    public void EndTurnEndingWithQuestion_IsFinished_TheWorkIsOver()
     {
         var events = Events(AssistantText("I found two options.\nShould I refactor the parser?"));
         var status = TranscriptTail.DeriveStatus(events, TimeSpan.FromMinutes(1), null, null);
-        Assert.Equal(SessionStatus.NeedsYou, status);
+        Assert.Equal(SessionStatus.Finished, status);
     }
 
     [Fact]
-    public void EndTurnWithAskingPhrase_NoQuestionMark_IsNeedsYou()
+    public void EndTurnWithAskingPhrase_NoQuestionMark_IsFinished()
     {
+        // Orange means a real question. A phrase without a "?" is not one: the old
+        // stem rule behind this case also turned plain reports orange ("onaylı
+        // fotoğraf", "izin ver" as a UI label). See IsAskingTests.
         var events = Events(AssistantText("Do you want me to also update the tests"));
         var status = TranscriptTail.DeriveStatus(events, TimeSpan.FromMinutes(1), null, null);
-        Assert.Equal(SessionStatus.NeedsYou, status);
+        Assert.Equal(SessionStatus.Finished, status);
     }
 
     [Fact]
@@ -504,7 +507,7 @@ public sealed class SessionParsingTests : IDisposable
 
         var s = Assert.Single(list);
         Assert.Equal("sNew", s.SessionId);
-        Assert.Equal(SessionStatus.NeedsYou, s.Status);
+        Assert.Equal(SessionStatus.Finished, s.Status);
     }
 
     [Fact]
@@ -515,7 +518,7 @@ public sealed class SessionParsingTests : IDisposable
         WriteRegistry(home, 12, "sDone", Path.Combine(_dir, "proj2"));
         WriteRegistry(home, 13, "sWork", Path.Combine(_dir, "proj3"), status: "busy",
             statusUpdatedAtMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-        WriteTranscript(home, "sNeeds", AssistantText("Should I refactor the parser?"));
+        WriteTranscript(home, "sNeeds", AssistantToolUse("AskUserQuestion", stopReason: "end_turn"));
         WriteTranscript(home, "sDone", AssistantText("Refactor complete. All tests pass."));
         WriteTranscript(home, "sWork", AssistantToolUse("Bash"), UserToolResult());
 

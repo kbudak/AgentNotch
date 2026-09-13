@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Buffers;
 using System.Text;
@@ -94,6 +95,37 @@ public static class TranscriptTail
         }
     }
 
+    private readonly record struct TailEntry(DateTime MtimeUtc, long Size, IReadOnlyList<JsonElement> Events);
+
+    private static readonly ConcurrentDictionary<string, TailEntry> TailCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// <see cref="ReadTailEvents"/> memoised on (mtime, size) — the same deal
+    /// <see cref="CursorTail"/> already makes for its transcripts.
+    /// <see cref="BuildSnapshot"/> runs on every emit, up to once a second, but a
+    /// transcript only changes when its agent writes: without this the same 256 KB
+    /// window is re-read and re-parsed (and every surviving element re-cloned) for
+    /// every idle session, every tick, forever. The returned list is shared —
+    /// callers must treat it as read-only.
+    /// </summary>
+    internal static IReadOnlyList<JsonElement> ReadTailEventsCached(string path, DateTime mtimeUtc, long size)
+    {
+        if (TailCache.TryGetValue(path, out var hit) && hit.MtimeUtc == mtimeUtc && hit.Size == size)
+            return hit.Events;
+
+        var events = ReadTailEvents(path);
+        TailCache[path] = new TailEntry(mtimeUtc, size, events);
+        return events;
+    }
+
+    /// <summary>Drops memo entries for transcripts this snapshot pass did not touch.</summary>
+    private static void PruneTailCache(HashSet<string> keep)
+    {
+        foreach (var path in TailCache.Keys)
+            if (!keep.Contains(path)) TailCache.TryRemove(path, out _);
+    }
+
     /// <summary>Parses NDJSON text; unparseable lines (e.g. a cut-off first line) are skipped.</summary>
     public static List<JsonElement> ParseLines(string text)
     {
@@ -162,33 +194,6 @@ public static class TranscriptTail
     }
 
     /// <summary>
-    /// Is the agent's closing message asking the user something (a question or an
-    /// approval prompt) rather than reporting that it is done? Looks at the tail of
-    /// the message — that's where questions live.
-    /// </summary>
-    public static bool IsAsking(string? text)
-    {
-        if (string.IsNullOrEmpty(text)) return false;
-        var tail = text.Length <= 400 ? text : text[^400..];
-        if (QuestionTail.IsMatch(tail)) return true;
-        if (TurkishQuestion.IsMatch(tail)) return true;
-        return AskingPhrases.IsMatch(tail);
-    }
-
-    private static readonly Regex QuestionTail =
-        new("[?？]\\s*$", RegexOptions.Compiled);
-
-    private static readonly Regex TurkishQuestion =
-        new("(mı|mi|mu|mü)\\s*\\?",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
-    private static readonly Regex AskingPhrases =
-        new("\\b(yes\\s*/\\s*no|y\\s*/\\s*n|approve|confirm|proceed\\??|should i\\b|shall i\\b|" +
-            "do you want|would you like|want me to|which (one|option|approach)|onayl|izin ver|" +
-            "devam edeyim|devam et\\?|ister misin|onay bekl|hangisini|seçer misin|karar ver)",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
-    /// <summary>
     /// Tool name + short target (file path or command excerpt, max 60 chars) from
     /// the MOST RECENT assistant event only — like the Electron collector, earlier
     /// events are not consulted.
@@ -211,6 +216,29 @@ public static class TranscriptTail
             break; // only the last assistant event counts
         }
         return (null, null);
+    }
+
+    /// <summary>
+    /// When the agent last actually said or did something: the timestamp on the most
+    /// recent assistant/user record, or null if the tail holds none.
+    ///
+    /// This is NOT the file's mtime, and the difference is the whole point. Claude
+    /// Code keeps appending bookkeeping to a transcript long after the conversation
+    /// is over — `bridge-session` records, and `system`/`local_command` notices such
+    /// as Remote Control connecting and disconnecting. Every one of those touches the
+    /// file. A session whose last real turn was two days ago was still showing an
+    /// mtime nine minutes old, which reset its age, un-dropped it, and put it back on
+    /// the notch reading "Done" forever.
+    /// </summary>
+    public static DateTime? LastTurnTimeUtc(IReadOnlyList<JsonElement> events)
+    {
+        for (int i = events.Count - 1; i >= 0; i--)
+        {
+            var type = GetString(events[i], "type");
+            if (type is not ("assistant" or "user")) continue;
+            if (ParseTimestamp(events[i], "timestamp") is { } stamp) return stamp;
+        }
+        return null;
     }
 
     /// <summary>Last meaningful turn event (assistant or user), skipping summary/system noise.</summary>
@@ -265,29 +293,51 @@ public static class TranscriptTail
 
         if (GetString(last, "type") == "assistant")
         {
-            if (StopReason(last) == "tool_use")
+            var reason = StopReason(last);
+            var block = LastContentBlockType(last);
+
+            // Claude Code writes one transcript line PER CONTENT BLOCK as the model
+            // streams, so the last line is usually mid-turn, not the end of one — and
+            // its stop_reason is often still absent when the line is written. The
+            // evidence is the block, not the reason: a turn ends on TEXT the model
+            // signed off, and `thinking` / `tool_use` are never where it stops.
+            bool midTurn = block is "thinking" or "tool_use"
+                           || reason is null or "" or "tool_use";
+
+            // Orange means the agent is asking you something RIGHT NOW. Only two things
+            // in a transcript prove that: an ask tool waiting for its answer, or a tool
+            // waiting for approval while the CLI sits idle at the permission prompt.
+            if (block == "tool_use" && IsAskTool(LastToolUse(events).Tool))
+                return SessionStatus.NeedsYou;
+            if (block == "tool_use" && registryStatus == "idle" && (statusFresh || reason == "tool_use"))
+                return SessionStatus.NeedsYou;
+
+            if (midTurn)
             {
-                // Pending tool, no result yet. CLI reports 'idle' at an approval
-                // prompt (waiting on you); otherwise it's the agent's turn.
-                if (registryStatus == "idle") return SessionStatus.NeedsYou;
-                return transcriptAge < BusyMax ? SessionStatus.Working : SessionStatus.NeedsYou;
+                // Idle on anything else is an interrupt, or a stream that finished before
+                // its stop_reason was written (10 of 47 finished transcripts end that way).
+                // The turn is back with you — but nothing is being asked.
+                if (registryStatus == "idle" && statusFresh) return SessionStatus.Finished;
+
+                // A thinking or tool_use block proves the agent is mid-turn, so it may
+                // stay Working for the long window; a bare text block with no reason is
+                // only PROBABLY mid-stream and gets the short grace.
+                var window = block is "thinking" or "tool_use" ? BusyMax : WorkingGrace;
+                if (transcriptAge < window) return SessionStatus.Working;
             }
 
-            // Assistant ended its turn -> it's YOUR turn: a question, or simply done.
-            // Never "working" here, however recent.
-            var (tool, _) = LastToolUse(events);
-            return IsAsking(LastAssistantText(events)) || tool == "AskUserQuestion"
-                ? SessionStatus.NeedsYou
-                : SessionStatus.Finished;
+            // The turn is over. Whatever its closing words — "Hangisini istersin?",
+            // "nasıl devam edelim?" — the agent has stopped and is waiting on nothing:
+            // a question at the END of the work is not a question DURING it.
+            return SessionStatus.Finished;
         }
 
-        // Last event is a user message — a new prompt, or a tool result fed back to the
-        // agent. Normally the AGENT'S turn (thinking/composing while the transcript
-        // stays frozen), but a fresh 'idle' means it handed the turn back to you, and a
-        // transcript frozen past the grace means it was stopped/interrupted — either
-        // way the turn is back with you.
-        if (registryStatus == "idle" && statusFresh) return SessionStatus.NeedsYou;
-        return transcriptFresh ? SessionStatus.Working : SessionStatus.NeedsYou;
+        // Last turn is a user record: a prompt or tool result the agent is working on —
+        // or something written after the work ended (a local /command's output,
+        // "[Request interrupted by user]"). Fresh and not idle: the agent has the turn.
+        // Otherwise it is back with you, and still nobody is asking.
+        if (registryStatus == "idle" && statusFresh) return SessionStatus.Finished;
+        return transcriptFresh ? SessionStatus.Working : SessionStatus.Finished;
     }
 
     // ---------- token spend (incremental) ----------
@@ -447,6 +497,50 @@ public static class TranscriptTail
         return map;
     }
 
+    /// <summary>
+    /// How long the sessionId -> path map is trusted. It is a RECURSIVE walk of every
+    /// project folder the user has ever opened, and it was running on every emit — up
+    /// to once a second — for a map that only changes when a session is created or
+    /// removed. Measured at 4.85 ms of BuildSnapshot's 5.48 ms: nearly the whole cost
+    /// of the Claude side went on re-deriving something that had not moved.
+    /// Appending to a transcript never changes it; <see cref="InvalidateTranscriptMap"/>
+    /// covers the create/delete/rename that does.
+    /// </summary>
+    private static readonly TimeSpan MapTtl = TimeSpan.FromSeconds(30);
+
+    private static readonly object MapGate = new();
+    private static Dictionary<string, string>? _map;
+    private static string _mapRoot = "";
+    private static long _mapAtMs = -1;
+
+    /// <summary>Forces the next snapshot to re-walk — the watcher calls this when a file appears or goes.</summary>
+    public static void InvalidateTranscriptMap()
+    {
+        lock (MapGate) _mapAtMs = -1;
+    }
+
+    private static Dictionary<string, string> CachedTranscriptMap(string projectsRoot)
+    {
+        lock (MapGate)
+        {
+            long now = Environment.TickCount64;
+            if (_map is not null && _mapRoot == projectsRoot && _mapAtMs >= 0
+                && now - _mapAtMs <= MapTtl.TotalMilliseconds)
+                return _map;
+
+            var map = TranscriptMap(projectsRoot);
+            // An empty result usually means the walk raced a rewrite, not that every
+            // session vanished — keep the last good map rather than blanking the notch.
+            if (map.Count == 0 && _map is { Count: > 0 } && _mapRoot == projectsRoot)
+                return _map;
+
+            _map = map;
+            _mapRoot = projectsRoot;
+            _mapAtMs = now;
+            return map;
+        }
+    }
+
     // ---------- snapshot ----------
 
     /// <summary>
@@ -489,9 +583,16 @@ public static class TranscriptTail
         foreach (var stale in spendCache.Keys.Where(k => !liveIds.Contains(k)).ToList())
             spendCache.Remove(stale);
 
-        if (live.Count == 0) return new List<AgentSession>();
+        // Transcripts seen this pass; anything else in the memo is a closed session.
+        var touched = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var transcripts = TranscriptMap(Path.Combine(claudeHome, "projects"));
+        if (live.Count == 0)
+        {
+            PruneTailCache(touched);
+            return new List<AgentSession>();
+        }
+
+        var transcripts = CachedTranscriptMap(Path.Combine(claudeHome, "projects"));
         var candidates = new List<AgentSession>();
 
         foreach (var reg in live)
@@ -510,20 +611,30 @@ public static class TranscriptTail
                 }
 
                 DateTime mtimeUtc, startedUtc;
+                long size;
                 try
                 {
                     var info = new FileInfo(file);
                     if (!info.Exists) continue;
                     mtimeUtc = info.LastWriteTimeUtc;
+                    size = info.Length;
                     // The transcript is created when the session starts — its age is
                     // how long this agent has been on the task.
                     startedUtc = info.CreationTimeUtc;
                 }
                 catch { continue; }
 
-                var age = nowUtc - mtimeUtc;
-                var events = ReadTailEvents(file);
+                touched.Add(file);
+                var events = ReadTailEventsCached(file, mtimeUtc, size);
                 if (events.Count == 0) continue;
+
+                // Age from the last TURN, never from the file's mtime — see
+                // LastTurnTimeUtc. Falling back to mtime only when the tail holds no
+                // turn at all keeps a transcript we cannot read from vanishing, and a
+                // future-dated record cannot make a session look eternally fresh.
+                var activityUtc = LastTurnTimeUtc(events) ?? mtimeUtc;
+                if (activityUtc > nowUtc) activityUtc = nowUtc;
+                var age = nowUtc - activityUtc;
 
                 TimeSpan? statusAge = reg.StatusUpdatedAtUtc is { } su ? nowUtc - su : null;
                 var status = DeriveStatus(events, age, reg.Status, statusAge);
@@ -532,13 +643,23 @@ public static class TranscriptTail
                 if (status != SessionStatus.Working && age > IdleKeep) continue;
 
                 spendCache.TryGetValue(reg.SessionId, out var prevSpend);
-                var spend = AddSpend(file, prevSpend);
+                // Nothing appended since the last pass -> AddSpend would open the
+                // file only to compute a zero-byte delta. Skip the open.
+                var spend = prevSpend.Offset == size ? prevSpend : AddSpend(file, prevSpend);
                 spendCache[reg.SessionId] = spend;
 
                 string? tool = null, target = null;
                 if (status == SessionStatus.Working ||
                     (status == SessionStatus.NeedsYou && IsPendingTool(events)))
                     (tool, target) = LastToolUse(events);
+
+                // Mid-thought there is no tool to name, so the row would fall back to
+                // the previous narration — which reads as if the turn were over, the
+                // very impression the status fix exists to correct. Say what is
+                // actually happening instead.
+                if (status == SessionStatus.Working && tool is null && target is null
+                    && LastTurn(events) is { } turn && LastContentBlockType(turn) == "thinking")
+                    target = "Thinking…";
 
                 var cwd = reg.Cwd ?? "";
                 candidates.Add(new AgentSession
@@ -554,7 +675,7 @@ public static class TranscriptTail
                     CurrentTarget = target,
                     LastMessage = Excerpt(LastAssistantText(events), 120),
                     TokensSpent = spend.Tokens,
-                    LastActivityUtc = mtimeUtc,
+                    LastActivityUtc = activityUtc,
                 });
             }
             catch (Exception ex)
@@ -562,6 +683,8 @@ public static class TranscriptTail
                 AppLog.Write("sessions: snapshot of " + reg.SessionId + " failed: " + ex.Message);
             }
         }
+
+        PruneTailCache(touched);
 
         // A CLI leaves older registry files behind when new tabs open in the same
         // project. The notch represents the project, not every historical tab — keep
@@ -686,6 +809,38 @@ public static class TranscriptTail
     }
 
     /// <summary>stopReason on the event, else message.stop_reason.</summary>
+    /// <summary>A tool whose whole purpose is to block on the user's answer.</summary>
+    private static bool IsAskTool(string? tool) =>
+        !string.IsNullOrEmpty(tool)
+        && (tool.Contains("AskUserQuestion", StringComparison.OrdinalIgnoreCase)
+            || tool.Contains("AskQuestion", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Type of the LAST content block of a turn — "thinking", "tool_use", "text"
+    /// (or null when the shape is unfamiliar). This is what says whether the model
+    /// was mid-thought when the line was written; stop_reason often is not there yet.
+    /// </summary>
+    internal static string? LastContentBlockType(JsonElement evt)
+    {
+        try
+        {
+            if (evt.ValueKind != JsonValueKind.Object) return null;
+            if (!evt.TryGetProperty("message", out var msg) || msg.ValueKind != JsonValueKind.Object)
+                return null;
+            if (!msg.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array)
+                return null;
+
+            string? last = null;
+            foreach (var block in content.EnumerateArray())
+            {
+                if (block.ValueKind != JsonValueKind.Object) continue;
+                if (GetString(block, "type") is { Length: > 0 } type) last = type;
+            }
+            return last;
+        }
+        catch { return null; }
+    }
+
     private static string? StopReason(JsonElement evt)
     {
         if (GetString(evt, "stopReason") is { } top) return top;

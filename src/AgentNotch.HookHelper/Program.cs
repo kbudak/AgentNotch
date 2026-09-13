@@ -18,11 +18,19 @@ using AgentNotch.Protocol;
 
 const int ConnectTimeoutObserveMs = 500;
 const int ConnectTimeoutBlockingMs = 1500;
-// Claude Code kills command hooks at the registered timeout (600 s); stay under it.
-const int DecisionTimeoutMs = 590_000;
+// How long the notch gets to answer before we hand the question back to the agent.
+//
+// This used to sit at 590 s — just under the registered 600 s hook timeout — on the
+// theory that a human might take that long. In practice it meant that whenever the
+// notch went unnoticed the agent sat frozen for TEN MINUTES with nothing on screen,
+// because Claude Code will not draw its own prompt while a hook is still pending.
+// (It happened three times in this machine's helper log.) Handing back after a
+// minute costs an unhurried answer nothing — the terminal's own prompt appears and
+// still waits for you — and it caps what a missed notch can ever cost the agent.
+const int DecisionTimeoutMs = 60_000;
 
 string mode = args.Length > 0 ? args[0].Trim().ToLowerInvariant() : "";
-bool expectsReply = mode is Proto.ModePermissionRequest or Proto.ModeAskUserQuestion;
+bool expectsReply = mode is Proto.ModePermissionRequest or Proto.ModeAskUserQuestion or Proto.ModeCursorPermission;
 
 try
 {
@@ -64,13 +72,29 @@ try
     if (!expectsReply)
         return 0;
 
+    // The notch now holds this question. Put it on the terminal too — the agent
+    // will not draw its own prompt while we are pending, so without this the
+    // terminal just goes quiet and you have no idea anything is waiting.
+    var (title, detail) = HookSummary.Describe(mode, evt);
+    var echo = new List<string> { "  [AgentNotch] " + title };
+    foreach (var detailLine in detail) echo.Add("    " + detailLine);
+    echo.Add($"    waiting for your answer in the notch ({DecisionTimeoutMs / 1000}s, then this prompt takes over)");
+    AgentNotch.HookHelper.TerminalEcho.Write(echo.ToArray());
+
     using var cts = new CancellationTokenSource(DecisionTimeoutMs);
     var decision = await ReadDecisionAsync(pipe, envelope.Id, cts.Token);
     if (decision is null)
     {
-        Log($"{mode}: no decision (timeout or app closed) — passing through");
+        // Print nothing: Claude Code falls back to its own terminal prompt, which is
+        // exactly where an unanswered question should end up.
+        AgentNotch.HookHelper.TerminalEcho.Write("  [AgentNotch] no answer in the notch - over to you here.");
+        Log($"{mode}: no decision in {DecisionTimeoutMs / 1000}s — handing back to the terminal");
         return 0;
     }
+
+    // Close the loop on the terminal as well, so its transcript still records what
+    // was decided rather than showing a question that silently stops mattering.
+    AgentNotch.HookHelper.TerminalEcho.Write("  [AgentNotch] " + Outcome(decision.Decision));
 
     var output = BuildHookOutput(mode, decision.Decision);
     if (output is not null)
@@ -148,30 +172,75 @@ static JsonObject? BuildHookOutput(string mode, DecisionBody d)
             // There is no hook mechanism to answer AskUserQuestion directly; blocking
             // the tool with the user's picks in the deny reason is the supported way
             // to feed the answer back to the model without re-prompting in the terminal.
-            var sb = new StringBuilder(
-                "The user already answered this question via the AgentNotch overlay. " +
-                "Do not ask again; proceed with their answer(s): ");
-            for (int i = 0; i < d.Answers.Count; i++)
-            {
-                if (i > 0) sb.Append("; ");
-                sb.Append('[').Append(d.Answers[i].Question).Append("] -> ")
-                  .Append(string.Join(", ", d.Answers[i].Labels));
-            }
             return new JsonObject
             {
                 ["hookSpecificOutput"] = new JsonObject
                 {
                     ["hookEventName"] = "PreToolUse",
                     ["permissionDecision"] = "deny",
-                    ["permissionDecisionReason"] = sb.ToString(),
+                    ["permissionDecisionReason"] = AnswerSentence(d.Answers),
                 }
             };
         }
 
-        // "pass" and anything unrecognized: print nothing → normal flow.
+        // Cursor has no mechanism to answer a question tool directly either, so the
+        // same trick the Claude AskUserQuestion path uses applies: block the call and
+        // put the user's picks in the message the model reads, which answers it
+        // without a second round trip through the chat.
+        case Proto.ModeCursorPermission when d.Behavior == "answer" && d.Answers is { Count: > 0 }:
+            return new JsonObject
+            {
+                ["permission"] = "deny",
+                ["userMessage"] = "Answered from the AgentNotch overlay.",
+                ["agentMessage"] = AnswerSentence(d.Answers),
+            };
+
+        // Cursor's dialect: a flat {"permission": ...} object. userMessage is what
+        // the human sees in the chat, agentMessage is what the model is told —
+        // without the latter the agent just retries the command it was denied.
+        case Proto.ModeCursorPermission when d.Behavior is "allow" or "deny":
+        {
+            var output = new JsonObject { ["permission"] = d.Behavior };
+            if (d.Behavior == "deny")
+            {
+                output["userMessage"] = "Denied from the AgentNotch overlay.";
+                output["agentMessage"] = d.Message ?? "The user denied this command in AgentNotch.";
+            }
+            return output;
+        }
+
+        // "pass" and anything unrecognized: print nothing → normal flow. For Cursor
+        // that means its own permission dialog still runs, exactly as if AgentNotch
+        // were not installed — never a silent auto-allow.
         default:
             return null;
     }
+}
+
+/// <summary>One line for the terminal saying how the notch answered.</summary>
+static string Outcome(DecisionBody d) => d.Behavior switch
+{
+    "allow" => "allowed from the notch.",
+    "deny" => "denied from the notch.",
+    "answer" when d.Answers is { Count: > 0 } =>
+        "answered from the notch: " + string.Join(", ", d.Answers[0].Labels),
+    _ => "handed back — answer here.",
+};
+
+// What the model is told when the user picked an option in the notch. Shared by
+// both dialects so an answer never reads differently depending on the agent.
+static string AnswerSentence(List<QuestionAnswer> answers)
+{
+    var sb = new StringBuilder(
+        "The user already answered this question via the AgentNotch overlay. " +
+        "Do not ask again; proceed with their answer(s): ");
+    for (int i = 0; i < answers.Count; i++)
+    {
+        if (i > 0) sb.Append("; ");
+        sb.Append('[').Append(answers[i].Question).Append("] -> ")
+          .Append(string.Join(", ", answers[i].Labels));
+    }
+    return sb.ToString();
 }
 
 static void Log(string message)

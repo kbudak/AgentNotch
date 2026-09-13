@@ -226,7 +226,7 @@ public sealed class CodexTailTests : IDisposable
     }
 
     [Fact]
-    public void QuestionEndingFinalMessageMeansNeedsYou()
+    public void QuestionEndingFinalMessage_IsFinished_TheTaskIsOver()
     {
         var now = DateTime.UtcNow;
         WriteRollout("r1.jsonl", now.AddSeconds(-30),
@@ -235,12 +235,12 @@ public sealed class CodexTailTests : IDisposable
             TaskComplete("Should I also update the README?"));
 
         var s = Assert.Single(CodexTail.Collect(_dir, now));
-        Assert.Equal(SessionStatus.NeedsYou, s.Status);
+        Assert.Equal(SessionStatus.Finished, s.Status);
         Assert.Equal("Should I also update the README?", s.LastMessage);
     }
 
     [Fact]
-    public void TurkishQuestionMeansNeedsYou()
+    public void TurkishQuestionAtTheEnd_IsFinished()
     {
         var now = DateTime.UtcNow;
         WriteRollout("r1.jsonl", now.AddSeconds(-30),
@@ -249,7 +249,7 @@ public sealed class CodexTailTests : IDisposable
             TaskComplete("Devam edeyim mi? Sonra commit atarım."));
 
         var s = Assert.Single(CodexTail.Collect(_dir, now));
-        Assert.Equal(SessionStatus.NeedsYou, s.Status);
+        Assert.Equal(SessionStatus.Finished, s.Status);
     }
 
     [Fact]

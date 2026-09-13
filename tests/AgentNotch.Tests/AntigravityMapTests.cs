@@ -110,14 +110,12 @@ public sealed class AntigravityMapTests
 
     [Theory]
     [InlineData("Should I refactor the parser?")]     // trailing question mark
-    [InlineData("Blocked - do you want me to retry")] // asking phrase, no question mark
-    [InlineData("Değişiklik hazır, onay bekleniyor")] // Turkish approval phrase
-    public void Finished_ButSummaryAsksQuestion_BecomesNeedsYou(string summary)
+    public void Finished_EvenWhenSummaryEndsWithAQuestion(string summary)
     {
         var sessions = AntigravityClient.MapTrajectories(
             Wrap(new { id = "a", status = "complete", summary, updatedAt = MsAgo(TimeSpan.FromMinutes(1)) }), Now);
 
-        Assert.Equal(SessionStatus.NeedsYou, Assert.Single(sessions).Status);
+        Assert.Equal(SessionStatus.Finished, Assert.Single(sessions).Status);
     }
 
     [Theory]

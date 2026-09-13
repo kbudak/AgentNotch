@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using AgentNotch.App.Sessions;
 using Xunit;
 
@@ -101,7 +101,7 @@ public sealed class CursorTailTests
     }
 
     [Fact]
-    public void NeedsYou_WhenAssistantTextEndsWithQuestion()
+    public void Finished_WhenAssistantTextEndsWithQuestion()
     {
         var events = new[]
         {
@@ -111,7 +111,7 @@ public sealed class CursorTailTests
 
         var s = CursorTail.ParseEvents(events, "c-Users-test-Desktop-app", Now, "q2");
         Assert.NotNull(s);
-        Assert.Equal(SessionStatus.NeedsYou, s!.Status);
+        Assert.Equal(SessionStatus.Finished, s!.Status);
         Assert.Contains("auth module", s.LastMessage);
     }
 
@@ -218,7 +218,7 @@ public sealed class CursorTailTests
     }
 
     [Fact]
-    public void NeedsYou_WhenQuestionIsOnLastLine()
+    public void Finished_WhenQuestionIsOnLastLine()
     {
         var events = new[]
         {
@@ -228,8 +228,8 @@ public sealed class CursorTailTests
 
         var s = CursorTail.ParseEvents(events, "c-Users-test-Desktop-app", Now, "q3");
         Assert.NotNull(s);
-        Assert.Equal(SessionStatus.NeedsYou, s!.Status);
-        Assert.Contains("simpler", s.LastMessage);
+        Assert.Equal(SessionStatus.Finished, s!.Status);
+        Assert.Equal("I found two approaches.", s.LastMessage); // a finished row shows the opening line
     }
 
     [Fact]
@@ -250,7 +250,7 @@ public sealed class CursorTailTests
     }
 
     [Fact]
-    public void NeedsYou_SurvivesTurnEndedAfterTextQuestion()
+    public void Finished_AfterTurnEndedOnATextQuestion()
     {
         var events = new[]
         {
@@ -261,8 +261,8 @@ public sealed class CursorTailTests
 
         var s = CursorTail.ParseEvents(events, "c-Users-test-Desktop-app", Now, "q5");
         Assert.NotNull(s);
-        Assert.Equal(SessionStatus.NeedsYou, s!.Status);
-        Assert.Contains("production", s.LastMessage);
+        Assert.Equal(SessionStatus.Finished, s!.Status);
+        Assert.Equal("Ready.", s.LastMessage);
     }
 
     [Fact]

@@ -29,27 +29,22 @@ public static class AgentIcons
         "M6,6 L8,6 L8,8 L6,8Z M16,6 L18,6 L18,8 L16,8Z");
 
     /// <summary>
-    /// The OpenAI knot (Codex). Nonzero fill: the six interlocking loops overlap,
-    /// and only the small centre hexagon is meant to be a hole.
+    /// The OpenAI knot (Codex), reduced to the two things that survive at the size
+    /// the notch draws it: six lobes and a hexagonal centre.
+    ///
+    /// The literal mark is six interlocking loops, and the icon supplied for it is
+    /// that outline at a ~4% stroke. Neither works here — these marks render at
+    /// 11-17px and never larger, where the filled knot collapsed into a featureless
+    /// smudge and an outline that thin goes sub-pixel and disappears (the same trap
+    /// the old hollow Cursor cube fell into). Each lobe is one quadratic whose
+    /// control point is pushed out to (4*Rtip - 2*Rvalley*cos30)/2, so the curve
+    /// passes through the tip: twelve numbers instead of a sampled polygon, and
+    /// still editable by hand. Even-odd fill turns the centre into a hole.
     /// </summary>
     public static readonly Geometry Codex = Frozen(
-        "F1 M22.2819,9.8211a5.9847,5.9847 0 0 0-.5157-4.9108 6.0462,6.0462 0 0 0-6.5098-2.9" +
-        "A6.0651,6.0651 0 0 0 4.9807,4.1818a5.9847,5.9847 0 0 0-3.9977,2.9 6.0462,6.0462 0 0 0 .7427,7.0966" +
-        "a5.98,5.98 0 0 0 .511,4.9107 6.051,6.051 0 0 0 6.5146,2.9001A5.9847,5.9847 0 0 0 13.2599,24" +
-        "a6.0557,6.0557 0 0 0 5.7718-4.2058 5.9894,5.9894 0 0 0 3.9977-2.9001 6.0557,6.0557 0 0 0-.7475-7.0729z" +
-        "m-9.022,12.6081a4.4755,4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582" +
-        "a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02,1.1686a.071.071 0 0 1 .038.052v5.5826" +
-        "a4.504,4.504 0 0 1-4.4945,4.4944zm-9.6607-4.1254a4.4708,4.4708 0 0 1-.5346-3.0137l.142.0852 4.783,2.7582" +
-        "a.7712.7712 0 0 0 .7806,0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74,19.9502" +
-        "a4.4992,4.4992 0 0 1-6.1408-1.6464zM2.3408,7.8956a4.485,4.485 0 0 1 2.3655-1.9728V11.6" +
-        "a.7664.7664 0 0 0 .3879.6765l5.8144,3.3543-2.0201,1.1685a.0757.0757 0 0 1-.071,0l-4.8303-2.7865" +
-        "A4.504,4.504 0 0 1 2.3408,7.872zm16.5963,3.8558L13.1038,8.364 15.1192,7.2a.0757.0757 0 0 1 .071,0" +
-        "l4.8303,2.7913a4.4944,4.4944 0 0 1-.6765,8.1042v-5.6772a.79.79 0 0 0-.407-.667z" +
-        "m2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854,0L9.409,9.2297V6.8974" +
-        "a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992,4.4992 0 0 1 6.6802,4.66zM8.3065,12.863" +
-        "l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992,4.4992 0 0 1 7.3757-3.4537l-.142.0805" +
-        "L8.704,5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069,1.4998v2.9994" +
-        "l-2.5974,1.4997-2.6067-1.4997Z");
+        "M15.8,5.42 Q12,-4.62 8.2,5.42 Q-2.39,3.69 4.4,12 Q-2.39,20.31 8.2,18.58 " +
+        "Q12,28.62 15.8,18.58 Q26.39,20.31 19.6,12 Q26.39,3.69 15.8,5.42Z " +
+        "M16.6,12 L14.3,15.98 L9.7,15.98 L7.4,12 L9.7,8.02 L14.3,8.02Z");
 
     /// <summary>
     /// The Gemini diamond (Antigravity): a four-point star with concave sides,
@@ -62,12 +57,26 @@ public static class AgentIcons
         "C11.61,14.57 9.43,12.39 6.2,12 C9.43,11.61 11.61,9.43 12,6.2Z");
 
     /// <summary>
-    /// Cursor cube. Nonzero fill (F1) — an even-odd outer+inner path used to punch a
-    /// hollow hole that vanished to a hairline at 15px on the pill, so Working looked
-    /// like an empty notch. Solid silhouette stays readable next to the spinner.
+    /// Cursor, as pixel art in the same idiom as the Claude invader: a pointy-top
+    /// hexagon on a 9x10 grid with the cursor arrow of Cursor's own mark cut out of
+    /// it. Traced from resources/app/out/vs/glass/browser/media/cursor-splash-logo-normal.png
+    /// and then squared up by hand — a raw threshold of the logo came out lumpy and
+    /// lopsided. One seamless outline plus the arrow's hole loop, so even-odd fill
+    /// leaves the arrow empty and no seams open between cells (X = filled):
+    ///   ....X....
+    ///   ..XXXXX..
+    ///   XXXXXXXXX
+    ///   XX......X
+    ///   XXX.....X
+    ///   XXXX...XX
+    ///   XXXX..XXX
+    ///   XXXXX.XXX
+    ///   ..XXXXX..
+    ///   ....X....
+    /// Tinted by state like every other mark: blue working, orange asking, green done.
     /// </summary>
     public static readonly Geometry Cursor = Frozen(
-        "F1 M12,2.2 L20.8,7.3 L20.8,16.7 L12,21.8 L3.2,16.7 L3.2,7.3Z");
+        "M8,0 L10,0 L10,2 L14,2 L14,4 L18,4 L18,16 L14,16 L14,18 L10,18 L10,20 L8,20 L8,18 L4,18 L4,16 L0,16 L0,4 L4,4 L4,2 L8,2Z M4,6 L4,8 L6,8 L6,10 L8,10 L8,14 L10,14 L10,16 L12,16 L12,12 L14,12 L14,10 L16,10 L16,6Z");
 
     /// <summary>Neutral dot — unknown agent, or the idle pill.</summary>
     public static readonly Geometry Generic = Frozen("M0,0 M24,24 M7.5,12 A4.5,4.5 0 1 0 16.5,12 A4.5,4.5 0 1 0 7.5,12Z");

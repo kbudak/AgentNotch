@@ -32,15 +32,50 @@ public sealed class HookRequest
         Event = envelope.Event.ValueKind == JsonValueKind.Undefined ? default : envelope.Event.Clone();
 
         HookEventName = GetString("hook_event_name");
-        ToolName = GetString("tool_name");
-        SessionId = GetString("session_id");
-        Cwd = GetString("cwd");
         PermissionMode = GetString("permission_mode");
+
+        // Cursor names the same facts differently (conversation_id / workspace_roots)
+        // and sends a bare `command` string for beforeShellExecution instead of a
+        // tool. Normalising here — the one place raw hook JSON becomes typed facts —
+        // means every consumer downstream (PromptViewModel, the diff renderer, the
+        // views) keeps working against the Claude Code shape it already knows.
+        SessionId = FirstNonEmpty(GetString("session_id"), GetString("conversation_id"));
+        Cwd = FirstNonEmpty(GetString("cwd"), FirstWorkspaceRoot());
+
+        var shellCommand = GetString("command");
+        ToolName = FirstNonEmpty(GetString("tool_name"), shellCommand.Length > 0 ? "Bash" : "");
         ToolInput = Event.ValueKind == JsonValueKind.Object
                     && Event.TryGetProperty("tool_input", out JsonElement toolInput)
                     && toolInput.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined)
             ? toolInput
-            : null;
+            : shellCommand.Length > 0
+                ? JsonSerializer.SerializeToElement(new { command = shellCommand })
+                : null;
+    }
+
+    private static string FirstNonEmpty(params string[] values)
+    {
+        foreach (var value in values)
+            if (!string.IsNullOrEmpty(value)) return value;
+        return "";
+    }
+
+    /// <summary>Cursor sends the open folders as an array; the first is the session's project.</summary>
+    private string FirstWorkspaceRoot()
+    {
+        try
+        {
+            if (Event.ValueKind == JsonValueKind.Object
+                && Event.TryGetProperty("workspace_roots", out var roots)
+                && roots.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var root in roots.EnumerateArray())
+                    if (root.ValueKind == JsonValueKind.String && root.GetString() is { Length: > 0 } value)
+                        return value;
+            }
+        }
+        catch { /* tolerate */ }
+        return "";
     }
 
     /// <summary>Envelope correlation id (echoed back in the decision).</summary>

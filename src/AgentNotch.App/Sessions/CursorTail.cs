@@ -42,7 +42,7 @@ public static class CursorTail
                 if (!File.Exists(key)) Cache.TryRemove(key, out _);
             }
 
-            foreach (var file in ListRecentFiles(cursorProjectsDir))
+            foreach (var file in ListRecentFiles(cursorProjectsDir, nowUtc))
             {
                 scanned++;
                 var parentInfo = SafeFileInfo(file.Path);
@@ -203,57 +203,111 @@ public static class CursorTail
     private readonly record struct TranscriptFile(
         string Path, string ProjectSlug, long Size, DateTime ActivityMtimeUtc);
 
-    private static List<TranscriptFile> ListRecentFiles(string root)
+    /// <summary>Where a session's transcript lives. Paths only, no timestamps — cacheable.</summary>
+    private readonly record struct TranscriptSite(string Path, string ProjectSlug, string SessionDir);
+
+    /// <summary>
+    /// How long the directory STRUCTURE is trusted. Appending to a transcript does
+    /// not touch its parent directory's mtime, so there is no cheap way to spot a
+    /// new session other than re-walking — but a new session is rare, while the
+    /// re-walk is not: one "agent-transcripts" probe per project the user has EVER
+    /// opened, on every poll tick, forever. Only the structure is cached; the mtimes
+    /// that actually drive status are re-read every single tick.
+    /// <see cref="InvalidateStructure"/> makes a new session appear at once.
+    /// </summary>
+    private static readonly TimeSpan StructureTtl = TimeSpan.FromSeconds(30);
+
+    private static readonly object StructureGate = new();
+    private static List<TranscriptSite>? _sites;
+    private static string _sitesRoot = "";
+    private static long _sitesAtMs = -1;
+
+    /// <summary>Forces the next scan to re-walk — the watcher calls this on create/delete/rename.</summary>
+    public static void InvalidateStructure()
+    {
+        lock (StructureGate) _sitesAtMs = -1;
+    }
+
+    private static List<TranscriptSite> Sites(string root)
+    {
+        lock (StructureGate)
+        {
+            long now = Environment.TickCount64;
+            if (_sites is not null && _sitesRoot == root && _sitesAtMs >= 0
+                && now - _sitesAtMs <= StructureTtl.TotalMilliseconds)
+                return _sites;
+
+            var sites = new List<TranscriptSite>();
+            try
+            {
+                foreach (var projectDir in Directory.EnumerateDirectories(root))
+                {
+                    var slug = Path.GetFileName(projectDir);
+                    if (string.IsNullOrEmpty(slug) || slug.StartsWith(".", StringComparison.Ordinal))
+                        continue;
+
+                    var transcriptsDir = Path.Combine(projectDir, "agent-transcripts");
+                    if (!Directory.Exists(transcriptsDir)) continue;
+
+                    foreach (var sessionDir in Directory.EnumerateDirectories(transcriptsDir))
+                    {
+                        var sessionId = Path.GetFileName(sessionDir);
+                        if (string.IsNullOrEmpty(sessionId)) continue;
+                        var jsonl = Path.Combine(sessionDir, sessionId + ".jsonl");
+                        if (File.Exists(jsonl)) sites.Add(new TranscriptSite(jsonl, slug, sessionDir));
+                    }
+                }
+            }
+            catch
+            {
+                return _sites ?? new List<TranscriptSite>(); // keep the last good structure
+            }
+
+            _sites = sites;
+            _sitesRoot = root;
+            _sitesAtMs = now;
+            return sites;
+        }
+    }
+
+    private static List<TranscriptFile> ListRecentFiles(string root, DateTime nowUtc)
     {
         var files = new List<TranscriptFile>();
         if (!Directory.Exists(root)) return files;
 
-        try
+        foreach (var site in Sites(root))
         {
-            foreach (var projectDir in Directory.EnumerateDirectories(root))
+            try
             {
-                var slug = Path.GetFileName(projectDir);
-                if (string.IsNullOrEmpty(slug) || slug.StartsWith(".", StringComparison.Ordinal))
-                    continue;
+                var info = new FileInfo(site.Path);
+                if (!info.Exists) continue;
+                var activity = info.LastWriteTimeUtc;
 
-                var transcriptsDir = Path.Combine(projectDir, "agent-transcripts");
-                if (!Directory.Exists(transcriptsDir)) continue;
-
-                foreach (var sessionDir in Directory.EnumerateDirectories(transcriptsDir))
+                // A Task child can be live while its parent has gone quiet, so a
+                // subagent's mtime counts as the session's activity.
+                var subDir = Path.Combine(site.SessionDir, "subagents");
+                if (Directory.Exists(subDir))
                 {
-                    var sessionId = Path.GetFileName(sessionDir);
-                    if (string.IsNullOrEmpty(sessionId)) continue;
-
-                    var jsonl = Path.Combine(sessionDir, sessionId + ".jsonl");
-                    if (!File.Exists(jsonl)) continue;
-
-                    try
+                    foreach (var sub in Directory.EnumerateFiles(subDir, "*.jsonl"))
                     {
-                        var info = new FileInfo(jsonl);
-                        if (!info.Exists) continue;
-                        var activity = info.LastWriteTimeUtc;
-                        var subDir = Path.Combine(sessionDir, "subagents");
-                        if (Directory.Exists(subDir))
+                        try
                         {
-                            foreach (var sub in Directory.EnumerateFiles(subDir, "*.jsonl"))
-                            {
-                                try
-                                {
-                                    var sm = File.GetLastWriteTimeUtc(sub);
-                                    if (sm > activity) activity = sm;
-                                }
-                                catch { /* vanished */ }
-                            }
+                            var sm = File.GetLastWriteTimeUtc(sub);
+                            if (sm > activity) activity = sm;
                         }
-                        files.Add(new TranscriptFile(jsonl, slug, info.Length, activity));
+                        catch { /* vanished */ }
                     }
-                    catch { /* vanished mid-scan */ }
                 }
+
+                // Drop the long-dead BEFORE parsing. A transcript cannot be newer than
+                // the file it was written into, so anything past the widest keep window
+                // is discarded after the parse anyway — this just stops us reading
+                // dozens of dead transcripts every tick to prove it.
+                if (nowUtc - activity > WorkingKeep) continue;
+
+                files.Add(new TranscriptFile(site.Path, site.ProjectSlug, info.Length, activity));
             }
-        }
-        catch
-        {
-            return new List<TranscriptFile>();
+            catch { /* vanished mid-scan */ }
         }
 
         return files.OrderByDescending(f => f.ActivityMtimeUtc).Take(MaxFiles).ToList();
@@ -336,9 +390,8 @@ public static class CursorTail
                     lastSpawnedTask = false;
                     lastMessage = FirstLine(text);
                     cwd ??= ExtractCwd(text);
-                    var ask = QuestionLine(text);
-                    if (ask is not null) { lastAskedUser = true; lastQuestion = ask; }
-                    else { lastAskedUser = false; lastHasToolUse = false; }
+                    lastAskedUser = false; // question-shaped text is not an active ask
+                    lastHasToolUse = false;
                 }
                 else if (role == "user")
                 {
@@ -365,9 +418,8 @@ public static class CursorTail
                         lastSpawnedTask = false;
                         lastMessage = FirstLine(text);
                         cwd ??= ExtractCwd(text);
-                        var ask = QuestionLine(text);
-                        if (ask is not null) { lastAskedUser = true; lastQuestion = ask; }
-                        else { lastAskedUser = false; lastHasToolUse = false; }
+                        lastAskedUser = false; // question-shaped text is not an active ask
+                        lastHasToolUse = false;
                     }
                     else if (role == "user")
                     {
@@ -475,16 +527,6 @@ public static class CursorTail
                 if (turnTarget is not null) lastTarget = turnTarget;
                 if (turnQuestion is not null) lastQuestion = turnQuestion;
 
-                var askLine = QuestionLine(turnTextFull ?? turnText);
-                if (askLine is not null)
-                {
-                    lastAskedUser = true;
-                    lastQuestion = askLine;
-                }
-                else if (!askedUser && hasToolUse)
-                {
-                    lastAskedUser = false;
-                }
             }
             else if (role == "user")
             {
@@ -502,7 +544,9 @@ public static class CursorTail
         if (lastRole is null) return null;
 
         SessionStatus status;
-        if (lastAskedUser || QuestionLine(lastQuestion ?? lastMessage) is not null)
+        // Orange only for an ask the agent is blocked on: AskQuestion / cursor_dialog /
+        // a permission request. A question in the closing text ends the work, not a step.
+        if (lastAskedUser)
         {
             status = SessionStatus.NeedsYou;
             lastQuestion ??= QuestionLine(lastMessage) ?? lastMessage;

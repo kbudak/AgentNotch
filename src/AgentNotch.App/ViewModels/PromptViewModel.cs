@@ -20,7 +20,7 @@ public sealed record QuestionOption(int Index, string Label, string Description,
 public sealed class PromptViewModel
 {
     public HookRequest Request { get; }
-    public PromptKind Kind { get; }
+    public PromptKind Kind { get; private set; }
     public string ToolName { get; }
 
     /// <summary>"Edit src\auth\middleware.ts" — or the Bash command's first line.</summary>
@@ -48,9 +48,15 @@ public sealed class PromptViewModel
     public PromptViewModel(HookRequest request)
     {
         Request = request;
-        Kind = string.Equals(request.Mode, Proto.ModeAskUserQuestion, StringComparison.OrdinalIgnoreCase)
-            ? PromptKind.Question
-            : PromptKind.Permission;
+
+        // Claude Code announces a question through its own helper mode. Cursor has
+        // no such event — its AskQuestion arrives as an ordinary blocking tool call
+        // — so the SHAPE of the request decides, not the mode. A question tool whose
+        // input yields no options falls back to Permission below, so the user can
+        // still allow/deny rather than face an empty card.
+        bool questionMode = string.Equals(request.Mode, Proto.ModeAskUserQuestion, StringComparison.OrdinalIgnoreCase)
+                            || IsAskTool(request.ToolName);
+        Kind = questionMode ? PromptKind.Question : PromptKind.Permission;
 
         string toolName = "", title = "", subtitle = "";
         string command = "", generic = "", questionText = "", header = "";
@@ -74,9 +80,20 @@ public sealed class PromptViewModel
             if (Kind == PromptKind.Question)
             {
                 (questionText, header, options, multi) = ParseQuestion(input);
-                title = header.Length > 0 ? header : "Question";
+                if (options.Count == 0 && questionText.Length == 0)
+                {
+                    // Nothing renderable — treat it as a plain approval instead of
+                    // showing a question card with no question and no buttons.
+                    Kind = PromptKind.Permission;
+                    generic = input is { } raw ? Trunc(raw.GetRawText(), 1000) : "";
+                }
+                else
+                {
+                    title = header.Length > 0 ? header : "Question";
+                }
             }
-            else
+
+            if (Kind == PromptKind.Permission && generic.Length == 0)
             {
                 switch (toolName)
                 {
@@ -139,6 +156,26 @@ public sealed class PromptViewModel
         DiffStats = added + removed > 0 ? $"+{added} -{removed}" : "";
     }
 
+    /// <summary>
+    /// Tool names that mean "the agent is asking YOU something" — Claude Code's
+    /// AskUserQuestion, Cursor's native AskQuestion, Antigravity's ask_question.
+    /// Kept in step with <see cref="Sessions.CursorTail"/>'s own ask detection.
+    /// </summary>
+    internal static bool IsAskTool(string? tool) =>
+        !string.IsNullOrEmpty(tool)
+        && (tool.Contains("AskQuestion", StringComparison.OrdinalIgnoreCase)
+            || tool.Contains("AskUserQuestion", StringComparison.OrdinalIgnoreCase)
+            || tool.Equals("ask_question", StringComparison.OrdinalIgnoreCase)
+            || tool.Equals("cursor_dialog", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// One question + its options, out of either dialect. The agents agree on the
+    /// structure (an array of questions, each with an array of options) and disagree
+    /// on every field name: Claude Code writes question/header/label, Cursor writes
+    /// prompt/title/label with an id, Antigravity writes question/title. Reading a
+    /// small set of aliases costs nothing and stops a renamed field from silently
+    /// producing an empty card.
+    /// </summary>
     private static (string Question, string Header, IReadOnlyList<QuestionOption> Options, bool Multi)
         ParseQuestion(JsonElement? input)
     {
@@ -152,11 +189,11 @@ public sealed class PromptViewModel
             questions.GetArrayLength() > 0)
         {
             var q = questions[0]; // single-question MVP
-            questionText = GetStr(q, "question");
-            header = GetStr(q, "header");
-            multi = q.ValueKind == JsonValueKind.Object &&
-                    q.TryGetProperty("multiSelect", out var ms) &&
-                    ms.ValueKind == JsonValueKind.True;
+            questionText = FirstStr(q, "question", "prompt", "text");
+            // Cursor puts the heading on the call, not on each question.
+            header = FirstStr(q, "header", "title");
+            if (header.Length == 0) header = FirstStr(obj, "title", "header");
+            multi = IsTrue(q, "multiSelect") || IsTrue(q, "multi_select") || IsTrue(q, "multiple");
 
             if (q.ValueKind == JsonValueKind.Object &&
                 q.TryGetProperty("options", out var opts) &&
@@ -167,8 +204,10 @@ public sealed class PromptViewModel
                 {
                     string label = opt.ValueKind == JsonValueKind.String
                         ? opt.GetString() ?? ""
-                        : GetStr(opt, "label");
-                    string description = opt.ValueKind == JsonValueKind.Object ? GetStr(opt, "description") : "";
+                        : FirstStr(opt, "label", "name", "text", "id");
+                    string description = opt.ValueKind == JsonValueKind.Object
+                        ? FirstStr(opt, "description", "detail", "hint")
+                        : "";
                     if (label.Length == 0) label = $"Option {i + 1}";
                     list.Add(new QuestionOption(i, label, description, i < 9 ? $"Ctrl+{i + 1}" : ""));
                     i++;
@@ -178,6 +217,19 @@ public sealed class PromptViewModel
 
         return (questionText, header, list, multi);
     }
+
+    /// <summary>First of <paramref name="names"/> present as a non-empty string.</summary>
+    private static string FirstStr(JsonElement element, params string[] names)
+    {
+        foreach (var name in names)
+            if (GetStr(element, name) is { Length: > 0 } value) return value;
+        return "";
+    }
+
+    private static bool IsTrue(JsonElement element, string name)
+        => element.ValueKind == JsonValueKind.Object
+           && element.TryGetProperty(name, out var prop)
+           && prop.ValueKind == JsonValueKind.True;
 
     private static string GetStr(JsonElement? element, string name)
     {

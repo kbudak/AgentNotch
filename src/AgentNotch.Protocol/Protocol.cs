@@ -23,6 +23,14 @@ public static class Proto
     public const string ModeStop = "stop";
     public const string ModePrompt = "prompt";
 
+    // Cursor IDE speaks its own hook dialect (~\.cursor\hooks.json): flat event
+    // arrays, a shell-string command, and a {"permission": ...} reply instead of
+    // Claude Code's hookSpecificOutput envelope. Separate modes keep the helper
+    // honest about which dialect to print — the app side sees one normalised
+    // HookRequest either way.
+    public const string ModeCursorPermission = "cursor-permission";
+    public const string ModeCursorNotify = "cursor-notify";
+
     public static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

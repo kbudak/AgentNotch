@@ -121,6 +121,7 @@ public partial class OverlayWindow
             Recenter();
         else if (e.PropertyName == nameof(MainViewModel.Theme))
             ApplyThemeGeometry();
+
     }
 
     /// <summary>
@@ -248,7 +249,7 @@ public partial class OverlayWindow
         };
         RevealHost.BeginAnimation(HeightProperty, height, HandoffBehavior.SnapshotAndReplace);
 
-        Animate(NotchPanel, WidthProperty, IsConsole ? _consoleLineWidth : IslandCollapsedWidth, 200, Ease.Morph);
+        Animate(NotchPanel, WidthProperty, IsConsole ? _consoleLineWidth : CollapsedPanelWidth, 200, Ease.Morph);
         // Fade the content out a touch faster than the shape closes, so it's gone
         // before the panel finishes shrinking (also masks the prompt card unloading).
         Animate(ExpandedContent, OpacityProperty, 0, 110, Ease.Out);

@@ -1,4 +1,3 @@
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AgentNotch.App.Diagnostics;
@@ -31,11 +30,7 @@ public static class ClaudeCodeInstaller
     /// <summary>Marker that identifies our hook command entries (case-insensitive).</summary>
     private const string CommandMarker = "agentnotch-hook";
 
-    private static readonly JsonSerializerOptions WriteOptions = new()
-    {
-        WriteIndented = true,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
+    private static readonly JsonSerializerOptions WriteOptions = JsonSettingsFile.WriteOptions;
 
     /// <summary>The five hook registrations we own: (event, matcher — null = no matcher property, helper mode arg, timeout seconds).</summary>
     private static readonly (string Event, string? Matcher, string Mode, int Timeout)[] HookSpecs =
@@ -187,32 +182,7 @@ public static class ClaudeCodeInstaller
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".claude", "settings.json");
 
-    /// <summary>Parses the settings file. Missing/empty → fresh object; malformed → InvalidOperationException.</summary>
-    private static JsonObject LoadRoot(string path)
-    {
-        if (!File.Exists(path))
-            return new JsonObject();
-
-        var text = File.ReadAllText(path);
-        if (string.IsNullOrWhiteSpace(text))
-            return new JsonObject();
-
-        JsonNode? node;
-        try
-        {
-            node = JsonNode.Parse(text);
-        }
-        catch (JsonException ex)
-        {
-            throw new InvalidOperationException(
-                $"'{path}' contains malformed JSON. Fix or remove the file manually — AgentNotch will not overwrite it.", ex);
-        }
-
-        if (node is not JsonObject obj)
-            throw new InvalidOperationException(
-                $"'{path}' is not a JSON object — refusing to rewrite it.");
-        return obj;
-    }
+    private static JsonObject LoadRoot(string path) => JsonSettingsFile.LoadRoot(path);
 
     /// <summary>Idempotently merges one of our hook registrations into hooks[evt].</summary>
     private static void EnsureEntry(
@@ -306,31 +276,7 @@ public static class ClaudeCodeInstaller
     private static bool IsGroupPrunable(JsonObject group) =>
         group.All(p => p.Key is "matcher" or "hooks");
 
-    private static string? GetString(JsonNode? node) =>
-        node is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
+    private static string? GetString(JsonNode? node) => JsonSettingsFile.GetString(node);
 
-    /// <summary>Backs up the existing file, then writes atomically via a temp file.</summary>
-    private static void Save(string path, string json)
-    {
-        var dir = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(dir))
-            Directory.CreateDirectory(dir);
-
-        if (File.Exists(path))
-        {
-            var backup = path + $".agentnotch-backup-{DateTime.Now:yyyyMMdd-HHmmss}";
-            var candidate = backup;
-            for (int i = 1; File.Exists(candidate); i++)
-                candidate = backup + "-" + i; // same-second collision (e.g. install then uninstall)
-            File.Copy(path, candidate);
-            AppLog.Write($"installer: backed up settings to {candidate}");
-        }
-
-        var tmp = path + ".agentnotch-tmp";
-        File.WriteAllText(tmp, json);
-        if (File.Exists(path))
-            File.Replace(tmp, path, destinationBackupFileName: null);
-        else
-            File.Move(tmp, path);
-    }
+    private static void Save(string path, string json) => JsonSettingsFile.Save(path, json);
 }

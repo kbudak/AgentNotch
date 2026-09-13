@@ -57,8 +57,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// </summary>
     public string? ToastText { get; private set; }
 
-    /// <summary>What the confirmation applied to ("Write(hello.txt)"); may be empty.</summary>
-    public string ToastDetail { get; private set; } = "";
 
     /// <summary>"ok" | "deny" | "pass" — picks the badge glyph and colour.</summary>
     public string ToastKind { get; private set; } = "ok";
@@ -372,7 +370,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         try
         {
-            if (request.Mode is Proto.ModePermissionRequest or Proto.ModeAskUserQuestion)
+            // Gate on ExpectsReply, NOT on a list of known modes. The helper and
+            // PipeServer already decided from this same flag whether to hold the
+            // connection open — a mode enumerated in only one of the two places is
+            // a blocking request nobody ever answers, and the agent hangs for the
+            // helper's full timeout before falling through.
+            if (request.ExpectsReply)
             {
                 var prompt = new PromptViewModel(request);
                 _queue.Add(prompt);
@@ -389,7 +392,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
             else
             {
-                // Observe-only modes (notify/stop/prompt): freshness nudge, no UI card.
+                // Observe-only modes (notify/stop/prompt/cursor-notify): freshness
+                // nudge, no UI card and nothing waiting on a reply.
                 AppLog.Write($"observe: {request.Mode} {request.HookEventName} session={request.SessionId}");
             }
         }
@@ -418,13 +422,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>Flashes a confirmation in the notch for a couple of seconds.</summary>
-    private void ShowToast(string text, string detail, string kind)
+    private void ShowToast(string text, string kind)
     {
         ToastText = text;
-        ToastDetail = detail;
         ToastKind = kind;
         Raise(nameof(ToastText));
-        Raise(nameof(ToastDetail));
         Raise(nameof(ToastKind));
         Raise(nameof(HasToast));
 
@@ -553,7 +555,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var prompt = ActivePrompt;
         if (prompt is null || prompt.Kind != PromptKind.Permission) return;
         Resolve(prompt, new DecisionBody { Behavior = "allow" }, "allow");
-        ShowToast("Allowed", ShortTitle(prompt), "ok");
+        ShowToast("Allowed", "ok");
     }
 
     public void DenyActive()
@@ -561,7 +563,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var prompt = ActivePrompt;
         if (prompt is null || prompt.Kind != PromptKind.Permission) return;
         Resolve(prompt, new DecisionBody { Behavior = "deny", Message = "Denied from AgentNotch" }, "deny");
-        ShowToast("Denied", ShortTitle(prompt), "deny");
+        ShowToast("Denied", "deny");
     }
 
     public void PassActive()
@@ -569,15 +571,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var prompt = ActivePrompt;
         if (prompt is null) return;
         Resolve(prompt, new DecisionBody { Behavior = "pass" }, "pass");
-        ShowToast("Handed back", "over to the terminal", "pass");
+        ShowToast("Handed back", "pass");
     }
 
-    /// <summary>Prompt title trimmed to fit the confirmation pill.</summary>
-    private static string ShortTitle(PromptViewModel prompt)
-    {
-        var title = prompt.Title ?? "";
-        return title.Length <= 34 ? title : title[..34] + "…";
-    }
 
     public void ChooseOption(int index)
     {
@@ -595,7 +591,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             },
         };
         Resolve(prompt, body, $"answer #{index + 1}");
-        ShowToast("Answered", option.Label, "ok");
+        ShowToast("Answered", "ok");
     }
 
     private void Resolve(PromptViewModel prompt, DecisionBody body, string what)

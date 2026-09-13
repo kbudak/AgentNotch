@@ -428,13 +428,6 @@ public sealed class AntigravityClient : IDisposable
         "complete|finished|done|idle|stopped|cancelled",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
-    private static readonly Regex QuestionTail = new(
-        "[?？]\\s*$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
-    private static readonly Regex QuestionPhrases = new(
-        "\\b(approve|confirm|do you want|which option|onay|izin|ister misin|hangisini)\\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
     private static readonly Regex Whitespace = new(
         "\\s+", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
@@ -603,11 +596,12 @@ public sealed class AntigravityClient : IDisposable
                     var content = FirstString(root, "content");
                     if (!string.IsNullOrEmpty(content))
                     {
-                        var asks = AsksQuestion(content);
-                        var msg = CollapseExcerpt(content, 100) ?? (asks ? "Waiting for you" : "Task complete");
+                        // A closing message is a finished task, question mark or not; only an
+                        // ask_question step (handled above) is an active ask.
+                        var msg = CollapseExcerpt(content, 100) ?? "Task complete";
                         return new TranscriptInfo
                         {
-                            Status = asks ? SessionStatus.NeedsYou : SessionStatus.Finished,
+                            Status = SessionStatus.Finished,
                             Message = msg,
                             Cwd = detectedCwd,
                             TimestampUtc = timeUtc,
@@ -734,7 +728,7 @@ public sealed class AntigravityClient : IDisposable
                 else if (NeedsYouStatus.IsMatch(rawStatus)) mapped = SessionStatus.NeedsYou;
                 else if (WorkingStatus.IsMatch(rawStatus)) mapped = SessionStatus.Working;
                 else if (FinishedStatus.IsMatch(rawStatus))
-                    mapped = AsksQuestion(summary) ? SessionStatus.NeedsYou : SessionStatus.Finished;
+                    mapped = SessionStatus.Finished;
                 if (mapped is not { } status) continue;
 
                 var updatedAtUtc = transcript.TimestampUtc ?? CoerceTimestamp(FirstTruthy(t, TimeKeys), nowUtc);
@@ -862,14 +856,6 @@ public sealed class AntigravityClient : IDisposable
         return value;
     }
 
-    /// <summary>Does the summary end in (or contain) a question/approval ask? Includes Turkish.</summary>
-    private static bool AsksQuestion(string? text)
-    {
-        if (string.IsNullOrEmpty(text)) return false;
-        var tail = text.Trim();
-        if (tail.Length > 500) tail = tail[^500..];
-        return QuestionTail.IsMatch(tail) || QuestionPhrases.IsMatch(tail);
-    }
 
     /// <summary>Whitespace-collapsed, trimmed, ≤<paramref name="max"/> chars; null when empty.</summary>
     private static string? CollapseExcerpt(string? text, int max)
