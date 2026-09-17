@@ -226,6 +226,27 @@ from such a list is a request nobody ever answers, and the agent hangs for the
 helper's full 590 s timeout before falling through. `CursorHookPayloadTests` pins
 this.
 
+### When the limits stop moving
+
+The `5h` / `7d` numbers need Claude Code's OAuth token from `~/.claude/.credentials.json`.
+Claude Code rewrites that token only while one of its CLI sessions runs, and sessions
+started from Claude Desktop take their auth from the desktop app instead, so a day spent
+in Desktop leaves the token expired and the header frozen.
+
+When the token has expired, AgentNotch asks Claude Code to renew it by running
+`claude -p /usage` in the background, at most every 30 minutes. `/usage` is a local
+command: it renews the token and refreshes the usage figures without a model call, so
+it spends none of the limit it reports. It runs with `--setting-sources project` in an
+empty folder of AgentNotch's own and with `--no-session-persistence`, which keeps your
+hooks, status line and transcript history out of it. AgentNotch never reads the refresh
+token or writes credentials itself. (`claude auth status` was tried first; it renews
+nothing.)
+
+While a renewal is pending the header stays honest rather than stale. A window whose
+reset time has passed has started over, so it is shown as the fresh window it became,
+0% with no countdown, instead of the ended window's percentage beside a "now" that read
+as current.
+
 ## Reading the notch
 
 Shape says **which agent**, colour says **what state**:

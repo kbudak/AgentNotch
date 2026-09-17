@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Http;
@@ -45,6 +46,10 @@ public sealed class ClaudeUsageClient : IDisposable
 
     private static readonly TimeSpan FreshFor = TimeSpan.FromSeconds(150);
     private static readonly TimeSpan BackoffFor = TimeSpan.FromMinutes(5);
+
+    /// <summary>How often, at most, we ask Claude Code to renew an expired token.</summary>
+    internal static readonly TimeSpan RenewEvery = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan RenewTimeout = TimeSpan.FromMinutes(2);
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
 
     /// <summary>Windows we surface, in display order.</summary>
@@ -62,6 +67,10 @@ public sealed class ClaudeUsageClient : IDisposable
     private DateTime _fetchedUtc = DateTime.MinValue;
     private DateTime _nextTryUtc = DateTime.MinValue;
     private bool _refreshing;
+    private long _loggedExpiryMs; // the expiry we already reported, so it is logged once, not every backoff
+    private bool _tokenExpired;
+    private DateTime _lastRenewUtc = DateTime.MinValue;
+    private int _renewing;
     private volatile bool _disposed;
 
     public ClaudeUsageClient(string? claudeHome = null)
@@ -77,7 +86,23 @@ public sealed class ClaudeUsageClient : IDisposable
     }
 
     /// <summary>Latest known windows; empty until the first successful read.</summary>
-    public IReadOnlyList<UsageWindow> Windows => _windows;
+    public IReadOnlyList<UsageWindow> Windows => RollOver(_windows, DateTime.UtcNow);
+
+    /// <summary>
+    /// A window whose reset time has passed has started over, so the percentage we
+    /// hold belongs to a window that already ended. Shown with a "now" countdown —
+    /// what the header did for hours while Claude Code's token sat expired — it read
+    /// as current and was simply wrong: 69% used where the fresh window stood at 3%.
+    /// A rolled-over window is shown as the fresh window it became, 0% with no known
+    /// reset, until the next successful read replaces it.
+    /// </summary>
+    internal static IReadOnlyList<UsageWindow> RollOver(IReadOnlyList<UsageWindow> windows, DateTime nowUtc)
+    {
+        if (!windows.Any(w => w.ResetsAtUtc is { } r && r <= nowUtc)) return windows;
+        return windows
+            .Select(w => w.ResetsAtUtc is { } r && r <= nowUtc ? w with { UsedPct = 0, ResetsAtUtc = null } : w)
+            .ToList();
+    }
 
     /// <summary>
     /// Requests a refresh. Non-blocking and safe to call every poll: at most one
@@ -114,8 +139,10 @@ public sealed class ClaudeUsageClient : IDisposable
             var token = ReadAccessToken();
             if (token is null)
             {
-                // Not signed in (or the token expired — Claude Code rewrites it on
-                // next use). Keep whatever we last knew rather than blanking out.
+                // Not signed in, or the token expired. Keep whatever we last knew rather
+                // than blanking out — and if it expired, ask Claude Code to renew it.
+                if (_tokenExpired && ShouldRenew(_lastRenewUtc, DateTime.UtcNow))
+                    AskClaudeCodeToRenewToken();
                 lock (_gate) { _nextTryUtc = DateTime.UtcNow + BackoffFor; }
                 return;
             }
@@ -215,9 +242,84 @@ public sealed class ClaudeUsageClient : IDisposable
         return null;
     }
 
+    internal static bool ShouldRenew(DateTime lastAttemptUtc, DateTime nowUtc)
+        => nowUtc - lastAttemptUtc >= RenewEvery;
+
+    /// <summary>
+    /// Has Claude Code renew its own token, by running its local `/usage` command.
+    ///
+    /// Claude Code only rewrites ~\.claude\.credentials.json while one of its CLI
+    /// sessions runs, and sessions launched from Claude Desktop get their auth from the
+    /// desktop app instead — so a day in Desktop left the token expired and the header
+    /// frozen for hours. `claude auth status` was checked and renews nothing; `claude -p
+    /// /usage` renews the token and refreshes the usage figures, and it is a local
+    /// command, so it makes no model call and spends none of the limit it reports.
+    ///
+    /// `--setting-sources project` in an empty folder of our own keeps the user's hooks
+    /// and status line out of it (without it the run fired every Stop hook and briefly
+    /// put a phantom session on the notch), and `--no-session-persistence` keeps it out
+    /// of the transcript history. AgentNotch never touches the credentials itself.
+    /// </summary>
+    private void AskClaudeCodeToRenewToken()
+    {
+        if (Interlocked.Exchange(ref _renewing, 1) == 1) return;
+        _lastRenewUtc = DateTime.UtcNow;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var dir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "AgentNotch", "usage-refresh");
+                Directory.CreateDirectory(dir);
+
+                var psi = new ProcessStartInfo("cmd.exe",
+                    "/c claude -p /usage --no-session-persistence --setting-sources project")
+                {
+                    WorkingDirectory = dir,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                };
+                using var process = Process.Start(psi);
+                if (process is null)
+                {
+                    AppLog.Write("usage: could not start claude to renew its token");
+                    return;
+                }
+                // Drain both pipes, or a full buffer would stall the child.
+                var drainOut = process.StandardOutput.ReadToEndAsync();
+                var drainErr = process.StandardError.ReadToEndAsync();
+
+                using var timeout = new CancellationTokenSource(RenewTimeout);
+                try { await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false); }
+                catch (OperationCanceledException)
+                {
+                    try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+                    AppLog.Write("usage: claude /usage timed out while renewing the token");
+                    return;
+                }
+                await Task.WhenAll(drainOut, drainErr).ConfigureAwait(false);
+
+                AppLog.Write($"usage: asked Claude Code to renew its token (claude -p /usage exited {process.ExitCode})");
+                lock (_gate) { _nextTryUtc = DateTime.MinValue; } // read the renewed token on the next poll
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("usage: renewing the token via claude failed: " + ex.Message);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _renewing, 0);
+            }
+        });
+    }
+
     /// <summary>The OAuth access token Claude Code stored, or null when absent/expired.</summary>
     private string? ReadAccessToken()
     {
+        _tokenExpired = false;
         try
         {
             if (!File.Exists(_credentialsPath)) return null;
@@ -231,7 +333,19 @@ public sealed class ClaudeUsageClient : IDisposable
                 exp.TryGetInt64(out var expiresAtMs))
             {
                 var expiresUtc = DateTimeOffset.FromUnixTimeMilliseconds(expiresAtMs).UtcDateTime;
-                if (DateTime.UtcNow >= expiresUtc - TimeSpan.FromSeconds(30)) return null; // stale
+                if (DateTime.UtcNow >= expiresUtc - TimeSpan.FromSeconds(30))
+                {
+                    _tokenExpired = true;
+                    // This used to return silently, so a header frozen for hours left no
+                    // trace. Claude Code only rewrites this token when one of ITS sessions
+                    // runs; a day spent in Claude Desktop leaves it expired.
+                    if (_loggedExpiryMs != expiresAtMs)
+                    {
+                        _loggedExpiryMs = expiresAtMs;
+                        AppLog.Write($"usage: Claude Code's token expired at {expiresUtc:u}; asking Claude Code to renew it");
+                    }
+                    return null;
+                }
             }
 
             return oauth.TryGetProperty("accessToken", out var t) && t.ValueKind == JsonValueKind.String
