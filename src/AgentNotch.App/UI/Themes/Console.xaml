@@ -31,6 +31,7 @@
 
     <!-- ===================== Palette ===================== -->
     <SolidColorBrush x:Key="PanelBgBrush" Color="#FA000000"/>
+    <SolidColorBrush x:Key="PanelShadowCasterBrush" Color="#FA000000"/>
     <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF262626"/>
     <!-- Cards are the same black as the panel; the hairline is what separates them. -->
     <SolidColorBrush x:Key="CardBgBrush" Color="#FF000000"/>
@@ -38,6 +39,10 @@
     <SolidColorBrush x:Key="CardHoverBrush" Color="#FF101010"/>
     <SolidColorBrush x:Key="CodeBgBrush" Color="#FF000000"/>
     <SolidColorBrush x:Key="RowSeparatorBrush" Color="#FF131313"/>
+    <SolidColorBrush x:Key="SessionRowBgBrush" Color="#00000000"/>
+    <Thickness x:Key="SessionRowBorderThickness">0,0,0,1</Thickness>
+    <Thickness x:Key="SessionRowPadding">10,7,10,6</Thickness>
+    <Thickness x:Key="SessionRowMargin">0,2,0,0</Thickness>
 
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFE4E4E4"/>
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF8E8E8E"/>

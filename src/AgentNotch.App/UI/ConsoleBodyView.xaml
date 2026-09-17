@@ -610,12 +610,16 @@
                                        Foreground="{DynamicResource TextTertiaryBrush}"/>
                             <TextBlock Grid.Column="1" Text="theme" FontSize="11.5" VerticalAlignment="Center"
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Grid.Column="2" Text="rounded island, or this console" FontSize="10.5"
+                            <TextBlock Grid.Column="2" Text="island, glass, atari, or console" FontSize="10.5"
                                        Margin="0,0,14,0" VerticalAlignment="Center"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                                 <RadioButton GroupName="ctheme" Content="island" Style="{StaticResource ConsoleSegment}"
                                              IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=island, Mode=TwoWay}"/>
+                                <RadioButton GroupName="ctheme" Content="glass" Style="{StaticResource ConsoleSegment}"
+                                             IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=glass, Mode=TwoWay}"/>
+                                <RadioButton GroupName="ctheme" Content="atari" Style="{StaticResource ConsoleSegment}"
+                                             IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=atari, Mode=TwoWay}"/>
                                 <RadioButton GroupName="ctheme" Content="console" Style="{StaticResource ConsoleSegment}"
                                              IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=console, Mode=TwoWay}"/>
                             </StackPanel>

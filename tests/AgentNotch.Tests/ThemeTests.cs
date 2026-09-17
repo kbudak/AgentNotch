@@ -31,25 +31,38 @@ public class ThemeTests
             .Select(k => k!)
             .ToHashSet(StringComparer.Ordinal);
 
-    [Fact]
-    public void BothPalettesDeclareTheSameTokens()
+    /// <summary>Every selectable theme, as (id, its declared keys). Adding a theme to
+    /// <see cref="ThemeManager.All"/> without shipping its palette fails here.</summary>
+    private static IEnumerable<(string Id, HashSet<string> Keys)> Palettes()
     {
         var ui = UiDir();
-        var island = KeysOf(Path.Combine(ui, "Themes", "Island.xaml"));
-        var console = KeysOf(Path.Combine(ui, "Themes", "Console.xaml"));
-
-        Assert.Empty(island.Except(console));  // console is missing an island token
-        Assert.Empty(console.Except(island));  // island is missing a console token
-        Assert.NotEmpty(island);
+        foreach (var id in ThemeManager.All)
+        {
+            var file = char.ToUpperInvariant(id[0]) + id[1..] + ".xaml";
+            var path = Path.Combine(ui, "Themes", file);
+            Assert.True(File.Exists(path), $"theme '{id}' has no palette at {file}");
+            yield return (id, KeysOf(path));
+        }
     }
 
     [Fact]
-    public void EveryDynamicResourceKeyIsDeclaredByBothPalettes()
+    public void AllPalettesDeclareTheSameTokens()
+    {
+        var palettes = Palettes().ToList();
+        var island = palettes.Single(p => p.Id == ThemeManager.Island).Keys;
+
+        Assert.NotEmpty(island);
+        foreach (var (id, keys) in palettes)
+        {
+            Assert.Empty(island.Except(keys));  // this theme is missing an island token
+            Assert.Empty(keys.Except(island));  // island is missing this theme's token
+        }
+    }
+
+    [Fact]
+    public void EveryDynamicResourceKeyIsDeclaredByAllPalettes()
     {
         var ui = UiDir();
-        var island = KeysOf(Path.Combine(ui, "Themes", "Island.xaml"));
-        var console = KeysOf(Path.Combine(ui, "Themes", "Console.xaml"));
-
         // Theme.xaml holds the styles; the rest are the views that consume them.
         var referenced = Directory.EnumerateFiles(ui, "*.xaml", SearchOption.AllDirectories)
             .Where(p => !p.Contains(Path.Combine("UI", "Themes"), StringComparison.Ordinal))
@@ -58,13 +71,17 @@ public class ThemeTests
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.NotEmpty(referenced);
-        Assert.Empty(referenced.Except(island));
-        Assert.Empty(referenced.Except(console));
+        foreach (var (id, keys) in Palettes())
+            Assert.Empty(referenced.Except(keys));
     }
 
     [Theory]
     [InlineData("console", ThemeManager.Console)]
     [InlineData("CONSOLE", ThemeManager.Console)]
+    [InlineData("glass", ThemeManager.Glass)]
+    [InlineData(" GLASS ", ThemeManager.Glass)]
+    [InlineData("atari", ThemeManager.Atari)]
+    [InlineData(" Atari ", ThemeManager.Atari)]
     [InlineData(" island ", ThemeManager.Island)]
     [InlineData("", ThemeManager.Island)]
     [InlineData(null, ThemeManager.Island)]

@@ -109,10 +109,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string? _themeOverride; // --theme for a self-test run; never persisted
 
     /// <summary>
-    /// Which skin the notch wears: "island" | "console". It selects the palette AND
-    /// which of the two view trees is live, so anything that changes it has to go
-    /// through here — swapping only the palette leaves one theme wearing the other's
-    /// layout.
+    /// Which skin the notch wears: "island" | "glass" | "atari" | "console". It selects
+    /// the palette and layout (only Console has its own tree; the rest dress Island's
+    /// rounded one), so all changes go through here.
     /// </summary>
     public string Theme
     {

@@ -255,13 +255,22 @@ public sealed class TrackedConverter : IValueConverter
         => Binding.DoNothing;
 }
 
-/// <summary>Theme id → Visibility, so both themes' trees can sit side by side. Parameter is the theme that shows.</summary>
+/// <summary>
+/// Theme id → Visibility. Only the console has its own view tree; every other theme
+/// dresses the island one with its own palette, so they all match "island". Asking
+/// for a specific id ("glass") still matches only that theme's own decoration.
+/// </summary>
 public sealed class ThemeVisibilityConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => string.Equals(ThemeManager.Normalize(value as string), parameter as string, StringComparison.Ordinal)
+    {
+        var theme = ThemeManager.Normalize(value as string);
+        var requested = parameter as string;
+        return (string.Equals(theme, requested, StringComparison.Ordinal)
+                || (theme != ThemeManager.Console && requested == ThemeManager.Island))
             ? Visibility.Visible
             : Visibility.Collapsed;
+    }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => Binding.DoNothing;

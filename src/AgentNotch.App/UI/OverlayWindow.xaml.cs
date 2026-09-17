@@ -50,6 +50,7 @@ public partial class OverlayWindow
     private bool _open;
     private bool _opening;               // suppress content-driven re-targeting mid-open
     private double _consoleLineWidth = 240; // the collapsed line's natural width, for a smooth close
+    private IntPtr _hwnd;
 
     private bool IsConsole => ThemeManager.Normalize(_vm?.Theme) == ThemeManager.Console;
     private double ExpandedPanelWidth => IsConsole ? ConsoleExpandedWidth : IslandExpandedWidth;
@@ -67,7 +68,11 @@ public partial class OverlayWindow
     {
         InitializeComponent();
 
-        Loaded += (_, _) => { ApplyThemeGeometry(); if (_open) AnimateOpen(); };
+        Loaded += (_, _) =>
+        {
+            ApplyThemeGeometry();
+            if (_open) AnimateOpen();
+        };
         MouseEnter += (_, _) => _vm?.SetHover(true);
         MouseLeave += (_, _) => _vm?.SetHover(false);
         DataContextChanged += OnDataContextChanged;
@@ -92,8 +97,8 @@ public partial class OverlayWindow
         try
         {
             Focusable = false;
-            var hwnd = new WindowInteropHelper(this).Handle;
-            NativeMethods.MakeOverlay(hwnd);
+            _hwnd = new WindowInteropHelper(this).Handle;
+            NativeMethods.MakeOverlay(_hwnd);
         }
         catch (Exception ex)
         {
@@ -125,9 +130,8 @@ public partial class OverlayWindow
     }
 
     /// <summary>
-    /// Re-sizes the surface and the panel for the active theme. The two themes do
-    /// not merely repaint — the console panel is 812 wide against the island's 576,
-    /// so the window itself has to grow and re-centre.
+    /// Re-sizes the surface and panel for the active layout. Console is 812 wide;
+    /// Island and Glass share the 576-wide rounded layout.
     /// </summary>
     private void ApplyThemeGeometry()
     {
@@ -291,7 +295,7 @@ public partial class OverlayWindow
             // window's centre to a fraction of the screen places the pill there.
             double frac = _vm?.Position switch { "left" => 0.20, "right" => 0.80, _ => 0.50 };
             Left = Math.Round(screenWidth * frac - Width / 2.0);
-            Top = 0;
+            Top = 0; // the notch hangs off the top edge, flush with it
         }
         catch (Exception ex)
         {

@@ -33,6 +33,7 @@
          on top keep their old value, so darkening this deepens the layering rather
          than flattening it. -->
     <SolidColorBrush x:Key="PanelBgBrush" Color="#FB040406"/>
+    <SolidColorBrush x:Key="PanelShadowCasterBrush" Color="#FB040406"/>
     <SolidColorBrush x:Key="PanelBorderBrush" Color="#14FFFFFF"/>
     <SolidColorBrush x:Key="CardBgBrush" Color="#FF131316"/>
     <!-- Island cards read by their fill alone; the console theme adds a hairline. -->
@@ -40,6 +41,10 @@
     <SolidColorBrush x:Key="CardHoverBrush" Color="#FF1D1D22"/>
     <SolidColorBrush x:Key="CodeBgBrush" Color="#FF0F0F12"/>
     <SolidColorBrush x:Key="RowSeparatorBrush" Color="#00000000"/>
+    <SolidColorBrush x:Key="SessionRowBgBrush" Color="#00000000"/>
+    <Thickness x:Key="SessionRowBorderThickness">0,0,0,1</Thickness>
+    <Thickness x:Key="SessionRowPadding">10,7,10,6</Thickness>
+    <Thickness x:Key="SessionRowMargin">0,2,0,0</Thickness>
 
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFF4F4F5"/>
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF9CA3AF"/>

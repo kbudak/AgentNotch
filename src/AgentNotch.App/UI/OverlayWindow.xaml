@@ -26,17 +26,40 @@
          click-through and hover-transparent; only the panel is interactive. -->
     <Grid Margin="28,0,28,32" HorizontalAlignment="Center" VerticalAlignment="Top">
 
-        <!-- Shadow layer: same shape, effect applied here so text above stays crisp. -->
-        <Border Background="{DynamicResource PanelBgBrush}"
-                CornerRadius="{DynamicResource PanelCornerRadius}">
+        <!-- Must match NotchPanel's size. A stretch caster fills the 640px host and
+             reads as a second, badly-rounded slab behind the pill. -->
+        <Border x:Name="ShadowCaster"
+                HorizontalAlignment="Center" VerticalAlignment="Top"
+                Width="{Binding ActualWidth, ElementName=NotchPanel}"
+                Height="{Binding ActualHeight, ElementName=NotchPanel}"
+                Background="{DynamicResource PanelShadowCasterBrush}"
+                CornerRadius="{DynamicResource PanelCornerRadius}"
+                IsHitTestVisible="False">
+            <Border.Style>
+                <Style TargetType="{x:Type Border}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                    <Style.Triggers>
+                        <!-- Glass: the caster + DropShadow rasterize a dark rectangle
+                             around the pill on a layered window. -->
+                        <DataTrigger Binding="{Binding Theme}" Value="glass">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <Border.Effect>
-                <DropShadowEffect Color="#FF000000" Opacity="0.4" BlurRadius="24" ShadowDepth="8" Direction="270"/>
+                <DropShadowEffect Color="#FF000000" Opacity="0.28" BlurRadius="18" ShadowDepth="6" Direction="270"/>
             </Border.Effect>
         </Border>
 
         <!-- Notch panel — Width is animated from code-behind (248 pill ⇄ 576 open). -->
+        <!-- SnapsToDevicePixels off: snapping the straight edges to whole pixels while
+             the corner arcs stay antialiased breaks the hairline where they meet. -->
         <Border x:Name="NotchPanel"
                 Width="248"
+                HorizontalAlignment="Center" VerticalAlignment="Top"
+                SnapsToDevicePixels="False"
+                UseLayoutRounding="False"
                 Background="{DynamicResource PanelBgBrush}"
                 BorderThickness="1,0,1,1"
                 CornerRadius="{DynamicResource PanelCornerRadius}"
@@ -60,7 +83,8 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <StackPanel>
+            <Grid>
+                <StackPanel>
 
                 <!-- ============ Top header + collapsed pill (island) ============ -->
                 <Grid MinWidth="184"
@@ -379,7 +403,7 @@
                     <!-- Settings flyout (gear-toggled) -->
                     <Border Margin="4,8,4,0" Padding="14,12"
                             Background="{DynamicResource CardBgBrush}"
-                            BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1"
+                            BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
                             CornerRadius="{DynamicResource CardCornerRadius}"
                             Visibility="{Binding SettingsOpen, Converter={StaticResource BoolToVis}}">
                         <StackPanel>
@@ -429,7 +453,7 @@
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock Text="Theme" FontSize="13"
                                                Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    <TextBlock Text="Rounded island, or the square console" FontSize="11"
+                                    <TextBlock Text="Island, glass, atari, or console" FontSize="11"
                                                Foreground="{DynamicResource TextTertiaryBrush}"/>
                                 </StackPanel>
                                 <Border Grid.Column="1" VerticalAlignment="Center"
@@ -439,6 +463,12 @@
                                         <RadioButton GroupName="notchtheme" Content="Island"
                                                      Style="{StaticResource SegmentRadioStyle}"
                                                      IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=island, Mode=TwoWay}"/>
+                                        <RadioButton GroupName="notchtheme" Content="Glass"
+                                                     Style="{StaticResource SegmentRadioStyle}"
+                                                     IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=glass, Mode=TwoWay}"/>
+                                        <RadioButton GroupName="notchtheme" Content="Atari"
+                                                     Style="{StaticResource SegmentRadioStyle}"
+                                                     IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=atari, Mode=TwoWay}"/>
                                         <RadioButton GroupName="notchtheme" Content="Console"
                                                      Style="{StaticResource SegmentRadioStyle}"
                                                      IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=console, Mode=TwoWay}"/>
@@ -524,7 +554,8 @@
                     </StackPanel>
                 </Grid>
 
-            </StackPanel>
+                </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </Window>

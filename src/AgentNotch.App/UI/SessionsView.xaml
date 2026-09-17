@@ -31,14 +31,16 @@
                          one table; the island theme paints it transparent. It eats the
                          last pixel of padding rather than adding one, so row height is
                          identical either way. -->
-                    <Border x:Name="Row" Background="Transparent"
+                    <Border x:Name="Row" Background="{DynamicResource SessionRowBgBrush}"
                             CornerRadius="{DynamicResource ButtonCornerRadius}"
-                            BorderBrush="{DynamicResource RowSeparatorBrush}" BorderThickness="0,0,0,1"
-                            Padding="10,7,10,6" Margin="0,2,0,0" Cursor="Hand"
+                            BorderBrush="{DynamicResource RowSeparatorBrush}"
+                            BorderThickness="{DynamicResource SessionRowBorderThickness}"
+                            Padding="{DynamicResource SessionRowPadding}"
+                            Margin="{DynamicResource SessionRowMargin}" Cursor="Hand"
                             MouseLeftButtonDown="OnSessionRowClick">
                         <Border.Style>
                             <Style TargetType="{x:Type Border}">
-                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Background" Value="{DynamicResource SessionRowBgBrush}"/>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
                                         <Setter Property="Background" Value="{DynamicResource CardHoverBrush}"/>

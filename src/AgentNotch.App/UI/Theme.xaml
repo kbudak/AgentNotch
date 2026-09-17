@@ -1,6 +1,6 @@
 <!--
-    Shared converters + control styles. The PALETTE lives in Themes/Island.xaml and
-    Themes/Console.xaml; App.xaml merges the active one into slot 0 and this file
+    Shared converters + control styles. Palettes live in Themes/*.xaml; App.xaml
+    merges the active one into slot 0 and this file
     into slot 1. Every colour, font and corner radius below is a DynamicResource so
     ThemeManager can swap slot 0 at runtime and the whole notch repaints in place.
     Rule of thumb when editing: theme tokens -> DynamicResource, styles and

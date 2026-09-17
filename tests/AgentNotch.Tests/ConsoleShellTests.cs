@@ -122,7 +122,7 @@ public class ConsoleShellTests
         // the colours but not this flag once left the island wearing the console
         // panel, clipped by the island-sized window.
         var pick = new ThemeVisibilityConverter();
-        foreach (var theme in new[] { ThemeManager.Island, ThemeManager.Console })
+        foreach (var theme in ThemeManager.All)
         {
             var shown = new[] { ThemeManager.Island, ThemeManager.Console }
                 .Count(t => (Visibility)pick.Convert(theme, typeof(Visibility), t, CultureInfo.InvariantCulture)

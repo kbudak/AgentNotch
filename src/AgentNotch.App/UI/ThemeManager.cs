@@ -19,11 +19,17 @@ public static class ThemeManager
     /// <summary>The original VibeIsland look: rounded soft-black capsule.</summary>
     public const string Island = "island";
 
+    /// <summary>Translucent, layered glass using the rounded island layout.</summary>
+    public const string Glass = "glass";
+
+    /// <summary>The one light skin: off-white paper, espresso ink, turquoise/mustard/chilli signals.</summary>
+    public const string Atari = "atari";
+
     /// <summary>The AgentNotch Console direction: square, monospace, hairline rules.</summary>
     public const string Console = "console";
 
     /// <summary>Every selectable theme id, in the order the settings picker shows them.</summary>
-    public static readonly string[] All = { Island, Console };
+    public static readonly string[] All = { Island, Glass, Atari, Console };
 
     /// <summary>Unknown/missing ids fall back to Island rather than leaving the app unstyled.</summary>
     public static string Normalize(string? name)
@@ -36,7 +42,13 @@ public static class ThemeManager
         if (app is null) return; // unit tests / designer — nothing to repaint
 
         var id = Normalize(name);
-        var file = id == Console ? "Console" : "Island";
+        var file = id switch
+        {
+            Glass => "Glass",
+            Atari => "Atari",
+            Console => "Console",
+            _ => "Island",
+        };
         try
         {
             var dict = new ResourceDictionary { Source = new Uri($"UI/Themes/{file}.xaml", UriKind.Relative) };
