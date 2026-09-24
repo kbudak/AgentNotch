@@ -4,8 +4,14 @@
              Focusable="False">
 
     <!-- DataContext: PromptViewModel (Kind = Permission) -->
+    <!-- Shadow layer: a no-op outside Atari, where it is the card's hard shadow. -->
+    <Grid>
+    <Border IsHitTestVisible="False" Margin="{DynamicResource HardShadowOffset}"
+            CornerRadius="{DynamicResource CardCornerRadius}"
+            Background="{DynamicResource HardShadowBrush}"/>
     <Border Background="{DynamicResource CardBgBrush}"
-            BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
+            BorderBrush="{DynamicResource CardBorderBrush}"
+            BorderThickness="{DynamicResource CardBorderThickness}"
             CornerRadius="{DynamicResource CardCornerRadius}" Padding="14,12">
         <StackPanel>
 
@@ -138,4 +144,5 @@
 
         </StackPanel>
     </Border>
+    </Grid>
 </UserControl>

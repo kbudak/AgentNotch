@@ -1,13 +1,19 @@
 <!--
-    Atari — the label, not the bottle: an off-white paper body with espresso ink,
-    and three signal colours doing all the work — turquoise, mustard, chilli red.
-    Grotesk type, pill buttons, 10px cards. It dresses the island layout
-    (see UI/ConsoleConverters.ThemeVisibilityConverter).
+    Atari — soft neo-brutalism, the one light skin. Grey paper, white cards, and
+    every surface drawn the same way: a 2px ink outline and a HARD offset shadow —
+    solid ink shifted 3px down-right, no blur. Saturated flat colour is used as a
+    FILL with black ink on top (state-coloured tiles behind the agent marks,
+    state-coloured count badges, a mustard primary button), never as text on grey.
+    Type is Montserrat: a wide geometric grotesque, bold where things are named.
 
-    This is the only LIGHT palette, so two things invert against the other themes and
-    must stay inverted: hover states go DARKER than their surface (a lighter hover is
-    invisible on paper), and the Allow capsule is the dark slug with pale ink, which
-    is why the Kbd*OnLight* chips — the ones that sit on it — are pale here.
+    The hard shadow is a second element behind each surface (HardShadowBrush +
+    HardShadowOffset), not a DropShadowEffect: effects rasterise on the CPU on this
+    layered window, a solid Border costs nothing. The panel's own shadow is the
+    shared caster shifted by a RenderTransform (see OverlayWindow.xaml).
+
+    Because it is light, two things invert against the other palettes and must stay
+    inverted: hover states go darker/warmer than their surface, and the Kbd*OnLight*
+    chips — the ones that sit on the primary button — take dark ink.
 
     Palette + shape/type tokens only; every style lives in UI/Theme.xaml and reaches
     these keys through DynamicResource. Must declare the SAME key set as the other
@@ -17,116 +23,127 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ===================== Fonts ===================== -->
-    <!-- Tight grotesk for prose, mono kept for numbers and code. -->
-    <FontFamily x:Key="UiFontFamily">Inter Tight, Inter, Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="UiFontFamily">Montserrat, Segoe UI Variable Display, Segoe UI</FontFamily>
     <FontFamily x:Key="MonoFontFamily">Cascadia Mono, Consolas, Courier New</FontFamily>
 
     <!-- ===================== Shape ===================== -->
-    <!-- Label geometry: 10px cards, capsule buttons. -->
+    <!-- Rounded rectangles, not capsules: ~10px on cards, a touch less on controls. -->
     <CornerRadius x:Key="PanelCornerRadius">0,0,16,16</CornerRadius>
-    <CornerRadius x:Key="CardCornerRadius">10</CornerRadius>
-    <CornerRadius x:Key="ButtonCornerRadius">18</CornerRadius>
+    <CornerRadius x:Key="CardCornerRadius">11</CornerRadius>
+    <CornerRadius x:Key="ButtonCornerRadius">9</CornerRadius>
     <CornerRadius x:Key="ChipCornerRadius">6</CornerRadius>
-    <CornerRadius x:Key="CodeCornerRadius">10</CornerRadius>
-    <CornerRadius x:Key="CountChipCornerRadius">8</CornerRadius>
-    <CornerRadius x:Key="PillCornerRadius">13</CornerRadius>
+    <CornerRadius x:Key="CodeCornerRadius">8</CornerRadius>
+    <CornerRadius x:Key="CountChipCornerRadius">5</CornerRadius>
+    <CornerRadius x:Key="PillCornerRadius">11</CornerRadius>
     <Thickness x:Key="PanelPaddingThickness">8,0,8,8</Thickness>
 
-    <!-- ===================== Palette ===================== -->
-    <!-- Off-white paper, warmed a touch at the top so the pill has a body. -->
-    <LinearGradientBrush x:Key="PanelBgBrush" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Offset="0" Color="#FFFBF7EE"/>
-        <GradientStop Offset="1" Color="#FFF1ECE0"/>
-    </LinearGradientBrush>
-    <SolidColorBrush x:Key="PanelShadowCasterBrush" Color="#FFF1ECE0"/>
-    <!-- The three signals, in the order they escalate: turquoise ▸ mustard ▸ chilli. -->
-    <LinearGradientBrush x:Key="PanelBorderBrush" StartPoint="0,0" EndPoint="1,0">
-        <GradientStop Offset="0.00" Color="#E60E9E9B"/>
-        <GradientStop Offset="0.50" Color="#E6D9A200"/>
-        <GradientStop Offset="1.00" Color="#E6CE2018"/>
-    </LinearGradientBrush>
-    <SolidColorBrush x:Key="CardBgBrush" Color="#FFFFFDF8"/>
-    <SolidColorBrush x:Key="CardBorderBrush" Color="#1F241C14"/>
-    <!-- Hover darkens: on paper a lighter hover reads as nothing at all. -->
-    <SolidColorBrush x:Key="CardHoverBrush" Color="#FFEDE7D9"/>
-    <SolidColorBrush x:Key="CodeBgBrush" Color="#FFF0EADC"/>
-    <SolidColorBrush x:Key="RowSeparatorBrush" Color="#14241C14"/>
-    <SolidColorBrush x:Key="SessionRowBgBrush" Color="#00000000"/>
-    <Thickness x:Key="SessionRowBorderThickness">0,0,0,1</Thickness>
-    <Thickness x:Key="SessionRowPadding">10,7,10,6</Thickness>
-    <Thickness x:Key="SessionRowMargin">0,2,0,0</Thickness>
+    <!-- ===================== Surfaces ===================== -->
+    <SolidColorBrush x:Key="PanelBgBrush" Color="#FFEFEFF1"/>
+    <!-- The caster IS the panel's hard shadow here: solid ink, shifted, unblurred. -->
+    <SolidColorBrush x:Key="PanelShadowCasterBrush" Color="#FF141414"/>
+    <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF141414"/>
+    <SolidColorBrush x:Key="CardBgBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#FF141414"/>
+    <!-- Hover warms to a mustard wash: a lighter hover is invisible on white. -->
+    <SolidColorBrush x:Key="CardHoverBrush" Color="#FFFFF4CC"/>
+    <SolidColorBrush x:Key="CodeBgBrush" Color="#FFF4F4F6"/>
+    <!-- Session rows are cards: white, fully outlined, spaced for their shadow. -->
+    <SolidColorBrush x:Key="RowSeparatorBrush" Color="#FF141414"/>
+    <SolidColorBrush x:Key="SessionRowBgBrush" Color="#FFFFFFFF"/>
+    <Thickness x:Key="SessionRowBorderThickness">2</Thickness>
+    <Thickness x:Key="SessionRowPadding">10,8,10,8</Thickness>
+    <Thickness x:Key="SessionRowMargin">0,0,3,9</Thickness>
 
-    <!-- Espresso ink, never pure black. -->
-    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FF241C14"/>
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF5F564A"/>
-    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#FF8A8073"/>
+    <!-- ===================== Ink ===================== -->
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FF141414"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF55555C"/>
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#FF8A8A91"/>
 
-    <SolidColorBrush x:Key="AccentAmberBrush" Color="#FFCE8A08"/>
-    <SolidColorBrush x:Key="AccentYellowBrush" Color="#FFD9A200"/>
-    <SolidColorBrush x:Key="AccentOrangeBrush" Color="#FFE2652A"/>
-    <SolidColorBrush x:Key="AccentTealBrush" Color="#FF0E9E9B"/>
-    <!-- "Plenty left" on the quota ramp: the calm end is turquoise, not green. -->
-    <SolidColorBrush x:Key="AccentGreenBrush" Color="#FF0E9E9B"/>
-    <SolidColorBrush x:Key="AccentRedBrush" Color="#FFCE2018"/>
+    <!-- Accents that appear AS TEXT on grey/white are the darker cuts, so they read. -->
+    <SolidColorBrush x:Key="AccentAmberBrush" Color="#FFD9480F"/>
+    <SolidColorBrush x:Key="AccentYellowBrush" Color="#FFB7791F"/>
+    <SolidColorBrush x:Key="AccentOrangeBrush" Color="#FFE8590C"/>
+    <SolidColorBrush x:Key="AccentTealBrush" Color="#FFD6336C"/>
+    <SolidColorBrush x:Key="AccentGreenBrush" Color="#FF15994A"/>
+    <SolidColorBrush x:Key="AccentRedBrush" Color="#FFD92D20"/>
 
-    <!-- One signal colour per state, so no two marks in the list ever match. -->
-    <SolidColorBrush x:Key="StatusWorkingBrush"  Color="#FF0E9E9B"/>
-    <SolidColorBrush x:Key="StatusNeedsYouBrush" Color="#FFCE2018"/>
-    <SolidColorBrush x:Key="StatusFinishedBrush" Color="#FFC98A00"/>
-    <SolidColorBrush x:Key="StatusPromptBrush"   Color="#FFCE2018"/>
-    <SolidColorBrush x:Key="StatusIdleBrush"     Color="#FF8A8073"/>
+    <!-- ===================== Status =====================
+         These are FILLS here — tiles and badges with black ink on top — so they are
+         the saturated reference colours: blue running, orange waiting on you,
+         green done. -->
+    <SolidColorBrush x:Key="StatusWorkingBrush"  Color="#FF2F6BFF"/>
+    <SolidColorBrush x:Key="StatusNeedsYouBrush" Color="#FFFF6A1F"/>
+    <SolidColorBrush x:Key="StatusFinishedBrush" Color="#FF1FA355"/>
+    <SolidColorBrush x:Key="StatusPromptBrush"   Color="#FFFF6A1F"/>
+    <SolidColorBrush x:Key="StatusIdleBrush"     Color="#FF8E8E93"/>
 
-    <SolidColorBrush x:Key="DiffAddBgBrush" Color="#220E9E9B"/>
-    <SolidColorBrush x:Key="DiffDelBgBrush" Color="#22CE2018"/>
-    <SolidColorBrush x:Key="DiffGutterBrush" Color="#FF8A8073"/>
+    <SolidColorBrush x:Key="DiffAddBgBrush" Color="#2622B45E"/>
+    <SolidColorBrush x:Key="DiffDelBgBrush" Color="#26FF3B30"/>
+    <SolidColorBrush x:Key="DiffGutterBrush" Color="#FF8A8A91"/>
 
-    <SolidColorBrush x:Key="BtnDenyBgBrush" Color="#FFEAE4D6"/>
-    <SolidColorBrush x:Key="BtnDenyBorderBrush" Color="#1F241C14"/>
-    <SolidColorBrush x:Key="BtnDenyHoverBrush" Color="#FFE0D9C8"/>
-    <SolidColorBrush x:Key="BtnDenyPressedBrush" Color="#FFD5CDB9"/>
-    <!-- Inverted: the dark capsule is the primary action on paper. -->
-    <SolidColorBrush x:Key="BtnAllowBgBrush" Color="#FF241C14"/>
-    <SolidColorBrush x:Key="BtnAllowHoverBrush" Color="#FF33291C"/>
-    <SolidColorBrush x:Key="BtnAllowPressedBrush" Color="#FF16100A"/>
-    <SolidColorBrush x:Key="BtnAllowFgBrush" Color="#FFFBF7EE"/>
+    <!-- ===================== Buttons ===================== -->
+    <!-- Deny: white block. Allow: the mustard block — the reference's "+" button. -->
+    <SolidColorBrush x:Key="BtnDenyBgBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="BtnDenyBorderBrush" Color="#FF141414"/>
+    <SolidColorBrush x:Key="BtnDenyHoverBrush" Color="#FFF1F1F3"/>
+    <SolidColorBrush x:Key="BtnDenyPressedBrush" Color="#FFE4E4E8"/>
+    <SolidColorBrush x:Key="BtnAllowBgBrush" Color="#FFFFC933"/>
+    <SolidColorBrush x:Key="BtnAllowHoverBrush" Color="#FFFFD65C"/>
+    <SolidColorBrush x:Key="BtnAllowPressedBrush" Color="#FFF0B90F"/>
+    <SolidColorBrush x:Key="BtnAllowFgBrush" Color="#FF141414"/>
 
-    <SolidColorBrush x:Key="KbdBgBrush" Color="#14241C14"/>
-    <SolidColorBrush x:Key="KbdBorderBrush" Color="#26241C14"/>
-    <!-- These sit on the Allow capsule, which is dark in this theme. -->
-    <SolidColorBrush x:Key="KbdOnLightBgBrush" Color="#26FFFFFF"/>
-    <SolidColorBrush x:Key="KbdOnLightBorderBrush" Color="#33FFFFFF"/>
-    <SolidColorBrush x:Key="KbdOnLightFgBrush" Color="#FFFBF7EE"/>
+    <SolidColorBrush x:Key="KbdBgBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="KbdBorderBrush" Color="#FF141414"/>
+    <!-- These sit on the mustard Allow block, so they take dark ink. -->
+    <SolidColorBrush x:Key="KbdOnLightBgBrush" Color="#00000000"/>
+    <SolidColorBrush x:Key="KbdOnLightBorderBrush" Color="#80141414"/>
+    <SolidColorBrush x:Key="KbdOnLightFgBrush" Color="#FF141414"/>
 
-    <SolidColorBrush x:Key="OptionBgBrush" Color="#FFEFEADE"/>
-    <SolidColorBrush x:Key="OptionHoverBrush" Color="#FFE5DFCF"/>
-    <SolidColorBrush x:Key="OptionPressedBrush" Color="#FFDAD2BF"/>
-    <!-- The selected segment is the turquoise signal. -->
-    <SolidColorBrush x:Key="SegmentCheckedBgBrush" Color="#FF0E9E9B"/>
-    <SolidColorBrush x:Key="SegmentCheckedFgBrush" Color="#FFFBF7EE"/>
+    <SolidColorBrush x:Key="OptionBgBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="OptionHoverBrush" Color="#FFFFF4CC"/>
+    <SolidColorBrush x:Key="OptionPressedBrush" Color="#FFFFE9A3"/>
+    <!-- The picked segment is the mustard block with black ink. -->
+    <SolidColorBrush x:Key="SegmentCheckedBgBrush" Color="#FFFFC933"/>
+    <SolidColorBrush x:Key="SegmentCheckedFgBrush" Color="#FF141414"/>
 
-    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#33241C14"/>
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#55141414"/>
 
-    <!-- Agent identity: one colour each, none of them shared. -->
-    <SolidColorBrush x:Key="AgentClaudeBrush" Color="#FFE2652A"/>
-    <SolidColorBrush x:Key="AgentCodexBrush" Color="#FF241C14"/>
-    <SolidColorBrush x:Key="AgentAntigravityBrush" Color="#FF0E9E9B"/>
-    <SolidColorBrush x:Key="AgentCursorBrush" Color="#FFD9A200"/>
-    <SolidColorBrush x:Key="AgentGenericBrush" Color="#FF8A8073"/>
+    <!-- Agent identity (the console tree reads these; the island layout colours by state). -->
+    <SolidColorBrush x:Key="AgentClaudeBrush" Color="#FFF26522"/>
+    <SolidColorBrush x:Key="AgentCodexBrush" Color="#FF141414"/>
+    <SolidColorBrush x:Key="AgentAntigravityBrush" Color="#FF2F6BFF"/>
+    <SolidColorBrush x:Key="AgentCursorBrush" Color="#FFD6336C"/>
+    <SolidColorBrush x:Key="AgentGenericBrush" Color="#FF8E8E93"/>
 
     <!-- Reserved: only ever means "blocked on you". -->
-    <SolidColorBrush x:Key="AccentYouBrush" Color="#FFCE2018"/>
+    <SolidColorBrush x:Key="AccentYouBrush" Color="#FFFF6A1F"/>
 
     <!-- On paper the "bright" end of the type ramp is the darkest ink. -->
-    <SolidColorBrush x:Key="TextBrightBrush" Color="#FF120D08"/>
-    <SolidColorBrush x:Key="TextSubtleBrush" Color="#FF3E362C"/>
-    <SolidColorBrush x:Key="TextFaintBrush" Color="#FFA9A093"/>
+    <SolidColorBrush x:Key="TextBrightBrush" Color="#FF000000"/>
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#FF2C2C30"/>
+    <SolidColorBrush x:Key="TextFaintBrush" Color="#FFB4B4BA"/>
 
-    <SolidColorBrush x:Key="InnerRuleBrush" Color="#1F241C14"/>
-    <SolidColorBrush x:Key="KickerBgBrush" Color="#FFEAE4D6"/>
-    <!-- A waiting row is washed with its own signal, not just lifted. -->
-    <SolidColorBrush x:Key="RowWaitingBrush" Color="#14CE2018"/>
+    <SolidColorBrush x:Key="InnerRuleBrush" Color="#26141414"/>
+    <SolidColorBrush x:Key="KickerBgBrush" Color="#FFFFF4CC"/>
+    <SolidColorBrush x:Key="RowWaitingBrush" Color="#FFFFE8DC"/>
 
-    <SolidColorBrush x:Key="SuccessTextBrush" Color="#FF0B8A72"/>
-    <SolidColorBrush x:Key="DangerTextBrush" Color="#FFC01E16"/>
+    <SolidColorBrush x:Key="SuccessTextBrush" Color="#FF15803D"/>
+    <SolidColorBrush x:Key="DangerTextBrush" Color="#FFC0271C"/>
+
+    <!-- ===================== Brutalist chrome =====================
+         The tokens only this skin turns on. Every other palette declares them as
+         no-ops (transparent shadow, zero offset, bare marks), so the shared views
+         stay identical there. -->
+    <SolidColorBrush x:Key="HardShadowBrush" Color="#FF141414"/>
+    <Thickness x:Key="HardShadowOffset">3,3,-3,-3</Thickness>
+    <Thickness x:Key="CardBorderThickness">2</Thickness>
+    <!-- Surfaces that have no outline elsewhere (Allow, options, toggle, pickers). -->
+    <Thickness x:Key="OutlineThickness">2</Thickness>
+    <Thickness x:Key="PanelBorderThickness">2,0,2,2</Thickness>
+    <!-- Agent marks and counts sit on state-coloured tiles instead of being tinted. -->
+    <Visibility x:Key="TiledVisibility">Visible</Visibility>
+    <Visibility x:Key="BareVisibility">Collapsed</Visibility>
+    <Thickness x:Key="CountItemMargin">6,0,0,0</Thickness>
+    <FontWeight x:Key="TitleFontWeight">Bold</FontWeight>
 
 </ResourceDictionary>

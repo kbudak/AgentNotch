@@ -31,12 +31,17 @@
                          one table; the island theme paints it transparent. It eats the
                          last pixel of padding rather than adding one, so row height is
                          identical either way. -->
+                    <!-- The row margin moved to this wrapper so the shadow layer and
+                         the row share one slot. The shadow is a no-op outside Atari. -->
+                    <Grid Margin="{DynamicResource SessionRowMargin}">
+                    <Border IsHitTestVisible="False" Margin="{DynamicResource HardShadowOffset}"
+                            CornerRadius="{DynamicResource ButtonCornerRadius}"
+                            Background="{DynamicResource HardShadowBrush}"/>
                     <Border x:Name="Row" Background="{DynamicResource SessionRowBgBrush}"
                             CornerRadius="{DynamicResource ButtonCornerRadius}"
                             BorderBrush="{DynamicResource RowSeparatorBrush}"
                             BorderThickness="{DynamicResource SessionRowBorderThickness}"
-                            Padding="{DynamicResource SessionRowPadding}"
-                            Margin="{DynamicResource SessionRowMargin}" Cursor="Hand"
+                            Padding="{DynamicResource SessionRowPadding}" Cursor="Hand"
                             MouseLeftButtonDown="OnSessionRowClick">
                         <Border.Style>
                             <Style TargetType="{x:Type Border}">
@@ -62,9 +67,21 @@
                                  tinted by the state colour (blue / orange / green). -->
                             <StackPanel Grid.Column="0" Orientation="Horizontal"
                                         VerticalAlignment="Center" Margin="1,0,10,0">
-                                <Path Width="17" Height="17" Stretch="Uniform" VerticalAlignment="Center"
-                                      Data="{Binding Converter={StaticResource SessionAgentIcon}}"
-                                      Fill="{Binding Converter={StaticResource SessionStatusBrush}}"/>
+                                <Grid VerticalAlignment="Center">
+                                    <Path Width="17" Height="17" Stretch="Uniform" VerticalAlignment="Center"
+                                          Visibility="{DynamicResource BareVisibility}"
+                                          Data="{Binding Converter={StaticResource SessionAgentIcon}}"
+                                          Fill="{Binding Converter={StaticResource SessionStatusBrush}}"/>
+                                    <Border Width="28" Height="28"
+                                            Visibility="{DynamicResource TiledVisibility}"
+                                            CornerRadius="{DynamicResource ChipCornerRadius}"
+                                            BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="2"
+                                            Background="{Binding Converter={StaticResource SessionStatusBrush}}">
+                                        <Path Width="15" Height="15" Stretch="Uniform"
+                                              Data="{Binding Converter={StaticResource SessionAgentIcon}}"
+                                              Fill="{DynamicResource TextPrimaryBrush}"/>
+                                    </Border>
+                                </Grid>
                                 <Grid Width="13" Height="13" Margin="6,0,0,0" VerticalAlignment="Center">
                                     <!-- Working: the pixel-dot comet spinner. -->
                                     <ui:PixelSpinner
@@ -104,7 +121,7 @@
                             <!-- Title + subtitle -->
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Converter={StaticResource SessionTitle}}"
-                                           FontSize="13"
+                                           FontSize="13" FontWeight="{DynamicResource TitleFontWeight}"
                                            Foreground="{DynamicResource TextPrimaryBrush}"
                                            TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Text="{Binding Converter={StaticResource SessionSubtitle}}"
@@ -185,6 +202,7 @@
                                        VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
+                    </Grid>
                     <DataTemplate.Triggers>
                         <Trigger SourceName="Row" Property="IsMouseOver" Value="True">
                             <Setter TargetName="Row" Property="Background" Value="{DynamicResource CardHoverBrush}"/>

@@ -38,18 +38,32 @@
             <Border.Style>
                 <Style TargetType="{x:Type Border}">
                     <Setter Property="Visibility" Value="Visible"/>
+                    <!-- In the style rather than local so the Atari trigger can drop it. -->
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect Color="#FF000000" Opacity="0.28" BlurRadius="18" ShadowDepth="6" Direction="270"/>
+                        </Setter.Value>
+                    </Setter>
                     <Style.Triggers>
                         <!-- Glass: the caster + DropShadow rasterize a dark rectangle
                              around the pill on a layered window. -->
                         <DataTrigger Binding="{Binding Theme}" Value="glass">
                             <Setter Property="Visibility" Value="Collapsed"/>
                         </DataTrigger>
+                        <!-- Atari: a hard shadow — the caster itself in solid ink,
+                             shifted down-right, no blur. No Effect at all, so it is
+                             also the cheapest of the four on this layered window. -->
+                        <DataTrigger Binding="{Binding Theme}" Value="atari">
+                            <Setter Property="Effect" Value="{x:Null}"/>
+                            <Setter Property="RenderTransform">
+                                <Setter.Value>
+                                    <TranslateTransform X="4" Y="4"/>
+                                </Setter.Value>
+                            </Setter>
+                        </DataTrigger>
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <Border.Effect>
-                <DropShadowEffect Color="#FF000000" Opacity="0.28" BlurRadius="18" ShadowDepth="6" Direction="270"/>
-            </Border.Effect>
         </Border>
 
         <!-- Notch panel — Width is animated from code-behind (248 pill ⇄ 576 open). -->
@@ -61,7 +75,7 @@
                 SnapsToDevicePixels="False"
                 UseLayoutRounding="False"
                 Background="{DynamicResource PanelBgBrush}"
-                BorderThickness="1,0,1,1"
+                BorderThickness="{DynamicResource PanelBorderThickness}"
                 CornerRadius="{DynamicResource PanelCornerRadius}"
                 Padding="{DynamicResource PanelPaddingThickness}">
             <Border.Style>
@@ -127,8 +141,20 @@
                         </ItemsControl>
                         <Button Grid.Column="1" Style="{StaticResource GhostButtonStyle}" Click="OnSettingsClick"
                                 VerticalAlignment="Center" HorizontalAlignment="Right">
-                            <Path Data="{x:Static ui:AgentIcons.Gear}" Width="14" Height="14" Stretch="Uniform"
-                                  Fill="{DynamicResource TextSecondaryBrush}"/>
+                            <Grid>
+                                <Border Width="24" Height="24" IsHitTestVisible="False"
+                                        Visibility="{DynamicResource TiledVisibility}"
+                                        Margin="{DynamicResource HardShadowOffset}"
+                                        CornerRadius="{DynamicResource ChipCornerRadius}"
+                                        Background="{DynamicResource HardShadowBrush}"/>
+                                <Border Width="24" Height="24"
+                                        Visibility="{DynamicResource TiledVisibility}"
+                                        CornerRadius="{DynamicResource ChipCornerRadius}"
+                                        Background="{DynamicResource CardBgBrush}"
+                                        BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="2"/>
+                                <Path Data="{x:Static ui:AgentIcons.Gear}" Width="14" Height="14" Stretch="Uniform"
+                                      Fill="{DynamicResource TextSecondaryBrush}"/>
+                            </Grid>
                         </Button>
                     </Grid>
 
@@ -198,9 +224,21 @@
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Left" VerticalAlignment="Center">
                         <!-- Lead agent mark (shape = which agent) tinted by state colour. -->
-                        <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"
-                              Data="{Binding LeadAgent, Converter={StaticResource AgentIcon}}"
-                              Fill="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF6B7280}"/>
+                        <Grid VerticalAlignment="Center">
+                            <Path Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"
+                                  Visibility="{DynamicResource BareVisibility}"
+                                  Data="{Binding LeadAgent, Converter={StaticResource AgentIcon}}"
+                                  Fill="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF6B7280}"/>
+                            <Border Width="20" Height="20"
+                                    Visibility="{DynamicResource TiledVisibility}"
+                                    CornerRadius="{DynamicResource CountChipCornerRadius}"
+                                    BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5"
+                                    Background="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF8E8E93}">
+                                <Path Width="11" Height="11" Stretch="Uniform"
+                                      Data="{Binding LeadAgent, Converter={StaticResource AgentIcon}}"
+                                      Fill="{DynamicResource TextPrimaryBrush}"/>
+                            </Border>
+                        </Grid>
                         <!-- Status glyph to its right: working = pixel comet spinner,
                              needs-you = "?", prompt = "?", done = "✓"; the whole slot is
                              hidden when idle so nothing but the grey dot shows. -->
@@ -273,8 +311,20 @@
                                          well and the number can then be plain text.
                                          The pip takes the theme's radius, so it is a dot on
                                          the island and a square pip on the console. -->
-                                    <StackPanel Orientation="Horizontal" Margin="11,0,0,0"
-                                                VerticalAlignment="Center">
+                                    <Grid Margin="{DynamicResource CountItemMargin}" VerticalAlignment="Center">
+                                    <!-- Atari: the reference's "NEW" badge — state fill,
+                                         ink outline, black number inside. -->
+                                    <Border Visibility="{DynamicResource TiledVisibility}"
+                                            Height="18" MinWidth="20" Padding="5,0"
+                                            CornerRadius="{DynamicResource CountChipCornerRadius}"
+                                            BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5"
+                                            Background="{Binding Kind, Converter={StaticResource StateKindBrush}}">
+                                        <TextBlock Text="{Binding Count}" FontSize="10.5" FontWeight="Bold"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </Border>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                Visibility="{DynamicResource BareVisibility}">
                                         <Border Width="6" Height="6" VerticalAlignment="Center"
                                                 CornerRadius="{DynamicResource CountChipCornerRadius}"
                                                 Background="{Binding Kind, Converter={StaticResource StateKindBrush}}"/>
@@ -294,6 +344,7 @@
                                             </TextBlock.RenderTransform>
                                         </TextBlock>
                                     </StackPanel>
+                                    </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -401,11 +452,16 @@
                     <!-- Plan limits now live in the pill header (top line); nothing here. -->
 
                     <!-- Settings flyout (gear-toggled) -->
-                    <Border Margin="4,8,4,0" Padding="14,12"
-                            Background="{DynamicResource CardBgBrush}"
-                            BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
+                    <Grid Margin="4,8,4,0"
+                          Visibility="{Binding SettingsOpen, Converter={StaticResource BoolToVis}}">
+                    <Border IsHitTestVisible="False" Margin="{DynamicResource HardShadowOffset}"
                             CornerRadius="{DynamicResource CardCornerRadius}"
-                            Visibility="{Binding SettingsOpen, Converter={StaticResource BoolToVis}}">
+                            Background="{DynamicResource HardShadowBrush}"/>
+                    <Border Padding="14,12"
+                            Background="{DynamicResource CardBgBrush}"
+                            BorderBrush="{DynamicResource CardBorderBrush}"
+                            BorderThickness="{DynamicResource CardBorderThickness}"
+                            CornerRadius="{DynamicResource CardCornerRadius}">
                         <StackPanel>
                             <TextBlock Text="SETTINGS" FontSize="10" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,0,0,10"/>
@@ -458,6 +514,8 @@
                                 </StackPanel>
                                 <Border Grid.Column="1" VerticalAlignment="Center"
                                         Background="{DynamicResource OptionBgBrush}"
+                                        BorderBrush="{DynamicResource CardBorderBrush}"
+                                        BorderThickness="{DynamicResource OutlineThickness}"
                                         CornerRadius="{DynamicResource ButtonCornerRadius}" Padding="2">
                                     <StackPanel Orientation="Horizontal">
                                         <RadioButton GroupName="notchtheme" Content="Island"
@@ -489,7 +547,10 @@
                                                Foreground="{DynamicResource TextTertiaryBrush}"/>
                                 </StackPanel>
                                 <Border Grid.Column="1" VerticalAlignment="Center"
-                                        Background="{DynamicResource OptionBgBrush}" CornerRadius="{DynamicResource ButtonCornerRadius}" Padding="2">
+                                        Background="{DynamicResource OptionBgBrush}"
+                                        BorderBrush="{DynamicResource CardBorderBrush}"
+                                        BorderThickness="{DynamicResource OutlineThickness}"
+                                        CornerRadius="{DynamicResource ButtonCornerRadius}" Padding="2">
                                     <StackPanel Orientation="Horizontal">
                                         <RadioButton GroupName="notchpos" Content="Left"
                                                      Style="{StaticResource SegmentRadioStyle}"
@@ -505,6 +566,7 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+                    </Grid>
 
                     <!-- Prompt card (permission / question by Kind) + queue badge -->
                     <StackPanel Margin="4,6,4,0"

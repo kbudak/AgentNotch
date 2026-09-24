@@ -118,4 +118,17 @@
     <SolidColorBrush x:Key="SuccessTextBrush" Color="#FF5FE39C"/>
     <SolidColorBrush x:Key="DangerTextBrush" Color="#FFFF7B6D"/>
 
+    <!-- ===================== Brutalist chrome (Atari only) =====================
+         Declared as no-ops so every palette carries the same keys: no hard shadow,
+         today's outline widths, bare marks. -->
+    <SolidColorBrush x:Key="HardShadowBrush" Color="#00000000"/>
+    <Thickness x:Key="HardShadowOffset">0</Thickness>
+    <Thickness x:Key="CardBorderThickness">1</Thickness>
+    <Thickness x:Key="OutlineThickness">0</Thickness>
+    <Thickness x:Key="PanelBorderThickness">1,0,1,1</Thickness>
+    <Visibility x:Key="TiledVisibility">Collapsed</Visibility>
+    <Visibility x:Key="BareVisibility">Visible</Visibility>
+    <Thickness x:Key="CountItemMargin">11,0,0,0</Thickness>
+    <FontWeight x:Key="TitleFontWeight">Normal</FontWeight>
+
 </ResourceDictionary>

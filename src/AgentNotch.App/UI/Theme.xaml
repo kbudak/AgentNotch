@@ -117,12 +117,19 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
-                    <Border x:Name="bd" Background="{DynamicResource BtnDenyBgBrush}"
-                            BorderBrush="{DynamicResource BtnDenyBorderBrush}" BorderThickness="1"
-                            CornerRadius="{DynamicResource ButtonCornerRadius}"
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
+                    <!-- The shadow layer is a no-op outside Atari (transparent, zero offset). -->
+                    <Grid>
+                        <Border IsHitTestVisible="False" Margin="{DynamicResource HardShadowOffset}"
+                                CornerRadius="{DynamicResource ButtonCornerRadius}"
+                                Background="{DynamicResource HardShadowBrush}"/>
+                        <Border x:Name="bd" Background="{DynamicResource BtnDenyBgBrush}"
+                                BorderBrush="{DynamicResource BtnDenyBorderBrush}"
+                                BorderThickness="{DynamicResource CardBorderThickness}"
+                                CornerRadius="{DynamicResource ButtonCornerRadius}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="bd" Property="Background" Value="{DynamicResource BtnDenyHoverBrush}"/>
@@ -145,11 +152,18 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
-                    <Border x:Name="bd" Background="{DynamicResource BtnAllowBgBrush}"
-                            CornerRadius="{DynamicResource ButtonCornerRadius}"
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
+                    <Grid>
+                        <Border IsHitTestVisible="False" Margin="{DynamicResource HardShadowOffset}"
+                                CornerRadius="{DynamicResource ButtonCornerRadius}"
+                                Background="{DynamicResource HardShadowBrush}"/>
+                        <Border x:Name="bd" Background="{DynamicResource BtnAllowBgBrush}"
+                                BorderBrush="{DynamicResource CardBorderBrush}"
+                                BorderThickness="{DynamicResource OutlineThickness}"
+                                CornerRadius="{DynamicResource ButtonCornerRadius}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="bd" Property="Background" Value="{DynamicResource BtnAllowHoverBrush}"/>
@@ -174,12 +188,19 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
-                    <Border x:Name="bd" Background="{DynamicResource OptionBgBrush}"
-                            CornerRadius="{DynamicResource ButtonCornerRadius}"
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                          VerticalAlignment="Center"/>
-                    </Border>
+                    <Grid>
+                        <Border IsHitTestVisible="False" Margin="{DynamicResource HardShadowOffset}"
+                                CornerRadius="{DynamicResource ButtonCornerRadius}"
+                                Background="{DynamicResource HardShadowBrush}"/>
+                        <Border x:Name="bd" Background="{DynamicResource OptionBgBrush}"
+                                BorderBrush="{DynamicResource CardBorderBrush}"
+                                BorderThickness="{DynamicResource OutlineThickness}"
+                                CornerRadius="{DynamicResource ButtonCornerRadius}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="bd" Property="Background" Value="{DynamicResource OptionHoverBrush}"/>
@@ -227,6 +248,8 @@
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
                     <Border x:Name="track" Width="40" Height="22"
                             CornerRadius="{DynamicResource PillCornerRadius}"
+                            BorderBrush="{DynamicResource CardBorderBrush}"
+                            BorderThickness="{DynamicResource OutlineThickness}"
                             Background="{DynamicResource OptionBgBrush}">
                         <Border x:Name="thumb" Width="16" Height="16"
                                 CornerRadius="{DynamicResource PillCornerRadius}"
