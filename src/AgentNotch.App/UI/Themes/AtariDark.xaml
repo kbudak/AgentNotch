@@ -38,8 +38,9 @@
     <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF050505"/>
     <SolidColorBrush x:Key="CardBgBrush" Color="#FF333338"/>
     <SolidColorBrush x:Key="CardBorderBrush" Color="#FF050505"/>
-    <!-- Hover warms to a dark mustard tint rather than just lifting the grey. -->
-    <SolidColorBrush x:Key="CardHoverBrush" Color="#FF3F3827"/>
+    <!-- Hover is a plain, slightly whiter lift of the card grey. A mustard tint
+         read as a yellow wash on graphite. -->
+    <SolidColorBrush x:Key="CardHoverBrush" Color="#FF404046"/>
     <SolidColorBrush x:Key="CodeBgBrush" Color="#FF1E1E21"/>
     <!-- Session rows are cards: graphite, fully outlined, spaced for their shadow. -->
     <SolidColorBrush x:Key="RowSeparatorBrush" Color="#FF050505"/>
@@ -94,8 +95,8 @@
     <SolidColorBrush x:Key="KbdOnLightFgBrush" Color="#FF141414"/>
 
     <SolidColorBrush x:Key="OptionBgBrush" Color="#FF333338"/>
-    <SolidColorBrush x:Key="OptionHoverBrush" Color="#FF3F3827"/>
-    <SolidColorBrush x:Key="OptionPressedBrush" Color="#FF4A4128"/>
+    <SolidColorBrush x:Key="OptionHoverBrush" Color="#FF404046"/>
+    <SolidColorBrush x:Key="OptionPressedBrush" Color="#FF4A4A51"/>
     <!-- The picked segment is the mustard block with black ink. -->
     <SolidColorBrush x:Key="SegmentCheckedBgBrush" Color="#FFFFC933"/>
     <SolidColorBrush x:Key="SegmentCheckedFgBrush" Color="#FF141414"/>
