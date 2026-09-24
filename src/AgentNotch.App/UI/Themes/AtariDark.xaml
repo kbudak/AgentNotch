@@ -1,0 +1,153 @@
+<!--
+    Atari Dark — the same soft neo-brutalism as Atari, on graphite instead of paper.
+
+    Everything structural is Atari's: 2px black outlines, hard black offset
+    shadows, black marks on state-coloured tiles, filled count badges, the mustard
+    Allow block, Montserrat bold. What changes is the paper (graphite #26262A,
+    cards #333338), the text (near-white), and any accent that appears AS TEXT
+    (lighter cuts, so it reads on the dark surface).
+
+    The paper is deliberately not black. The ink stays black, and a black outline
+    or shadow only reads on something lighter than itself.
+
+    Keep it in step with Atari.xaml: same keys, same shapes. ThemeTests fails
+    if the key sets drift apart.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ===================== Fonts ===================== -->
+    <FontFamily x:Key="UiFontFamily">Montserrat, Segoe UI Variable Display, Segoe UI</FontFamily>
+    <FontFamily x:Key="MonoFontFamily">Cascadia Mono, Consolas, Courier New</FontFamily>
+
+    <!-- ===================== Shape ===================== -->
+    <!-- Rounded rectangles, not capsules: ~10px on cards, a touch less on controls. -->
+    <CornerRadius x:Key="PanelCornerRadius">0,0,16,16</CornerRadius>
+    <CornerRadius x:Key="CardCornerRadius">11</CornerRadius>
+    <CornerRadius x:Key="ButtonCornerRadius">9</CornerRadius>
+    <CornerRadius x:Key="ChipCornerRadius">6</CornerRadius>
+    <CornerRadius x:Key="CodeCornerRadius">8</CornerRadius>
+    <CornerRadius x:Key="CountChipCornerRadius">5</CornerRadius>
+    <CornerRadius x:Key="PillCornerRadius">11</CornerRadius>
+    <Thickness x:Key="PanelPaddingThickness">8,0,8,8</Thickness>
+
+    <!-- ===================== Surfaces ===================== -->
+    <SolidColorBrush x:Key="PanelBgBrush" Color="#FF26262A"/>
+    <!-- The caster IS the panel's hard shadow here: solid ink, shifted, unblurred. -->
+    <SolidColorBrush x:Key="PanelShadowCasterBrush" Color="#FF050505"/>
+    <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF050505"/>
+    <SolidColorBrush x:Key="CardBgBrush" Color="#FF333338"/>
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#FF050505"/>
+    <!-- Hover warms to a dark mustard tint rather than just lifting the grey. -->
+    <SolidColorBrush x:Key="CardHoverBrush" Color="#FF3F3827"/>
+    <SolidColorBrush x:Key="CodeBgBrush" Color="#FF1E1E21"/>
+    <!-- Session rows are cards: graphite, fully outlined, spaced for their shadow. -->
+    <SolidColorBrush x:Key="RowSeparatorBrush" Color="#FF050505"/>
+    <SolidColorBrush x:Key="SessionRowBgBrush" Color="#FF333338"/>
+    <Thickness x:Key="SessionRowBorderThickness">2</Thickness>
+    <Thickness x:Key="SessionRowPadding">10,8,10,8</Thickness>
+    <Thickness x:Key="SessionRowMargin">0,0,3,9</Thickness>
+
+    <!-- ===================== Ink ===================== -->
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFF5F5F7"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FFB9B9C0"/>
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#FF85858D"/>
+
+    <!-- Accents that appear AS TEXT on graphite are the lighter cuts, so they read. -->
+    <SolidColorBrush x:Key="AccentAmberBrush" Color="#FFFF9A4D"/>
+    <SolidColorBrush x:Key="AccentYellowBrush" Color="#FFFACC15"/>
+    <SolidColorBrush x:Key="AccentOrangeBrush" Color="#FFFF8A3D"/>
+    <SolidColorBrush x:Key="AccentTealBrush" Color="#FFFF6FA8"/>
+    <SolidColorBrush x:Key="AccentGreenBrush" Color="#FF4ADE80"/>
+    <SolidColorBrush x:Key="AccentRedBrush" Color="#FFFF6B61"/>
+
+    <!-- ===================== Status =====================
+         These are FILLS here — tiles and badges with black ink on top — so they are
+         the saturated reference colours: blue running, orange waiting on you,
+         green done. -->
+    <SolidColorBrush x:Key="StatusWorkingBrush"  Color="#FF4B7DFF"/>
+    <SolidColorBrush x:Key="StatusNeedsYouBrush" Color="#FFFF7A2F"/>
+    <SolidColorBrush x:Key="StatusFinishedBrush" Color="#FF2BC46A"/>
+    <SolidColorBrush x:Key="StatusPromptBrush"   Color="#FFFF7A2F"/>
+    <SolidColorBrush x:Key="StatusIdleBrush"     Color="#FF8E8E96"/>
+
+    <SolidColorBrush x:Key="DiffAddBgBrush" Color="#332BC46A"/>
+    <SolidColorBrush x:Key="DiffDelBgBrush" Color="#33FF5A4D"/>
+    <SolidColorBrush x:Key="DiffGutterBrush" Color="#FF85858D"/>
+
+    <!-- ===================== Buttons ===================== -->
+    <!-- Deny: graphite block. Allow: the mustard block, unchanged from light Atari. -->
+    <SolidColorBrush x:Key="BtnDenyBgBrush" Color="#FF333338"/>
+    <SolidColorBrush x:Key="BtnDenyBorderBrush" Color="#FF050505"/>
+    <SolidColorBrush x:Key="BtnDenyHoverBrush" Color="#FF3D3D43"/>
+    <SolidColorBrush x:Key="BtnDenyPressedBrush" Color="#FF47474E"/>
+    <SolidColorBrush x:Key="BtnAllowBgBrush" Color="#FFFFC933"/>
+    <SolidColorBrush x:Key="BtnAllowHoverBrush" Color="#FFFFD65C"/>
+    <SolidColorBrush x:Key="BtnAllowPressedBrush" Color="#FFF0B90F"/>
+    <SolidColorBrush x:Key="BtnAllowFgBrush" Color="#FF141414"/>
+
+    <SolidColorBrush x:Key="KbdBgBrush" Color="#FF2A2A2E"/>
+    <SolidColorBrush x:Key="KbdBorderBrush" Color="#FF050505"/>
+    <!-- These sit on the mustard Allow block, so they take dark ink. -->
+    <SolidColorBrush x:Key="KbdOnLightBgBrush" Color="#00000000"/>
+    <SolidColorBrush x:Key="KbdOnLightBorderBrush" Color="#80141414"/>
+    <SolidColorBrush x:Key="KbdOnLightFgBrush" Color="#FF141414"/>
+
+    <SolidColorBrush x:Key="OptionBgBrush" Color="#FF333338"/>
+    <SolidColorBrush x:Key="OptionHoverBrush" Color="#FF3F3827"/>
+    <SolidColorBrush x:Key="OptionPressedBrush" Color="#FF4A4128"/>
+    <!-- The picked segment is the mustard block with black ink. -->
+    <SolidColorBrush x:Key="SegmentCheckedBgBrush" Color="#FFFFC933"/>
+    <SolidColorBrush x:Key="SegmentCheckedFgBrush" Color="#FF141414"/>
+
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#66F5F5F7"/>
+
+    <!-- Agent identity (the console tree reads these; the island layout colours by state). -->
+    <SolidColorBrush x:Key="AgentClaudeBrush" Color="#FFFF7A45"/>
+    <SolidColorBrush x:Key="AgentCodexBrush" Color="#FFF5F5F7"/>
+    <SolidColorBrush x:Key="AgentAntigravityBrush" Color="#FF4B7DFF"/>
+    <SolidColorBrush x:Key="AgentCursorBrush" Color="#FFFF6FA8"/>
+    <SolidColorBrush x:Key="AgentGenericBrush" Color="#FF8E8E96"/>
+
+    <!-- Reserved: only ever means "blocked on you". -->
+    <SolidColorBrush x:Key="AccentYouBrush" Color="#FFFF7A2F"/>
+
+    <!-- Dark surface: the "bright" end of the type ramp is white again. -->
+    <SolidColorBrush x:Key="TextBrightBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#FFD4D4D8"/>
+    <SolidColorBrush x:Key="TextFaintBrush" Color="#FF55555C"/>
+
+    <SolidColorBrush x:Key="InnerRuleBrush" Color="#33F5F5F7"/>
+    <SolidColorBrush x:Key="KickerBgBrush" Color="#FF3F3827"/>
+    <SolidColorBrush x:Key="RowWaitingBrush" Color="#FF3D2A1F"/>
+
+    <SolidColorBrush x:Key="SuccessTextBrush" Color="#FF4ADE80"/>
+    <SolidColorBrush x:Key="DangerTextBrush" Color="#FFFF6B61"/>
+
+    <!-- ===================== Brutalist chrome =====================
+         The tokens only this skin turns on. Every other palette declares them as
+         no-ops (transparent shadow, zero offset, bare marks), so the shared views
+         stay identical there. -->
+    <SolidColorBrush x:Key="HardShadowBrush" Color="#FF050505"/>
+    <Thickness x:Key="HardShadowOffset">3,3,-3,-3</Thickness>
+    <Thickness x:Key="CardBorderThickness">2</Thickness>
+    <!-- Surfaces that have no outline elsewhere (Allow, options, toggle, pickers). -->
+    <Thickness x:Key="OutlineThickness">2</Thickness>
+    <Thickness x:Key="PanelBorderThickness">2,0,2,2</Thickness>
+    <!-- Agent marks and counts sit on state-coloured tiles instead of being tinted. -->
+    <Visibility x:Key="TiledVisibility">Visible</Visibility>
+    <Visibility x:Key="BareVisibility">Collapsed</Visibility>
+    <Thickness x:Key="CountItemMargin">6,0,0,0</Thickness>
+    <FontWeight x:Key="TitleFontWeight">Bold</FontWeight>
+
+    <!-- Panel shadow: no blur at all — the caster is solid ink shifted 4px down-right,
+         which is the hard shadow. No Effect also makes this the cheapest to draw on
+         the layered window. -->
+    <x:Null x:Key="PanelShadowEffect"/>
+    <TranslateTransform x:Key="PanelShadowTransform" X="4" Y="4"/>
+
+    <!-- Ink ON a colour fill (tile icons, count badges). Black on both Ataris,
+         independent of the text colour, so the dark skin keeps black-on-colour. -->
+    <SolidColorBrush x:Key="TileInkBrush" Color="#FF141414"/>
+
+</ResourceDictionary>

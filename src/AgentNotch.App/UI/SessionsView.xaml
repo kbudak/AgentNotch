@@ -79,7 +79,7 @@
                                             Background="{Binding Converter={StaticResource SessionStatusBrush}}">
                                         <Path Width="15" Height="15" Stretch="Uniform"
                                               Data="{Binding Converter={StaticResource SessionAgentIcon}}"
-                                              Fill="{DynamicResource TextPrimaryBrush}"/>
+                                              Fill="{DynamicResource TileInkBrush}"/>
                                     </Border>
                                 </Grid>
                                 <Grid Width="13" Height="13" Margin="6,0,0,0" VerticalAlignment="Center">

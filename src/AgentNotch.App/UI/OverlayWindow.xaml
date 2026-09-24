@@ -34,32 +34,20 @@
                 Height="{Binding ActualHeight, ElementName=NotchPanel}"
                 Background="{DynamicResource PanelShadowCasterBrush}"
                 CornerRadius="{DynamicResource PanelCornerRadius}"
+                Effect="{DynamicResource PanelShadowEffect}"
+                RenderTransform="{DynamicResource PanelShadowTransform}"
                 IsHitTestVisible="False">
+            <!-- The palette decides soft blur vs hard offset (PanelShadowEffect /
+                 PanelShadowTransform), so no skin is named here except Glass,
+                 which drops the caster entirely. -->
             <Border.Style>
                 <Style TargetType="{x:Type Border}">
                     <Setter Property="Visibility" Value="Visible"/>
-                    <!-- In the style rather than local so the Atari trigger can drop it. -->
-                    <Setter Property="Effect">
-                        <Setter.Value>
-                            <DropShadowEffect Color="#FF000000" Opacity="0.28" BlurRadius="18" ShadowDepth="6" Direction="270"/>
-                        </Setter.Value>
-                    </Setter>
                     <Style.Triggers>
                         <!-- Glass: the caster + DropShadow rasterize a dark rectangle
                              around the pill on a layered window. -->
                         <DataTrigger Binding="{Binding Theme}" Value="glass">
                             <Setter Property="Visibility" Value="Collapsed"/>
-                        </DataTrigger>
-                        <!-- Atari: a hard shadow — the caster itself in solid ink,
-                             shifted down-right, no blur. No Effect at all, so it is
-                             also the cheapest of the four on this layered window. -->
-                        <DataTrigger Binding="{Binding Theme}" Value="atari">
-                            <Setter Property="Effect" Value="{x:Null}"/>
-                            <Setter Property="RenderTransform">
-                                <Setter.Value>
-                                    <TranslateTransform X="4" Y="4"/>
-                                </Setter.Value>
-                            </Setter>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
@@ -236,7 +224,7 @@
                                     Background="{Binding StateKind, Converter={StaticResource StateKindBrush}, FallbackValue=#FF8E8E93}">
                                 <Path Width="11" Height="11" Stretch="Uniform"
                                       Data="{Binding LeadAgent, Converter={StaticResource AgentIcon}}"
-                                      Fill="{DynamicResource TextPrimaryBrush}"/>
+                                      Fill="{DynamicResource TileInkBrush}"/>
                             </Border>
                         </Grid>
                         <!-- Status glyph to its right: working = pixel comet spinner,
@@ -321,7 +309,7 @@
                                             Background="{Binding Kind, Converter={StaticResource StateKindBrush}}">
                                         <TextBlock Text="{Binding Count}" FontSize="10.5" FontWeight="Bold"
                                                    HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                   Foreground="{DynamicResource TileInkBrush}"/>
                                     </Border>
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                                 Visibility="{DynamicResource BareVisibility}">
@@ -509,7 +497,7 @@
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock Text="Theme" FontSize="13"
                                                Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    <TextBlock Text="Island, glass, atari, or console" FontSize="11"
+                                    <TextBlock Text="How the notch is drawn" FontSize="11"
                                                Foreground="{DynamicResource TextTertiaryBrush}"/>
                                 </StackPanel>
                                 <Border Grid.Column="1" VerticalAlignment="Center"
@@ -527,6 +515,9 @@
                                         <RadioButton GroupName="notchtheme" Content="Atari"
                                                      Style="{StaticResource SegmentRadioStyle}"
                                                      IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=atari, Mode=TwoWay}"/>
+                                        <RadioButton GroupName="notchtheme" Content="Atari Dark"
+                                                     Style="{StaticResource SegmentRadioStyle}"
+                                                     IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=atari-dark, Mode=TwoWay}"/>
                                         <RadioButton GroupName="notchtheme" Content="Console"
                                                      Style="{StaticResource SegmentRadioStyle}"
                                                      IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=console, Mode=TwoWay}"/>

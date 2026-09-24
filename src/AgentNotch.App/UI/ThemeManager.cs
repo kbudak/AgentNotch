@@ -22,18 +22,35 @@ public static class ThemeManager
     /// <summary>Translucent, layered glass using the rounded island layout.</summary>
     public const string Glass = "glass";
 
-    /// <summary>The one light skin: off-white paper, espresso ink, turquoise/mustard/chilli signals.</summary>
+    /// <summary>Soft neo-brutalism on light paper: ink outlines, hard offset shadows, colour tiles.</summary>
     public const string Atari = "atari";
+
+    /// <summary>Atari on graphite: the same ink, shadows and tiles, dark surfaces.</summary>
+    public const string AtariDark = "atari-dark";
 
     /// <summary>The AgentNotch Console direction: square, monospace, hairline rules.</summary>
     public const string Console = "console";
 
     /// <summary>Every selectable theme id, in the order the settings picker shows them.</summary>
-    public static readonly string[] All = { Island, Glass, Atari, Console };
+    public static readonly string[] All = { Island, Glass, Atari, AtariDark, Console };
 
     /// <summary>Unknown/missing ids fall back to Island rather than leaving the app unstyled.</summary>
     public static string Normalize(string? name)
         => Array.Find(All, t => string.Equals(t, name?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? Island;
+
+    /// <summary>
+    /// The palette file (under UI/Themes, without extension) for a theme id. The one
+    /// place ids map to files — ThemeTests walks <see cref="All"/> through it too, so
+    /// a theme declared here without its palette fails the build's tests.
+    /// </summary>
+    public static string FileOf(string id) => Normalize(id) switch
+    {
+        Glass => "Glass",
+        Atari => "Atari",
+        AtariDark => "AtariDark",
+        Console => "Console",
+        _ => "Island",
+    };
 
     /// <summary>Loads the theme's palette into slot 0. Fail-soft: a bad id keeps the current look.</summary>
     public static void Apply(string? name)
@@ -42,16 +59,9 @@ public static class ThemeManager
         if (app is null) return; // unit tests / designer — nothing to repaint
 
         var id = Normalize(name);
-        var file = id switch
-        {
-            Glass => "Glass",
-            Atari => "Atari",
-            Console => "Console",
-            _ => "Island",
-        };
         try
         {
-            var dict = new ResourceDictionary { Source = new Uri($"UI/Themes/{file}.xaml", UriKind.Relative) };
+            var dict = new ResourceDictionary { Source = new Uri($"UI/Themes/{FileOf(id)}.xaml", UriKind.Relative) };
             if (app.Resources.MergedDictionaries.Count == 0) app.Resources.MergedDictionaries.Add(dict);
             else app.Resources.MergedDictionaries[0] = dict;
         }

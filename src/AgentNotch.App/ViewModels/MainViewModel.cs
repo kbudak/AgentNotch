@@ -109,7 +109,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string? _themeOverride; // --theme for a self-test run; never persisted
 
     /// <summary>
-    /// Which skin the notch wears: "island" | "glass" | "atari" | "console". It selects
+    /// Which skin the notch wears: "island" | "glass" | "atari" | "atari-dark" | "console". It selects
     /// the palette and layout (only Console has its own tree; the rest dress Island's
     /// rounded one), so all changes go through here.
     /// </summary>

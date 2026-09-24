@@ -38,11 +38,20 @@ public class ThemeTests
         var ui = UiDir();
         foreach (var id in ThemeManager.All)
         {
-            var file = char.ToUpperInvariant(id[0]) + id[1..] + ".xaml";
+            var file = ThemeManager.FileOf(id) + ".xaml";
             var path = Path.Combine(ui, "Themes", file);
             Assert.True(File.Exists(path), $"theme '{id}' has no palette at {file}");
             yield return (id, KeysOf(path));
         }
+    }
+
+    [Fact]
+    public void EveryThemeHasItsOwnPaletteFile()
+    {
+        // FileOf falls back to Island for an unknown id; without this, a theme added
+        // to All but not to FileOf would quietly borrow Island's palette.
+        var files = ThemeManager.All.Select(ThemeManager.FileOf).ToList();
+        Assert.Equal(files.Count, files.Distinct(StringComparer.OrdinalIgnoreCase).Count());
     }
 
     [Fact]
@@ -82,6 +91,8 @@ public class ThemeTests
     [InlineData(" GLASS ", ThemeManager.Glass)]
     [InlineData("atari", ThemeManager.Atari)]
     [InlineData(" Atari ", ThemeManager.Atari)]
+    [InlineData("atari-dark", ThemeManager.AtariDark)]
+    [InlineData("ATARI-DARK", ThemeManager.AtariDark)]
     [InlineData(" island ", ThemeManager.Island)]
     [InlineData("", ThemeManager.Island)]
     [InlineData(null, ThemeManager.Island)]

@@ -18,7 +18,7 @@ public sealed class AppConfig
     /// <summary>Where the notch sits along the top edge: "left" | "center" | "right".</summary>
     public string Position { get; set; } = "center";
 
-    /// <summary>Which palette to paint with: "island" | "glass" | "atari" | "console".</summary>
+    /// <summary>Which palette to paint with: "island" | "glass" | "atari" | "atari-dark" | "console".</summary>
     public string Theme { get; set; } = UI.ThemeManager.Island;
 
     private static string FilePath => Path.Combine(

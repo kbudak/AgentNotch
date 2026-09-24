@@ -131,4 +131,12 @@
     <Thickness x:Key="CountItemMargin">11,0,0,0</Thickness>
     <FontWeight x:Key="TitleFontWeight">Normal</FontWeight>
 
+    <!-- Panel shadow: the caster's blur and offset. Palettes own it, so a skin with
+         a different shadow never needs the view to name it. -->
+    <DropShadowEffect x:Key="PanelShadowEffect" Color="#FF000000" Opacity="0.28" BlurRadius="18" ShadowDepth="6" Direction="270"/>
+    <TranslateTransform x:Key="PanelShadowTransform"/>
+
+    <!-- Ink on a colour fill; tiles are collapsed in this palette, so it only has to exist. -->
+    <SolidColorBrush x:Key="TileInkBrush" Color="#FFF4F4F5"/>
+
 </ResourceDictionary>
