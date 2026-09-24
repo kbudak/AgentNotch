@@ -21,6 +21,13 @@ public sealed class AppConfig
     /// <summary>Which palette to paint with: "island" | "glass" | "atari" | "atari-dark" | "console".</summary>
     public string Theme { get; set; } = UI.ThemeManager.Island;
 
+    /// <summary>
+    /// The Atari dark-mode switch. Kept separately from <see cref="Theme"/> so it
+    /// survives a trip through another skin: picking Atari again returns to the
+    /// variant you left.
+    /// </summary>
+    public bool AtariDark { get; set; }
+
     private static string FilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "AgentNotch", "config.json");

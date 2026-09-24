@@ -135,4 +135,7 @@
     <!-- Ink on a colour fill; tiles are collapsed in this palette, so it only has to exist. -->
     <SolidColorBrush x:Key="TileInkBrush" Color="#FFE4E4E4"/>
 
+    <!-- Toggle knob inset: no track outline here, so 3px all round. -->
+    <Thickness x:Key="ToggleKnobInset">3</Thickness>
+
 </ResourceDictionary>

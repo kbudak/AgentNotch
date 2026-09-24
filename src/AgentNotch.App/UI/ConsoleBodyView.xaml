@@ -619,9 +619,7 @@
                                 <RadioButton GroupName="ctheme" Content="glass" Style="{StaticResource ConsoleSegment}"
                                              IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=glass, Mode=TwoWay}"/>
                                 <RadioButton GroupName="ctheme" Content="atari" Style="{StaticResource ConsoleSegment}"
-                                             IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=atari, Mode=TwoWay}"/>
-                                <RadioButton GroupName="ctheme" Content="atari dark" Style="{StaticResource ConsoleSegment}"
-                                             IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=atari-dark, Mode=TwoWay}"/>
+                                             IsChecked="{Binding IsAtari, Mode=TwoWay}"/>
                                 <RadioButton GroupName="ctheme" Content="console" Style="{StaticResource ConsoleSegment}"
                                              IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=console, Mode=TwoWay}"/>
                             </StackPanel>

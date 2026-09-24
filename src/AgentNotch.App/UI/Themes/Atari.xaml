@@ -156,4 +156,8 @@
          independent of the text colour, so the dark skin keeps black-on-colour. -->
     <SolidColorBrush x:Key="TileInkBrush" Color="#FF141414"/>
 
+    <!-- Toggle knob inset: the 2px track outline leaves 18px inside, so 1px
+         all round keeps the end gaps equal to the top/bottom ones. -->
+    <Thickness x:Key="ToggleKnobInset">1</Thickness>
+
 </ResourceDictionary>

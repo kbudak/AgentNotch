@@ -34,6 +34,15 @@ public static class ThemeManager
     /// <summary>Every selectable theme id, in the order the settings picker shows them.</summary>
     public static readonly string[] All = { Island, Glass, Atari, AtariDark, Console };
 
+    /// <summary>
+    /// Atari and Atari Dark are one choice in the picker plus a dark-mode switch;
+    /// they stay two palettes underneath. True for either variant.
+    /// </summary>
+    public static bool IsAtari(string? id) => Normalize(id) is Atari or AtariDark;
+
+    /// <summary>The Atari palette for the dark-mode switch's position.</summary>
+    public static string AtariVariant(bool dark) => dark ? AtariDark : Atari;
+
     /// <summary>Unknown/missing ids fall back to Island rather than leaving the app unstyled.</summary>
     public static string Normalize(string? name)
         => Array.Find(All, t => string.Equals(t, name?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? Island;

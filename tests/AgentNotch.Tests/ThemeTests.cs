@@ -85,6 +85,23 @@ public class ThemeTests
     }
 
     [Theory]
+    [InlineData("atari", true)]
+    [InlineData("atari-dark", true)]
+    [InlineData(" ATARI-DARK ", true)]
+    [InlineData("island", false)]
+    [InlineData("console", false)]
+    [InlineData(null, false)]
+    public void BothAtariVariantsAreOnePickerChoice(string? id, bool expected)
+        => Assert.Equal(expected, ThemeManager.IsAtari(id));
+
+    [Fact]
+    public void TheDarkSwitchSelectsTheVariant()
+    {
+        Assert.Equal(ThemeManager.AtariDark, ThemeManager.AtariVariant(dark: true));
+        Assert.Equal(ThemeManager.Atari, ThemeManager.AtariVariant(dark: false));
+    }
+
+    [Theory]
     [InlineData("console", ThemeManager.Console)]
     [InlineData("CONSOLE", ThemeManager.Console)]
     [InlineData("glass", ThemeManager.Glass)]

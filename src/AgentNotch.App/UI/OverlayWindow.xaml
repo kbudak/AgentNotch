@@ -512,17 +512,34 @@
                                         <RadioButton GroupName="notchtheme" Content="Glass"
                                                      Style="{StaticResource SegmentRadioStyle}"
                                                      IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=glass, Mode=TwoWay}"/>
+                                        <!-- One choice for both Atari variants; the switch below picks light or dark. -->
                                         <RadioButton GroupName="notchtheme" Content="Atari"
                                                      Style="{StaticResource SegmentRadioStyle}"
-                                                     IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=atari, Mode=TwoWay}"/>
-                                        <RadioButton GroupName="notchtheme" Content="Atari Dark"
-                                                     Style="{StaticResource SegmentRadioStyle}"
-                                                     IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=atari-dark, Mode=TwoWay}"/>
+                                                     IsChecked="{Binding IsAtari, Mode=TwoWay}"/>
                                         <RadioButton GroupName="notchtheme" Content="Console"
                                                      Style="{StaticResource SegmentRadioStyle}"
                                                      IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=console, Mode=TwoWay}"/>
                                     </StackPanel>
                                 </Border>
+                            </Grid>
+
+                            <!-- Atari dark mode: a switch rather than a fifth skin, and only
+                                 shown while Atari is the one selected. -->
+                            <Grid Margin="0,0,0,12"
+                                  Visibility="{Binding IsAtari, Converter={StaticResource BoolToVis}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Dark mode" FontSize="13"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="Atari on graphite instead of paper" FontSize="11"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                </StackPanel>
+                                <ToggleButton Grid.Column="1" VerticalAlignment="Center"
+                                              Style="{StaticResource ToggleSwitchStyle}"
+                                              IsChecked="{Binding AtariDarkMode, Mode=TwoWay}"/>
                             </Grid>
 
                             <!-- Position -->

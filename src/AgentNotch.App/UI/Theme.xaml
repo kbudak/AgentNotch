@@ -251,16 +251,19 @@
                             BorderBrush="{DynamicResource CardBorderBrush}"
                             BorderThickness="{DynamicResource OutlineThickness}"
                             Background="{DynamicResource OptionBgBrush}">
+                        <!-- One inset on every side, from the palette. It has to shrink
+                             with the track's outline: a 2px outline leaves an 18px
+                             interior, so a fixed 3px end gap next to a 1px top/bottom
+                             gap made the knob look like it stopped short of the end. -->
                         <Border x:Name="thumb" Width="16" Height="16"
                                 CornerRadius="{DynamicResource PillCornerRadius}"
-                                HorizontalAlignment="Left" Margin="3,0,0,0"
+                                HorizontalAlignment="Left" Margin="{DynamicResource ToggleKnobInset}"
                                 Background="{DynamicResource TextSecondaryBrush}"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="track" Property="Background" Value="{DynamicResource StatusFinishedBrush}"/>
                             <Setter TargetName="thumb" Property="HorizontalAlignment" Value="Right"/>
-                            <Setter TargetName="thumb" Property="Margin" Value="0,0,3,0"/>
                             <Setter TargetName="thumb" Property="Background" Value="White"/>
                         </Trigger>
                     </ControlTemplate.Triggers>

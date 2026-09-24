@@ -122,8 +122,44 @@ public sealed class MainViewModel : INotifyPropertyChanged
             if (string.Equals(next, Theme, StringComparison.Ordinal)) return;
             _themeOverride = null;
             _config.Theme = next;
+            // Landing on an Atari variant by any route records it as the preference.
+            if (UI.ThemeManager.IsAtari(next)) _config.AtariDark = next == UI.ThemeManager.AtariDark;
             _config.Save();
             ApplyTheme(next);
+        }
+    }
+
+    /// <summary>
+    /// The picker's single "Atari" choice, covering both variants. Checking it
+    /// returns to whichever variant the dark-mode switch last chose; unchecking is
+    /// ignored — another radio in the group being checked is what moves the theme.
+    /// </summary>
+    public bool IsAtari
+    {
+        get => UI.ThemeManager.IsAtari(Theme);
+        set { if (value && !IsAtari) Theme = UI.ThemeManager.AtariVariant(_config.AtariDark); }
+    }
+
+    /// <summary>
+    /// Atari's dark-mode switch. While Atari is showing it reports the live variant;
+    /// otherwise it reports (and sets) the variant Atari will open in next time.
+    /// </summary>
+    public bool AtariDarkMode
+    {
+        get => IsAtari ? Theme == UI.ThemeManager.AtariDark : _config.AtariDark;
+        set
+        {
+            if (value == AtariDarkMode) return;
+            if (IsAtari)
+            {
+                Theme = UI.ThemeManager.AtariVariant(value); // also records the preference
+            }
+            else
+            {
+                _config.AtariDark = value;
+                _config.Save();
+                Raise(nameof(AtariDarkMode));
+            }
         }
     }
 
@@ -139,6 +175,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         UI.ThemeManager.Apply(name);
         RepaintConverterBindings();
         Raise(nameof(Theme));
+        Raise(nameof(IsAtari));
+        Raise(nameof(AtariDarkMode));
     }
 
     /// <summary>
