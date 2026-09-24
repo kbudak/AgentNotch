@@ -262,6 +262,30 @@ public static class TranscriptTail
            GetString(last, "type") == "assistant" &&
            StopReason(last) == "tool_use";
 
+    /// <summary>
+    /// How long a browser tool call may stay unanswered before it is read as waiting
+    /// on its site-permission dialog. Measured on a real session: 12 finished
+    /// Claude_Browser calls took 0.7–4.9s when nothing asked, and 20–66s each time
+    /// the dialog was up.
+    /// ponytail: a timing heuristic, not a signal — a genuinely slow page load past
+    /// 8s shows orange until it returns. Swap for a real event if the browser tool
+    /// ever surfaces one (a hook, or a state file the app writes).
+    /// </summary>
+    public static readonly TimeSpan BrowserPromptAfter = TimeSpan.FromSeconds(8);
+
+    /// <summary>Tools that answer to a per-site permission dialog in the app or extension.</summary>
+    public static bool IsBrowserTool(string? tool)
+        => tool is not null &&
+           (tool.StartsWith("mcp__Claude_Browser__", StringComparison.Ordinal) ||
+            tool.StartsWith("mcp__claude-in-chrome__", StringComparison.Ordinal));
+
+    /// <summary>The last turn is a browser tool call with no result yet.</summary>
+    public static bool IsPendingBrowserTool(IReadOnlyList<JsonElement> events)
+        => LastTurn(events) is { } last &&
+           GetString(last, "type") == "assistant" &&
+           LastContentBlockType(last) == "tool_use" &&
+           IsBrowserTool(LastToolUse(events).Tool);
+
     // ---------- status derivation ----------
 
     /// <summary>
@@ -281,6 +305,15 @@ public static class TranscriptTail
 
         bool statusFresh = statusAge is { } sa && sa < BusyMax;
         bool transcriptFresh = transcriptAge < WorkingGrace;
+
+        // A browser tool held at its own per-site "Allow Claude to …?" dialog. That
+        // dialog belongs to the browser tool, inside a call Claude Code has already
+        // started, so no PermissionRequest or Notification hook fires and the
+        // registry keeps saying "busy". The one trace is the call sitting unanswered
+        // far longer than browser calls take — which is why this has to run before
+        // the busy check below, or it would read as ordinary work.
+        if (IsPendingBrowserTool(events) && transcriptAge >= BrowserPromptAfter)
+            return SessionStatus.NeedsYou;
 
         // Claude Code marks a session "busy"/"waiting" while it's doing work and only
         // flips to "idle" when the turn is handed back to you (interrupts flip to idle
@@ -649,9 +682,13 @@ public static class TranscriptTail
                 spendCache[reg.SessionId] = spend;
 
                 string? tool = null, target = null;
+                bool browserGate = status == SessionStatus.NeedsYou && IsPendingBrowserTool(events);
                 if (status == SessionStatus.Working ||
-                    (status == SessionStatus.NeedsYou && IsPendingTool(events)))
+                    (status == SessionStatus.NeedsYou && (IsPendingTool(events) || browserGate)))
                     (tool, target) = LastToolUse(events);
+                // The notch cannot answer this dialog — it lives in the app — so the
+                // row says where the question is; clicking it jumps there.
+                if (browserGate) target = "Waiting for you to allow it";
 
                 // Mid-thought there is no tool to name, so the row would fall back to
                 // the previous narration — which reads as if the turn were over, the
@@ -910,6 +947,20 @@ public static class TranscriptTail
                 return "Asking you a question";
 
             default:
+                if (IsBrowserTool(tool))
+                {
+                    // "mcp__Claude_Browser__javascript_tool" means nothing on a row.
+                    var action = tool[(tool.LastIndexOf("__", StringComparison.Ordinal) + 2)..];
+                    return action switch
+                    {
+                        "javascript_tool" or "javascript_exec" => "Running JavaScript in the browser",
+                        "navigate" => "Opening a page",
+                        "computer" => "Using the browser",
+                        "read_page" or "get_page_text" or "find" => "Reading the page",
+                        "form_input" => "Filling in a form",
+                        _ => "Using the browser",
+                    };
+                }
                 if (description is { Length: > 0 }) return Excerpt(description, 46);
                 if (file is { Length: > 0 }) return tool + " " + FileName(file);
                 return tool;

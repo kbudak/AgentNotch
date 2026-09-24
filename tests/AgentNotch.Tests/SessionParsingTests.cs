@@ -308,6 +308,30 @@ public sealed class SessionParsingTests : IDisposable
     // ---------- full snapshot ----------
 
     [Fact]
+    public void Snapshot_BrowserCallHeldAtItsSiteDialog_NeedsYou_AndSaysWhy()
+    {
+        // The Claude_Browser per-site "Allow Claude to …?" dialog fires no hook and
+        // leaves the registry at "busy"; the row has to go orange from the unanswered
+        // call alone, and say where the question is rather than print the tool id.
+        var home = Path.Combine(_dir, "home-browser-gate");
+        var cwd = Path.Combine(_dir, "repos", "subscancel");
+        WriteRegistry(home, 4343, "s-gate", cwd, status: "busy",
+            statusUpdatedAtMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        WriteTranscript(home, "s-gate", AssistantToolUseInput("mcp__Claude_Browser__javascript_tool",
+            new { action = "javascript_exec", text = "document.title" }));
+        var cache = new Dictionary<string, TranscriptTail.SpendState>();
+
+        var held = Assert.Single(TranscriptTail.BuildSnapshot(home, cache, _ => true, DateTime.UtcNow.AddSeconds(20)));
+        Assert.Equal(SessionStatus.NeedsYou, held.Status);
+        Assert.Equal("Waiting for you to allow it", held.CurrentTarget);
+
+        // Two seconds in, the same call is ordinary work — named, not "mcp__…".
+        var quick = Assert.Single(TranscriptTail.BuildSnapshot(home, cache, _ => true, DateTime.UtcNow.AddSeconds(2)));
+        Assert.Equal(SessionStatus.Working, quick.Status);
+        Assert.Equal("Running JavaScript in the browser", quick.CurrentTarget);
+    }
+
+    [Fact]
     public void Snapshot_WorkingSession_CarriesToolTargetSpendAndProjectName()
     {
         var home = Path.Combine(_dir, "home-working");

@@ -49,6 +49,34 @@ public sealed class ActiveAskTests
     private static SessionStatus IdleFresh(List<JsonElement> events)
         => TranscriptTail.DeriveStatus(events, Recent, "idle", Recent);
 
+    // ---------- browser site-permission dialog ----------
+    // No hook fires for it and the registry says "busy" throughout; only the time a
+    // browser call has gone unanswered tells a quick call from one held at the dialog.
+
+    [Fact]
+    public void BrowserCall_UnansweredPastTheThreshold_NeedsYou_EvenWhileBusy()
+        => Assert.Equal(SessionStatus.NeedsYou, TranscriptTail.DeriveStatus(
+            Events(ToolUse("mcp__Claude_Browser__javascript_tool")),
+            TimeSpan.FromSeconds(20), "busy", TimeSpan.FromSeconds(20)));
+
+    [Fact]
+    public void BrowserCall_StillQuick_IsWorking()
+        => Assert.Equal(SessionStatus.Working, TranscriptTail.DeriveStatus(
+            Events(ToolUse("mcp__claude-in-chrome__navigate")),
+            TimeSpan.FromSeconds(3), "busy", TimeSpan.FromSeconds(3)));
+
+    [Fact]
+    public void BrowserCall_Answered_IsNotHeldAtTheDialog()
+        => Assert.Equal(SessionStatus.Working, TranscriptTail.DeriveStatus(
+            Events(ToolUse("mcp__Claude_Browser__javascript_tool"),
+                   User(new object[] { new { type = "tool_result", tool_use_id = "t1", content = "ok" } })),
+            TimeSpan.FromSeconds(30), "busy", TimeSpan.FromSeconds(30)));
+
+    [Fact]
+    public void SlowNonBrowserTool_StaysWorking()
+        => Assert.Equal(SessionStatus.Working, TranscriptTail.DeriveStatus(
+            Events(ToolUse("Bash")), TimeSpan.FromMinutes(2), "busy", TimeSpan.FromMinutes(2)));
+
     // ---------- finished sessions: never orange ----------
 
     [Fact]
