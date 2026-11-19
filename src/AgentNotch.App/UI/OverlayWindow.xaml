@@ -26,27 +26,14 @@
          click-through and hover-transparent; only the panel is interactive. -->
     <Grid Margin="28,0,28,32" HorizontalAlignment="Center" VerticalAlignment="Top">
 
-        <!-- Atari/AtariDark hard shadow is shifted down-right by (4,4), which would leave
-             a 4px gap between the top of the screen and the shadow on the right edge.
-             This top cap bridges y=0..10 behind NotchPanel so the hard shadow sits flush
-             with the top edge at every DPI without a subpixel seam. -->
-        <Border HorizontalAlignment="Center" VerticalAlignment="Top"
-                Width="{Binding ActualWidth, ElementName=NotchPanel}"
-                Height="10"
-                Background="{DynamicResource PanelShadowCasterBrush}"
-                Visibility="{Binding IsAtari, Converter={StaticResource BoolToVis}}"
-                IsHitTestVisible="False">
-            <Border.RenderTransform>
-                <TranslateTransform X="4" Y="0"/>
-            </Border.RenderTransform>
-        </Border>
-
         <!-- Must match NotchPanel's size. A stretch caster fills the 640px host and
-             reads as a second, badly-rounded slab behind the pill. -->
+             reads as a second, badly-rounded slab behind the pill.
+             In Atari / Atari Dark this single Border stretches from y=0 (flush with the
+             screen's top edge) down to NotchPanel.ActualHeight + 4 and shifts +4px right,
+             forming one continuous hard shadow with no top-right gap. -->
         <Border x:Name="ShadowCaster"
-                HorizontalAlignment="Center" VerticalAlignment="Top"
+                HorizontalAlignment="Center" VerticalAlignment="Stretch"
                 Width="{Binding ActualWidth, ElementName=NotchPanel}"
-                Height="{Binding ActualHeight, ElementName=NotchPanel}"
                 Background="{DynamicResource PanelShadowCasterBrush}"
                 CornerRadius="{DynamicResource PanelCornerRadius}"
                 Effect="{DynamicResource PanelShadowEffect}"
@@ -58,11 +45,16 @@
             <Border.Style>
                 <Style TargetType="{x:Type Border}">
                     <Setter Property="Visibility" Value="Visible"/>
+                    <Setter Property="Margin" Value="0"/>
                     <Style.Triggers>
                         <!-- Glass: the caster + DropShadow rasterize a dark rectangle
                              around the pill on a layered window. -->
                         <DataTrigger Binding="{Binding Theme}" Value="glass">
                             <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                        <!-- Atari / Atari Dark: extend 4px below NotchPanel while staying flush at y=0. -->
+                        <DataTrigger Binding="{Binding IsAtari}" Value="True">
+                            <Setter Property="Margin" Value="0,0,0,-4"/>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>

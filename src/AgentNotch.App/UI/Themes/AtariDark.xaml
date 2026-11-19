@@ -144,11 +144,10 @@
     <Thickness x:Key="CountItemMargin">6,0,0,0</Thickness>
     <FontWeight x:Key="TitleFontWeight">Bold</FontWeight>
 
-    <!-- Panel shadow: no blur at all — the caster is solid ink shifted 4px down-right,
-         which is the hard shadow. No Effect also makes this the cheapest to draw on
-         the layered window. -->
+    <!-- Panel shadow: no blur at all — the caster is one solid ink block from y=0 to H+4,
+         shifted 4px right, so the top-right meets the screen edge flush with no gap. -->
     <x:Null x:Key="PanelShadowEffect"/>
-    <TranslateTransform x:Key="PanelShadowTransform" X="4" Y="4"/>
+    <TranslateTransform x:Key="PanelShadowTransform" X="4" Y="0"/>
 
     <!-- Ink ON a colour fill (tile icons, count badges). Black on both Ataris,
          independent of the text colour, so the dark skin keeps black-on-colour. -->
