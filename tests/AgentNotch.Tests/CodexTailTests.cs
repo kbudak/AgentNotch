@@ -92,6 +92,102 @@ public sealed class CodexTailTests : IDisposable
 
     // ---------- tests ----------
 
+    private static string Stamped(string line, DateTime at)
+    {
+        var node = System.Text.Json.Nodes.JsonNode.Parse(line)!;
+        node["timestamp"] = at.ToString("O");
+        return node.ToJsonString();
+    }
+
+    [Fact]
+    public void OpenWindowsAppendHandleDoesNotMakeAnActiveTurnStale()
+    {
+        var now = DateTime.UtcNow;
+        WriteRollout("open-handle.jsonl", now.AddHours(-2), Meta(),
+            Stamped(TaskStarted(), now.AddMinutes(-2)),
+            Stamped(ToolCall("shell", "c1"), now.AddSeconds(-1)));
+        var session = Assert.Single(CodexTail.Collect(_dir, now));
+        Assert.Equal(SessionStatus.Working, session.Status);
+        Assert.Equal(now.AddSeconds(-1), session.LastActivityUtc);
+    }
+
+    [Fact]
+    public void FrozenMtimeActiveFileIsNotLostBehindTwentyCompletedFiles()
+    {
+        var now = DateTime.UtcNow;
+        for (int i = 0; i < 22; i++)
+            WriteRollout($"finished-{i}.jsonl", now.AddMinutes(-1),
+                Meta(id: $"done-{i}"), TaskStarted(), TaskComplete());
+        WriteRollout("live.jsonl", now.AddHours(-3), Meta(id: "live"),
+            Stamped(TaskStarted(), now.AddSeconds(-2)));
+        Assert.Contains(CodexTail.Collect(_dir, now), s => s.SessionId == "codex:live");
+    }
+
+    [Fact]
+    public void AppendWithUnchangedMtimeUpdatesLiveActivityAndThinking()
+    {
+        var now = DateTime.UtcNow;
+        var oldMtime = now.AddHours(-1);
+        var path = WriteRollout("append.jsonl", oldMtime, Meta(),
+            Stamped(TaskStarted(), now.AddSeconds(-3)),
+            Stamped(ToolCall("shell", "c1"), now.AddSeconds(-2)));
+        Assert.False(Assert.Single(CodexTail.Collect(_dir, now)).IsThinking);
+        File.AppendAllText(path, Stamped(ToolOutput("c1"), now) + "\n");
+        File.SetLastWriteTimeUtc(path, oldMtime);
+        var next = Assert.Single(CodexTail.Collect(_dir, now));
+        Assert.True(next.IsThinking);
+        Assert.Equal(now, next.LastActivityUtc);
+    }
+
+    [Fact]
+    public void PreviousTurnsUnansweredQuestionCannotBlockTheNewTurn()
+    {
+        var now = DateTime.UtcNow;
+        WriteRollout("turns.jsonl", now, Meta(), TaskStarted(),
+            ToolCall("request_user_input", "old-question"), TaskComplete(), TaskStarted());
+        var next = Assert.Single(CodexTail.Collect(_dir, now));
+        Assert.Equal(SessionStatus.Working, next.Status);
+        Assert.True(next.IsThinking);
+        Assert.Null(next.CurrentTool);
+    }
+
+    [Fact]
+    public void PendingQuestionsAndPermissionsExposeDifferentBuddyStates()
+    {
+        var now = DateTime.UtcNow;
+        WriteRollout("question.jsonl", now, Meta(id: "question"), TaskStarted(),
+            ToolCall("request_user_input", "q"));
+        WriteRollout("permission.jsonl", now, Meta(id: "permission"), TaskStarted(),
+            ToolCall("shell", "p", "{\"sandbox_permissions\":\"require_escalated\"}"));
+        var sessions = CodexTail.Collect(_dir, now);
+        Assert.False(sessions.Single(s => s.SessionId == "codex:question").NeedsApproval);
+        Assert.True(sessions.Single(s => s.SessionId == "codex:permission").NeedsApproval);
+    }
+
+    [Fact]
+    public void CommandsReadingApprovalCodeAreWorkNotAUserQuestion()
+    {
+        var now = DateTime.UtcNow;
+        WriteRollout("source.jsonl", now, Meta(), TaskStarted(),
+            ToolCall("exec", "code", "text(await tools.exec_command({cmd:'rg request_user_input approval require_escalated src'}));"));
+        var session = Assert.Single(CodexTail.Collect(_dir, now));
+        Assert.Equal(SessionStatus.Working, session.Status);
+        Assert.False(session.NeedsApproval);
+    }
+
+    [Fact]
+    public void ActualCodeModeQuestionIsDetectedButQuotedSourceIsNot()
+    {
+        var now = DateTime.UtcNow;
+        WriteRollout("real.jsonl", now, Meta(id: "real"), TaskStarted(),
+            ToolCall("exec", "q", "await tools.request_user_input({questions: []});"));
+        WriteRollout("quoted.jsonl", now, Meta(id: "quoted"), TaskStarted(),
+            ToolCall("exec", "patch", "const patch = 'await tools.request_user_input({questions: []});'; text(await tools.apply_patch(patch));"));
+        var sessions = CodexTail.Collect(_dir, now);
+        Assert.Equal(SessionStatus.NeedsYou, sessions.Single(s => s.SessionId == "codex:real").Status);
+        Assert.Equal(SessionStatus.Working, sessions.Single(s => s.SessionId == "codex:quoted").Status);
+    }
+
     [Fact]
     public void WorkingSessionReportsToolModelAndHost()
     {
@@ -127,7 +223,7 @@ public sealed class CodexTailTests : IDisposable
         WriteRollout(
             Path.Combine("2026", "08", "17", "rollout-2026-08-17T12-00-00-exec.jsonl"),
             now.AddSeconds(-20),
-            Meta(id: "sess-exec", cwd: @"C:\Users\gym", model: "gpt-5.6-sol", source: "vscode", originator: "Codex Desktop"),
+            Meta(id: "sess-exec", cwd: @"C:\work\demo-app", model: "gpt-5.6-sol", source: "vscode", originator: "Codex Desktop"),
             TaskStarted(),
             JsonSerializer.Serialize(new
             {
@@ -155,7 +251,7 @@ public sealed class CodexTailTests : IDisposable
         WriteRollout(
             Path.Combine("2026", "08", "17", "rollout-2026-08-17T12-00-00-patch.jsonl"),
             now.AddSeconds(-20),
-            Meta(id: "sess-patch", cwd: @"C:\Users\gym", model: "gpt-5.6-sol"),
+            Meta(id: "sess-patch", cwd: @"C:\work\demo-app", model: "gpt-5.6-sol"),
             TaskStarted(),
             JsonSerializer.Serialize(new
             {

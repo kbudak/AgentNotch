@@ -73,8 +73,12 @@ public sealed class ClaudeUsageClient : IDisposable
     private int _renewing;
     private volatile bool _disposed;
 
+    public static ClaudeUsageClient? Shared { get; set; }
+    public static IReadOnlyList<UsageWindow> SharedWindows => Shared?.Windows ?? Array.Empty<UsageWindow>();
+
     public ClaudeUsageClient(string? claudeHome = null)
     {
+        Shared = this;
         var home = string.IsNullOrWhiteSpace(claudeHome)
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude")
             : claudeHome;

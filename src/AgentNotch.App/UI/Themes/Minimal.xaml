@@ -1,0 +1,41 @@
+<!--
+    Minimal — the quiet rounded skin. It inherits Island's complete token set and
+    changes only the visual emphasis: a softer, layered charcoal surface and no
+    lead-agent icon in the collapsed pill.
+
+    The surface is no longer a flat fill. A faint blue-tinted gradient (lighter at
+    the top edge, near-black at the bottom) gives the notch depth without adding
+    chrome, and a slightly brighter hairline reads as a rim light catching the
+    top curve — the two changes that make a plain panel look intentional.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="Island.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <!-- Layered surface: cool charcoal at the crown settling to near-black. -->
+    <LinearGradientBrush x:Key="PanelBgBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#FF171A23" Offset="0" />
+        <GradientStop Color="#FF101219" Offset="0.55" />
+        <GradientStop Color="#FF0A0B10" Offset="1" />
+    </LinearGradientBrush>
+    <!-- The caster is a single solid: a gradient here would defeat the shadow. -->
+    <SolidColorBrush x:Key="PanelShadowCasterBrush" Color="#FF0A0B10"/>
+    <SolidColorBrush x:Key="PanelBorderBrush" Color="#2BFFFFFF"/>
+    <SolidColorBrush x:Key="CardBgBrush" Color="#FF1A1E28"/>
+    <SolidColorBrush x:Key="CardHoverBrush" Color="#FF252A36"/>
+    <SolidColorBrush x:Key="OptionBgBrush" Color="#FF1D222C"/>
+    <SolidColorBrush x:Key="OptionHoverBrush" Color="#FF2C323F"/>
+    <SolidColorBrush x:Key="OptionPressedBrush" Color="#FF373E4E"/>
+    <SolidColorBrush x:Key="SegmentCheckedBgBrush" Color="#FF373E4E"/>
+    <!-- A wider, softer drop than Island's tight shadow: the layered panel should
+         feel like it floats, not sit on a hard ledge. -->
+    <DropShadowEffect x:Key="PanelShadowEffect" Color="#FF04050A" Opacity="0.42" BlurRadius="30" ShadowDepth="10" Direction="270"/>
+    <!-- The compact star field reaches the outer notch edge, with no inner gutter. -->
+    <Thickness x:Key="PanelPaddingThickness">0</Thickness>
+
+    <!-- The requested difference: no agent/logo mark at the left of the compact pill. -->
+    <Visibility x:Key="LeadAgentMarkVisibility">Collapsed</Visibility>
+    <Visibility x:Key="CollapsedLeadStatusVisibility">Collapsed</Visibility>
+</ResourceDictionary>

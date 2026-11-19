@@ -34,28 +34,25 @@
         </StackPanel>
     </Grid>
 
-    <UserControl.Triggers>
-        <EventTrigger RoutedEvent="UserControl.Loaded">
-            <BeginStoryboard>
-                <!-- 20fps: layered window, every frame is a CPU blit. -->
-                <Storyboard Timeline.DesiredFrameRate="20">
-                    <DoubleAnimation Storyboard.TargetName="b0" Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                     From="0.3" To="1" Duration="0:0:0.95" BeginTime="0:0:0.0"
-                                     AutoReverse="True" RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="b1" Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                     From="0.3" To="1" Duration="0:0:0.95" BeginTime="0:0:0.2"
-                                     AutoReverse="True" RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="b2" Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                     From="0.3" To="1" Duration="0:0:0.95" BeginTime="0:0:0.4"
-                                     AutoReverse="True" RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="b3" Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                     From="0.3" To="1" Duration="0:0:0.95" BeginTime="0:0:0.6"
-                                     AutoReverse="True" RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="b4" Storyboard.TargetProperty="RenderTransform.ScaleY"
-                                     From="0.3" To="1" Duration="0:0:0.95" BeginTime="0:0:0.8"
-                                     AutoReverse="True" RepeatBehavior="Forever"/>
-                </Storyboard>
-            </BeginStoryboard>
-        </EventTrigger>
-    </UserControl.Triggers>
+    <UserControl.Resources>
+        <!-- 20fps: layered window, every frame is a CPU blit. Started/stopped in
+             code-behind only while IsLoaded && IsVisible so non-Console themes cost 0% CPU. -->
+        <Storyboard x:Key="EqualiserStoryboard" Timeline.DesiredFrameRate="20">
+            <DoubleAnimation Storyboard.TargetName="b0" Storyboard.TargetProperty="RenderTransform.ScaleY"
+                             From="0.3" To="1" Duration="0:0:0.95" BeginTime="0:0:0.0"
+                             AutoReverse="True" RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="b1" Storyboard.TargetProperty="RenderTransform.ScaleY"
+                             From="0.3" To="1" Duration="0:0:0.95" BeginTime="0:0:0.2"
+                             AutoReverse="True" RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="b2" Storyboard.TargetProperty="RenderTransform.ScaleY"
+                             From="0.3" To="1" Duration="0:0:0.95" BeginTime="0:0:0.4"
+                             AutoReverse="True" RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="b3" Storyboard.TargetProperty="RenderTransform.ScaleY"
+                             From="0.3" To="1" Duration="0:0:0.95" BeginTime="0:0:0.6"
+                             AutoReverse="True" RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="b4" Storyboard.TargetProperty="RenderTransform.ScaleY"
+                             From="0.3" To="1" Duration="0:0:0.95" BeginTime="0:0:0.8"
+                             AutoReverse="True" RepeatBehavior="Forever"/>
+        </Storyboard>
+    </UserControl.Resources>
 </UserControl>

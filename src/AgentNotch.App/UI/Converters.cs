@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using AgentNotch.App.Sessions;
 
 namespace AgentNotch.App.UI;
@@ -28,23 +29,7 @@ public static class AgentIcons
         "L4,12 L0,12 L0,8 L4,8Z " +
         "M6,6 L8,6 L8,8 L6,8Z M16,6 L18,6 L18,8 L16,8Z");
 
-    /// <summary>
-    /// The OpenAI knot (Codex), reduced to the two things that survive at the size
-    /// the notch draws it: six lobes and a hexagonal centre.
-    ///
-    /// The literal mark is six interlocking loops, and the icon supplied for it is
-    /// that outline at a ~4% stroke. Neither works here — these marks render at
-    /// 11-17px and never larger, where the filled knot collapsed into a featureless
-    /// smudge and an outline that thin goes sub-pixel and disappears (the same trap
-    /// the old hollow Cursor cube fell into). Each lobe is one quadratic whose
-    /// control point is pushed out to (4*Rtip - 2*Rvalley*cos30)/2, so the curve
-    /// passes through the tip: twelve numbers instead of a sampled polygon, and
-    /// still editable by hand. Even-odd fill turns the centre into a hole.
-    /// </summary>
-    public static readonly Geometry Codex = Frozen(
-        "M15.8,5.42 Q12,-4.62 8.2,5.42 Q-2.39,3.69 4.4,12 Q-2.39,20.31 8.2,18.58 " +
-        "Q12,28.62 15.8,18.58 Q26.39,20.31 19.6,12 Q26.39,3.69 15.8,5.42Z " +
-        "M16.6,12 L14.3,15.98 L9.7,15.98 L7.4,12 L9.7,8.02 L14.3,8.02Z");
+    // Codex uses the user's original ChatGPT PNG instead of an approximated vector.
 
     /// <summary>
     /// The Gemini diamond (Antigravity): a four-point star with concave sides,
@@ -80,6 +65,20 @@ public static class AgentIcons
 
     /// <summary>Neutral dot — unknown agent, or the idle pill.</summary>
     public static readonly Geometry Generic = Frozen("M0,0 M24,24 M7.5,12 A4.5,4.5 0 1 0 16.5,12 A4.5,4.5 0 1 0 7.5,12Z");
+
+    /// <summary>
+    /// OpenCode, in the same pixel idiom as the Claude invader and Cursor cube: a
+    /// terminal prompt, a fat "&gt;" chevron over an underscore. It reads as "a
+    /// coding CLI" at 11-17px, which is the mark's whole job — its own brand shape
+    /// has no silhouette that survives that small, and the brand chip beside it
+    /// already spells the name.
+    /// </summary>
+    public static readonly Geometry OpenCode = FromMatrix(
+        "X.....",
+        ".X....",
+        "..X...",
+        ".X....",
+        "X..XXX");
 
     // ---- Pixel-art STATUS glyphs (shape = what state) --------------------------
     // Built from an ASCII bitmap so they read as chunky retro pixels and stay easy
@@ -150,13 +149,14 @@ public static class AgentIcons
     private static System.Windows.Point Polar(double cx, double cy, double r, double a)
         => new(cx + r * Math.Cos(a), cy + r * Math.Sin(a));
 
-    /// <summary>Mark for an agent id ("claude" | "codex" | "antigravity" | "cursor").</summary>
+    /// <summary>Mark for an agent id ("claude" | "codex" | "antigravity" | "cursor" | "opencode").</summary>
     public static Geometry For(string? agent) => agent?.Trim().ToLowerInvariant() switch
     {
         "claude" => Claude,
-        "codex" => Codex,
+        "codex" => Geometry.Empty,
         "antigravity" => Antigravity,
         "cursor" => Cursor,
+        "opencode" => OpenCode,
         _ => Generic,
     };
 
@@ -252,6 +252,7 @@ internal static class StatusBrushes
         "codex" => Lookup("AgentCodexBrush", 0xFF, 0xFF, 0xFF),
         "antigravity" => Lookup("AgentAntigravityBrush", 0x4E, 0x8C, 0xF7),
         "cursor" => Lookup("AgentCursorBrush", 0x6E, 0xE7, 0xD7),
+        "opencode" => Lookup("AgentOpenCodeBrush", 0xA7, 0x8B, 0xFA),
         _ => Lookup("AgentGenericBrush", 0x8E, 0x8E, 0x8E),
     };
 
@@ -423,7 +424,37 @@ public sealed class SessionTokensConverter : IValueConverter
             if (value is AgentSession s)
             {
                 var spend = TokenFormat.Short(s.TokensSpent);
-                return spend.Length > 0 ? spend : s.Model ?? "";
+                return spend;
+            }
+        }
+        catch { /* fall through */ }
+        return "";
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>AgentSession → clean model name (e.g. "Gemini 3.8 Flash", "GPT-5.3-codex", "Claude 3.7", "deepseek-v4.1-flash").</summary>
+public sealed class SessionModelConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        try
+        {
+            if (value is AgentSession s)
+            {
+                if (!string.IsNullOrWhiteSpace(s.Model))
+                    return s.Model;
+                return s.Agent?.ToLowerInvariant() switch
+                {
+                    "claude" => "Claude 3.7",
+                    "codex" => "GPT-5",
+                    "antigravity" => "Gemini",
+                    "cursor" => "Composer",
+                    "opencode" => "OpenCode",
+                    _ => "",
+                };
             }
         }
         catch { /* fall through */ }
@@ -445,6 +476,32 @@ public sealed class SessionAgentIconConverter : IValueConverter
         }
         catch { /* fall through */ }
         return AgentIcons.Generic;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>Original ChatGPT PNG for Codex; other agents keep their vector marks.</summary>
+public sealed class AgentPngIconConverter : IValueConverter
+{
+    private static readonly BitmapImage ChatGpt = LoadChatGpt();
+
+    private static BitmapImage LoadChatGpt()
+    {
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.UriSource = new Uri("pack://application:,,,/Assets/chatgpt.png", UriKind.Absolute);
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.EndInit();
+        image.Freeze();
+        return image;
+    }
+
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        string? agent = value is AgentSession session ? session.Agent : value as string;
+        return string.Equals(agent, "codex", StringComparison.OrdinalIgnoreCase) ? ChatGpt : null;
     }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -589,6 +646,7 @@ public sealed class SessionBrandConverter : IValueConverter
                     "codex" => "Codex",
                     "antigravity" => "Antigravity",
                     "cursor" => "Cursor",
+                    "opencode" => "OpenCode",
                     "claude" => "Claude",
                     _ => s.Agent ?? "",
                 };

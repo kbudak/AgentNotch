@@ -31,8 +31,11 @@ public static class ThemeManager
     /// <summary>The AgentNotch Console direction: square, monospace, hairline rules.</summary>
     public const string Console = "console";
 
+    /// <summary>A calm, icon-free version of the rounded island layout.</summary>
+    public const string Minimal = "minimal";
+
     /// <summary>Every selectable theme id, in the order the settings picker shows them.</summary>
-    public static readonly string[] All = { Island, Glass, Atari, AtariDark, Console };
+    public static readonly string[] All = { Island, Glass, Atari, AtariDark, Console, Minimal };
 
     /// <summary>
     /// Atari and Atari Dark are one choice in the picker plus a dark-mode switch;
@@ -58,6 +61,7 @@ public static class ThemeManager
         Atari => "Atari",
         AtariDark => "AtariDark",
         Console => "Console",
+        Minimal => "Minimal",
         _ => "Island",
     };
 

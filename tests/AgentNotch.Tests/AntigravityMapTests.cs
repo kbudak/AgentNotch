@@ -372,25 +372,25 @@ public sealed class AntigravityMapTests
         {
             ["511c97c1-54df-4814-976a-0b408e61183c"] = new
             {
-                summary = "projeyi analiz et ve rapor et",
+                summary = "analyze the project and summarize",
                 stepCount = 32,
                 lastModifiedTime = "2026-07-20T11:58:40.935930200Z",
                 trajectoryId = "8357b464-36db-4ea3-8f5d-8c4b082aa870",
                 status = "CASCADE_RUN_STATUS_RUNNING",
                 workspaces = new object[]
                 {
-                    new { workspaceFolderAbsoluteUri = "file:///c:/Users/kaan_/Desktop/Projects/belediyem" },
+                    new { workspaceFolderAbsoluteUri = "file:///c:/work/demo-app" },
                 },
             },
             ["07879285-cc7e-40f3-b679-5ff9cf5c6f50"] = new
             {
-                summary = "burada admin atamalari",
+                summary = "update user role settings",
                 lastModifiedTime = "2026-07-20T11:57:00Z",
                 trajectoryId = "abc",
                 status = "CASCADE_RUN_STATUS_IDLE",
                 workspaces = new object[]
                 {
-                    new { workspaceFolderAbsoluteUri = "file:///c:/Users/kaan_/Desktop/Projects/belediyem" },
+                    new { workspaceFolderAbsoluteUri = "file:///c:/work/demo-app" },
                 },
             },
         },
@@ -418,8 +418,8 @@ public sealed class AntigravityMapTests
     {
         var s = AntigravityClient.MapTrajectories(RealResponse(), Now)
             .Single(x => x.SessionId == "antigravity:8357b464-36db-4ea3-8f5d-8c4b082aa870");
-        Assert.Equal(@"c:\Users\kaan_\Desktop\Projects\belediyem", s.Cwd);
-        Assert.Equal("belediyem", s.ProjectName);
+        Assert.Equal(@"c:\work\demo-app", s.Cwd);
+        Assert.Equal("demo-app", s.ProjectName);
         Assert.Equal("antigravity", s.Host);
         Assert.Equal("Gemini", s.Model); // response carries no model
     }

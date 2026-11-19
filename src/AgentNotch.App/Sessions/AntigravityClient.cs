@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
@@ -7,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AgentNotch.App.Diagnostics;
+using AgentNotch.App.Usage;
 
 namespace AgentNotch.App.Sessions;
 
@@ -23,6 +26,10 @@ public sealed class AntigravityClient : IDisposable
 {
     private const string RpcPath =
         "/exa.language_server_pb.LanguageServerService/GetAllCascadeTrajectories";
+    private const string QuotaPath =
+        "/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary";
+    private const string ConfigPath =
+        "/exa.language_server_pb.LanguageServerService/GetCascadeModelConfigData";
     private const string CsrfHeader = "x-codeium-csrf-token";
 
     /// <summary>How much of each Antigravity log we read from the end looking for the token.</summary>
@@ -37,16 +44,33 @@ public sealed class AntigravityClient : IDisposable
     /// <summary>How long a discovered (token, ports) endpoint is trusted before re-discovery.</summary>
     private static readonly TimeSpan ServerTtl = TimeSpan.FromSeconds(60);
 
+    /// <summary>How long quotas and model configs are cached before re-fetching.</summary>
+    private static readonly TimeSpan QuotaRefreshInterval = TimeSpan.FromSeconds(15);
+
     /// <summary>Non-working trajectories idle longer than this are leftovers — drop them.</summary>
     private static readonly TimeSpan TaskKeep = TimeSpan.FromMinutes(10);
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(8) };
+    private static readonly HttpClient Http = new(new SocketsHttpHandler
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+        PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
+    }) { Timeout = TimeSpan.FromSeconds(8) };
 
     private readonly object _gate = new();
     private volatile IReadOnlyList<AgentSession> _latest = Array.Empty<AgentSession>();
     private (string Token, int[] Ports)? _server;
+    private int _lastGoodPort;
     private DateTime _serverCheckedUtc = DateTime.MinValue;
     private DateTime _lastAttemptUtc = DateTime.MinValue;
+    private DateTime _quotasLastFetchedUtc = DateTime.MinValue;
+    private volatile IReadOnlyList<UsageWindow> _geminiUsage = Array.Empty<UsageWindow>();
+    private volatile IReadOnlyList<UsageWindow> _claudeGptUsage = Array.Empty<UsageWindow>();
+    private volatile IReadOnlyList<UsageWindow> _argonUsage = Array.Empty<UsageWindow>();
+    private volatile IReadOnlyDictionary<string, string> _modelLabels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    internal static volatile IReadOnlyList<UsageWindow> SharedGeminiUsage = Array.Empty<UsageWindow>();
+
+    /// <summary>Latest Gemini usage windows for use across providers (e.g. OpenCode with Gemini).</summary>
+    public static IReadOnlyList<UsageWindow> LatestGeminiUsage => SharedGeminiUsage;
     private bool _refreshing;
     private volatile bool _disposed;
 
@@ -93,11 +117,19 @@ public sealed class AntigravityClient : IDisposable
             var server = GetServer();
             if (server is { } srv)
             {
-                foreach (var port in srv.Ports)
+                // Probe the last working port first so we don't pay failed-port roundtrips every 1.5s.
+                int preferred = _lastGoodPort;
+                IEnumerable<int> orderedPorts = preferred > 0 && Array.IndexOf(srv.Ports, preferred) >= 0
+                    ? srv.Ports.OrderByDescending(p => p == preferred)
+                    : srv.Ports;
+
+                foreach (var port in orderedPorts)
                 {
                     if (_disposed) return;
                     if (await FetchTrajectoriesAsync(port, srv.Token).ConfigureAwait(false) is { } response)
                     {
+                        _lastGoodPort = port;
+                        await RefreshQuotasAndConfigsAsync(port, srv.Token).ConfigureAwait(false);
                         var tasks = MapTrajectories(response, DateTime.UtcNow);
                         if (tasks.Count > 0)
                         {
@@ -105,6 +137,7 @@ public sealed class AntigravityClient : IDisposable
                             Refreshed?.Invoke();
                             return;
                         }
+                        break; // RPC responded cleanly on the active port; no need to probe other ports
                     }
                 }
             }
@@ -158,14 +191,17 @@ public sealed class AntigravityClient : IDisposable
         return discovered;
     }
 
-    private static async Task<JsonElement?> FetchTrajectoriesAsync(int port, string token)
+    private static Task<JsonElement?> FetchTrajectoriesAsync(int port, string token)
+        => CallRpcAsync(port, token, RpcPath);
+
+    private static async Task<JsonElement?> CallRpcAsync(int port, string token, string path, string jsonPayload = "{}")
     {
         try
         {
-            var content = new StringContent("{}", Encoding.UTF8);
+            var content = new StringContent(jsonPayload, Encoding.UTF8);
             content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             using var request = new HttpRequestMessage(
-                HttpMethod.Post, $"http://127.0.0.1:{port.ToString(CultureInfo.InvariantCulture)}{RpcPath}")
+                HttpMethod.Post, $"http://127.0.0.1:{port.ToString(CultureInfo.InvariantCulture)}{path}")
             {
                 Content = content,
             };
@@ -176,13 +212,181 @@ public sealed class AntigravityClient : IDisposable
             using var doc = JsonDocument.Parse(body);
             var root = doc.RootElement;
             if (root.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined or JsonValueKind.False)
-                return null; // "no answer", like the JS falsy check
+                return null;
             return root.Clone();
         }
         catch
         {
-            return null; // refused / timed out / non-JSON — the caller tries the next port
+            return null;
         }
+    }
+
+    private async Task RefreshQuotasAndConfigsAsync(int port, string token)
+    {
+        if (DateTime.UtcNow - _quotasLastFetchedUtc < QuotaRefreshInterval) return;
+        _quotasLastFetchedUtc = DateTime.UtcNow;
+
+        try
+        {
+            var quotaDoc = await CallRpcAsync(port, token, QuotaPath).ConfigureAwait(false);
+            if (quotaDoc is { } qRoot) ParseQuotas(qRoot);
+
+            var configDoc = await CallRpcAsync(port, token, ConfigPath).ConfigureAwait(false);
+            if (configDoc is { } cRoot) ParseModelConfigs(cRoot);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("antigravity: quota/config refresh failed: " + ex.Message);
+        }
+    }
+
+    internal void ParseQuotas(JsonElement root)
+    {
+        try
+        {
+            JsonElement groupsElem = default;
+            if (root.TryGetProperty("response", out var resp) && resp.TryGetProperty("groups", out var g1))
+                groupsElem = g1;
+            else if (root.TryGetProperty("groups", out var g2))
+                groupsElem = g2;
+
+            if (groupsElem.ValueKind != JsonValueKind.Array) return;
+
+            var gemini = new List<UsageWindow>(2);
+            var claudeGpt = new List<UsageWindow>(2);
+            var argon = new List<UsageWindow>(1);
+
+            foreach (var group in groupsElem.EnumerateArray())
+            {
+                var name = FirstString(group, "displayName", "label") ?? "";
+                if (!group.TryGetProperty("buckets", out var buckets) || buckets.ValueKind != JsonValueKind.Array)
+                    continue;
+
+                foreach (var b in buckets.EnumerateArray())
+                {
+                    var window = FirstString(b, "window") ?? "";
+                    double remaining = 1.0;
+                    if (b.TryGetProperty("remainingFraction", out var rf) && rf.TryGetDouble(out var d))
+                        remaining = d;
+
+                    double usedPct = Math.Clamp(Math.Round((1.0 - remaining) * 100), 0, 100);
+
+                    DateTime? resetUtc = null;
+                    if (FirstString(b, "resetTime") is { } rtStr &&
+                        DateTimeOffset.TryParse(rtStr, CultureInfo.InvariantCulture,
+                            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dto))
+                    {
+                        resetUtc = dto.UtcDateTime;
+                    }
+
+                    string label = window switch
+                    {
+                        "5h" => "5h",
+                        "weekly" => "7d",
+                        _ => window,
+                    };
+
+                    if (name.Contains("Argon", StringComparison.OrdinalIgnoreCase))
+                    {
+                        argon.Add(new UsageWindow("Argon", usedPct, resetUtc));
+                    }
+                    else if (name.Contains("Claude", StringComparison.OrdinalIgnoreCase) ||
+                             name.Contains("GPT", StringComparison.OrdinalIgnoreCase))
+                    {
+                        claudeGpt.Add(new UsageWindow(label, usedPct, resetUtc));
+                    }
+                    else if (name.Contains("Gemini", StringComparison.OrdinalIgnoreCase))
+                    {
+                        gemini.Add(new UsageWindow(label, usedPct, resetUtc));
+                    }
+                }
+            }
+
+            if (gemini.Count > 0)
+            {
+                gemini.Sort((a, b) => string.CompareOrdinal(a.Label, b.Label));
+                _geminiUsage = gemini;
+                SharedGeminiUsage = gemini;
+            }
+            if (claudeGpt.Count > 0)
+            {
+                claudeGpt.Sort((a, b) => string.CompareOrdinal(a.Label, b.Label));
+                _claudeGptUsage = claudeGpt;
+            }
+            if (argon.Count > 0)
+            {
+                _argonUsage = argon;
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("antigravity: parse quotas failed: " + ex.Message);
+        }
+    }
+
+    internal void ParseModelConfigs(JsonElement root)
+    {
+        try
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (root.TryGetProperty("clientModelConfigs", out var list) && list.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in list.EnumerateArray())
+                {
+                    string? label = FirstString(item, "label");
+                    string? modelId = FirstString(item, "modelId");
+                    string? placeholder = null;
+                    if (item.TryGetProperty("modelOrAlias", out var moa))
+                        placeholder = FirstString(moa, "model");
+
+                    if (!string.IsNullOrEmpty(label))
+                    {
+                        var clean = CleanModelLabel(label);
+                        if (!string.IsNullOrEmpty(modelId)) map[modelId] = clean;
+                        if (!string.IsNullOrEmpty(placeholder)) map[placeholder] = clean;
+                    }
+                }
+            }
+
+            if (root.TryGetProperty("defaultOverrideModelConfig", out var def) &&
+                def.TryGetProperty("modelOrAlias", out var defMoa))
+            {
+                var defModel = FirstString(defMoa, "model");
+                if (!string.IsNullOrEmpty(defModel) && map.TryGetValue(defModel, out var clean))
+                    map["default"] = clean;
+            }
+
+            if (map.Count > 0) _modelLabels = map;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("antigravity: parse model configs failed: " + ex.Message);
+        }
+    }
+
+    public static string CleanModelLabel(string label)
+    {
+        if (string.IsNullOrWhiteSpace(label)) return "Gemini";
+        int idx = label.IndexOf('(');
+        if (idx > 0) label = label[..idx].Trim();
+        return label.Trim();
+    }
+
+    public IReadOnlyList<UsageWindow> GetUsageForModel(string? model)
+    {
+        var m = (model ?? "").ToLowerInvariant();
+        if (m.Contains("claude") || m.Contains("gpt") || m.Contains("3p"))
+            return _claudeGptUsage.Count > 0 ? _claudeGptUsage : _geminiUsage;
+        if (m.Contains("argon"))
+        {
+            var list = new List<UsageWindow>();
+            var g5h = _geminiUsage.FirstOrDefault(w => w.Label == "5h");
+            if (g5h is not null) list.Add(g5h);
+            var argon = _argonUsage.FirstOrDefault() ?? _geminiUsage.FirstOrDefault(w => w.Label == "7d");
+            if (argon is not null) list.Add(argon);
+            return list.Count > 0 ? list : _geminiUsage;
+        }
+        return _geminiUsage;
     }
 
     // ---------- discovery (process + token + ports) ----------
@@ -193,7 +397,7 @@ public sealed class AntigravityClient : IDisposable
         {
             int pid = FindLanguageServerPid();
             if (pid == 0) return null;
-            var token = FindCsrfToken();
+            var token = FindCsrfToken(pid);
             if (string.IsNullOrEmpty(token)) return null;
             var ports = ListeningLoopbackPorts(pid);
             if (ports.Length == 0) return null;
@@ -259,11 +463,21 @@ public sealed class AntigravityClient : IDisposable
         @"(?:--)?csrf_token[\s=]+([0-9a-fA-F-]+)", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     /// <summary>
-    /// Latest CSRF token from Antigravity's own startup logs: newest log first,
-    /// last match within the tail of that log wins.
+    /// Latest CSRF token: first checks language_server command line via Win32 query;
+    /// falls back to Antigravity's own startup logs (head + tail).
     /// </summary>
-    private static string? FindCsrfToken()
+    private static string? FindCsrfToken(int pid = 0)
     {
+        if (pid > 0)
+        {
+            var cmd = Interop.ProcessTree.GetCommandLine(pid);
+            if (!string.IsNullOrEmpty(cmd))
+            {
+                var match = CsrfTokenPattern.Match(cmd);
+                if (match.Success) return match.Groups[1].Value;
+            }
+        }
+
         var logs = new List<FileInfo>();
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -289,10 +503,18 @@ public sealed class AntigravityClient : IDisposable
 
         foreach (var log in logs.OrderByDescending(SafeLastWriteUtc))
         {
+            var head = ReadHeadText(log.FullName);
+            if (head is not null)
+            {
+                var matches = CsrfTokenPattern.Matches(head);
+                if (matches.Count > 0) return matches[^1].Groups[1].Value;
+            }
             var tail = ReadTailText(log.FullName);
-            if (tail is null) continue;
-            var matches = CsrfTokenPattern.Matches(tail);
-            if (matches.Count > 0) return matches[^1].Groups[1].Value;
+            if (tail is not null)
+            {
+                var matches = CsrfTokenPattern.Matches(tail);
+                if (matches.Count > 0) return matches[^1].Groups[1].Value;
+            }
         }
         return null;
     }
@@ -302,8 +524,32 @@ public sealed class AntigravityClient : IDisposable
         try { return file.LastWriteTimeUtc; } catch { return DateTime.MinValue; }
     }
 
-    /// <summary>Last ≤512KB of a (possibly still-open) log file; null when unreadable.</summary>
-    private static string? ReadTailText(string path)
+    /// <summary>First ≤64KB of a log file — startup flags including --csrf_token land here.</summary>
+    private static string? ReadHeadText(string path)
+    {
+        try
+        {
+            using var fs = new FileStream(
+                path, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            int len = (int)Math.Min(fs.Length, 64 * 1024);
+            if (len <= 0) return null;
+            var buf = ArrayPool<byte>.Shared.Rent(len);
+            try
+            {
+                fs.ReadExactly(buf, 0, len);
+                return Encoding.UTF8.GetString(buf, 0, len);
+            }
+            finally { ArrayPool<byte>.Shared.Return(buf); }
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Last ≤<paramref name="maxBytes"/> of a (possibly still-open) file; null when unreadable.</summary>
+    private static string? ReadTailText(string path, int maxBytes = LogTailBytes)
     {
         try
         {
@@ -311,12 +557,16 @@ public sealed class AntigravityClient : IDisposable
                 path, FileMode.Open, FileAccess.Read,
                 FileShare.ReadWrite | FileShare.Delete);
             long size = fs.Length;
-            int len = (int)Math.Min(size, LogTailBytes);
+            int len = (int)Math.Min(size, maxBytes);
             if (len <= 0) return null;
             fs.Position = size - len;
-            var buf = new byte[len];
-            fs.ReadExactly(buf, 0, len);
-            return Encoding.UTF8.GetString(buf);
+            var buf = ArrayPool<byte>.Shared.Rent(len);
+            try
+            {
+                fs.ReadExactly(buf, 0, len);
+                return Encoding.UTF8.GetString(buf, 0, len);
+            }
+            finally { ArrayPool<byte>.Shared.Return(buf); }
         }
         catch
         {
@@ -358,18 +608,19 @@ public sealed class AntigravityClient : IDisposable
             {
                 int size = 0;
                 _ = GetExtendedTcpTable(IntPtr.Zero, ref size, false, AfInet, TcpTableOwnerPidListener, 0);
-                if (size <= 0) return Array.Empty<int>();
+                if (size < sizeof(int)) return Array.Empty<int>();
 
                 var buffer = Marshal.AllocHGlobal(size);
                 try
                 {
                     uint result = GetExtendedTcpTable(buffer, ref size, false, AfInet, TcpTableOwnerPidListener, 0);
                     if (result == ErrorInsufficientBuffer) continue;
-                    if (result != 0) return Array.Empty<int>();
+                    if (result != 0 || size < sizeof(int)) return Array.Empty<int>();
 
                     int rowSize = Marshal.SizeOf<MibTcpRowOwnerPid>();
                     int count = Marshal.ReadInt32(buffer);
                     int maxRows = (size - sizeof(int)) / rowSize;
+                    if (count <= 0) return Array.Empty<int>();
                     if (count > maxRows) count = maxRows; // never read past the buffer
 
                     var ports = new List<int>();
@@ -438,8 +689,20 @@ public sealed class AntigravityClient : IDisposable
         public string? Target;
         public string? Message;
         public string? Cwd;
+        public string? Model;
         public DateTime? TimestampUtc;
     }
+
+    private static readonly Regex ModelSelectionPattern = new(
+        @"Model Selection from .*? to (.*?)(?:\.|\r|\n|\\n)",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private readonly record struct TranscriptCacheEntry(DateTime MtimeUtc, long Size, TranscriptInfo Info);
+
+    private static readonly ConcurrentDictionary<string, TranscriptCacheEntry> TranscriptCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private const int TranscriptTailBytes = 256 * 1024;
 
     private static readonly string BrainDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -448,31 +711,71 @@ public sealed class AntigravityClient : IDisposable
     /// <summary>
     /// Reads the tail of a conversation's transcript.jsonl to discover the live step:
     /// questions asked by the model (ask_question -> NeedsYou), pending tool calls,
-    /// or final answers.
+    /// or final answers. Also detects the model selected by the user.
+    /// Memoized on (mtime, size) so historical transcripts aren't re-read every 1.5s.
     /// </summary>
     public static TranscriptInfo InspectTranscript(string? conversationId)
     {
         if (string.IsNullOrEmpty(conversationId)) return default;
         var transcriptPath = Path.Combine(BrainDir, conversationId, ".system_generated", "logs", "transcript.jsonl");
-        if (!File.Exists(transcriptPath)) return default;
 
+        DateTime mtimeUtc;
+        long size;
         try
         {
-            var tail = ReadTailText(transcriptPath);
+            var fi = new FileInfo(transcriptPath);
+            if (!fi.Exists) return default;
+            mtimeUtc = fi.LastWriteTimeUtc;
+            size = fi.Length;
+        }
+        catch
+        {
+            return default;
+        }
+
+        if (TranscriptCache.TryGetValue(transcriptPath, out var cached)
+            && cached.MtimeUtc == mtimeUtc && cached.Size == size)
+            return cached.Info;
+
+        var info = ParseTranscriptTail(transcriptPath);
+        if (TranscriptCache.Count >= 256)
+            TranscriptCache.Clear();
+        TranscriptCache[transcriptPath] = new TranscriptCacheEntry(mtimeUtc, size, info);
+        return info;
+    }
+
+    private static TranscriptInfo ParseTranscriptTail(string transcriptPath)
+    {
+        try
+        {
+            var tail = ReadTailText(transcriptPath, TranscriptTailBytes);
             if (string.IsNullOrEmpty(tail)) return default;
 
             var lines = tail.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             if (lines.Length == 0) return default;
 
             string? detectedCwd = null;
+            string? detectedModel = null;
 
             for (int i = lines.Length - 1; i >= 0; i--)
             {
                 var line = lines[i];
                 if (!line.StartsWith('{') || !line.EndsWith('}')) continue;
 
+                if (detectedModel is null && line.Contains("Model Selection from", StringComparison.OrdinalIgnoreCase))
+                {
+                    var m = ModelSelectionPattern.Match(line);
+                    if (m.Success) detectedModel = CleanModelLabel(m.Groups[1].Value);
+                }
+
                 using var doc = JsonDocument.Parse(line);
                 var root = doc.RootElement;
+
+                if (detectedModel is null && root.TryGetProperty("model", out var mProp) && mProp.ValueKind == JsonValueKind.String)
+                {
+                    var ms = mProp.GetString();
+                    if (!string.IsNullOrEmpty(ms)) detectedModel = CleanModelLabel(ms);
+                }
 
                 var type = FirstString(root, "type") ?? "";
                 var source = FirstString(root, "source") ?? "";
@@ -505,6 +808,7 @@ public sealed class AntigravityClient : IDisposable
                         Status = SessionStatus.Working,
                         Message = "Thinking…",
                         Cwd = detectedCwd,
+                        Model = detectedModel,
                         TimestampUtc = timeUtc,
                     };
                 }
@@ -521,6 +825,7 @@ public sealed class AntigravityClient : IDisposable
                         Target = "Working…",
                         Message = "Working…",
                         Cwd = detectedCwd,
+                        Model = detectedModel,
                         TimestampUtc = timeUtc,
                     };
                 }
@@ -557,6 +862,7 @@ public sealed class AntigravityClient : IDisposable
                                     Target = msg,
                                     Message = msg,
                                     Cwd = detectedCwd,
+                                    Model = detectedModel,
                                     TimestampUtc = timeUtc,
                                 };
                             }
@@ -588,6 +894,7 @@ public sealed class AntigravityClient : IDisposable
                                 Target = target,
                                 Message = target,
                                 Cwd = detectedCwd,
+                                Model = detectedModel,
                                 TimestampUtc = timeUtc,
                             };
                         }
@@ -604,11 +911,25 @@ public sealed class AntigravityClient : IDisposable
                             Status = SessionStatus.Finished,
                             Message = msg,
                             Cwd = detectedCwd,
+                            Model = detectedModel,
                             TimestampUtc = timeUtc,
                         };
                     }
                 }
             }
+
+            if (detectedModel is null)
+            {
+                var head = ReadHeadText(transcriptPath);
+                if (!string.IsNullOrEmpty(head) && head.Contains("Model Selection from", StringComparison.OrdinalIgnoreCase))
+                {
+                    var m = ModelSelectionPattern.Match(head);
+                    if (m.Success) detectedModel = CleanModelLabel(m.Groups[1].Value);
+                }
+            }
+
+            if (detectedModel is not null)
+                return new TranscriptInfo { Model = detectedModel };
         }
         catch (Exception ex)
         {
@@ -618,8 +939,14 @@ public sealed class AntigravityClient : IDisposable
         return default;
     }
 
+    public List<AgentSession> CollectFromBrainDir(DateTime nowUtc)
+        => CollectFromBrainDir(nowUtc, _modelLabels, GetUsageForModel);
+
     /// <summary>Fallback: scans recent conversation directories in ~/.gemini/antigravity/brain.</summary>
-    public static List<AgentSession> CollectFromBrainDir(DateTime nowUtc)
+    public static List<AgentSession> CollectFromBrainDir(
+        DateTime nowUtc,
+        IReadOnlyDictionary<string, string>? modelLabels = null,
+        Func<string?, IReadOnlyList<UsageWindow>>? usageSelector = null)
     {
         var tasks = new List<AgentSession>();
         if (!Directory.Exists(BrainDir)) return tasks;
@@ -646,12 +973,17 @@ public sealed class AntigravityClient : IDisposable
                 if (status != SessionStatus.Working && nowUtc - updatedAtUtc > TaskKeep) continue;
 
                 var cwd = info.Cwd ?? "";
+                string model = !string.IsNullOrEmpty(info.Model)
+                    ? info.Model
+                    : (modelLabels is not null && modelLabels.TryGetValue("default", out var dm) ? dm : "Gemini");
+
                 tasks.Add(new AgentSession
                 {
                     SessionId = "antigravity:" + id,
                     Agent = "antigravity",
                     Host = "antigravity",
-                    Model = "Gemini",
+                    Model = model,
+                    Usage = usageSelector?.Invoke(model) ?? Array.Empty<UsageWindow>(),
                     HostLabel = "Antigravity",
                     Cwd = cwd,
                     ProjectName = ProjectNameOf(cwd),
@@ -699,6 +1031,9 @@ public sealed class AntigravityClient : IDisposable
         return readable ? first + "…" : "a command";
     }
 
+    public List<AgentSession> MapTrajectories(JsonElement response, DateTime nowUtc)
+        => MapTrajectories(response, nowUtc, _modelLabels, GetUsageForModel);
+
     /// <summary>
     /// Maps a GetAllCascadeTrajectories response to display sessions — the pure,
     /// unit-tested core. Tolerates any response shape: the trajectory list is the
@@ -706,7 +1041,11 @@ public sealed class AntigravityClient : IDisposable
     /// (recursively, depth ≤3); items with an unrecognized status are skipped;
     /// non-working items idle over 10 minutes are dropped; at most 4 returned.
     /// </summary>
-    public static List<AgentSession> MapTrajectories(JsonElement response, DateTime nowUtc)
+    public static List<AgentSession> MapTrajectories(
+        JsonElement response,
+        DateTime nowUtc,
+        IReadOnlyDictionary<string, string>? modelLabels = null,
+        Func<string?, IReadOnlyList<UsageWindow>>? usageSelector = null)
     {
         var tasks = new List<AgentSession>();
         try
@@ -716,8 +1055,25 @@ public sealed class AntigravityClient : IDisposable
             foreach (var t in EnumerateItems(container))
             {
                 var rawStatus = (FirstString(t, StatusKeys) ?? "").ToLowerInvariant();
-                var summary = CollapseExcerpt(FirstString(t, SummaryKeys), 100);
+                var rpcUpdatedAtUtc = CoerceTimestamp(FirstTruthy(t, TimeKeys), nowUtc);
+                bool rpcWorking = WorkingStatus.IsMatch(rawStatus);
+
+                // Skip disk inspection for historical finished trajectories that haven't been
+                // touched in > TaskKeep — avoids reading 80+ old transcripts on startup.
                 var convId = ExtractConversationId(t);
+                if (!rpcWorking && nowUtc - rpcUpdatedAtUtc > TaskKeep)
+                {
+                    if (string.IsNullOrEmpty(convId)) continue;
+                    var tp = Path.Combine(BrainDir, convId, ".system_generated", "logs", "transcript.jsonl");
+                    try
+                    {
+                        var fi = new FileInfo(tp);
+                        if (!fi.Exists || nowUtc - fi.LastWriteTimeUtc > TaskKeep) continue;
+                    }
+                    catch { continue; }
+                }
+
+                var summary = CollapseExcerpt(FirstString(t, SummaryKeys), 100);
                 var transcript = InspectTranscript(convId);
 
                 SessionStatus? mapped = null;
@@ -726,12 +1082,12 @@ public sealed class AntigravityClient : IDisposable
                     mapped = tsStatus;
                 }
                 else if (NeedsYouStatus.IsMatch(rawStatus)) mapped = SessionStatus.NeedsYou;
-                else if (WorkingStatus.IsMatch(rawStatus)) mapped = SessionStatus.Working;
+                else if (rpcWorking) mapped = SessionStatus.Working;
                 else if (FinishedStatus.IsMatch(rawStatus))
                     mapped = SessionStatus.Finished;
                 if (mapped is not { } status) continue;
 
-                var updatedAtUtc = transcript.TimestampUtc ?? CoerceTimestamp(FirstTruthy(t, TimeKeys), nowUtc);
+                var updatedAtUtc = transcript.TimestampUtc ?? rpcUpdatedAtUtc;
                 if (status != SessionStatus.Working && nowUtc - updatedAtUtc > TaskKeep) continue;
 
                 var cwd = ExtractCwd(t) ?? transcript.Cwd;
@@ -747,12 +1103,30 @@ public sealed class AntigravityClient : IDisposable
                 var tool = (status == SessionStatus.Working || status == SessionStatus.NeedsYou) ? transcript.Tool : null;
                 var target = (status == SessionStatus.Working || status == SessionStatus.NeedsYou) ? transcript.Target : null;
 
+                string? model = transcript.Model;
+                if (string.IsNullOrEmpty(model))
+                {
+                    if (FirstString(t, "model", "modelId") is { } rawModel)
+                    {
+                        if (modelLabels is not null && modelLabels.TryGetValue(rawModel, out var resolved))
+                            model = resolved;
+                        else
+                            model = CleanModelLabel(rawModel);
+                    }
+                    else if (modelLabels is not null && modelLabels.TryGetValue("default", out var defModel))
+                    {
+                        model = defModel;
+                    }
+                }
+                model ??= "Gemini";
+
                 tasks.Add(new AgentSession
                 {
                     SessionId = "antigravity:" + id,
                     Agent = "antigravity",
                     Host = "antigravity",
-                    Model = FirstString(t, "model") ?? "Gemini",
+                    Model = model,
+                    Usage = usageSelector?.Invoke(model) ?? Array.Empty<UsageWindow>(),
                     HostLabel = "Antigravity",
                     Cwd = cwd ?? "",
                     ProjectName = ProjectNameOf(cwd),

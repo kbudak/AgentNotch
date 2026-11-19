@@ -274,6 +274,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>The project shown beside Buddy in Minimal's expanded header.</summary>
+    public string LeadProjectName => LeadSession?.ProjectName ?? "";
+
+    public AgentSession? LeadSession =>
+        Sessions.FirstOrDefault(s => s.Status == SessionStatus.NeedsYou)
+        ?? Sessions.FirstOrDefault(s => s.Status == SessionStatus.Working)
+        ?? Sessions.FirstOrDefault();
+
     /// <summary>"idle" | "working" | "needsyou" | "prompt" | "finished" — drives the pill dot.</summary>
     public string StateKind
     {
@@ -290,6 +298,25 @@ public sealed class MainViewModel : INotifyPropertyChanged
             if (needs) return "needsyou";
             if (working) return "working";
             return any ? "finished" : "idle";
+        }
+    }
+
+    /// <summary>Buddy distinguishes reasoning/streaming from executing a tool.
+    /// Attention states keep the same priority as the rest of the notch.</summary>
+    public string BuddyState
+    {
+        get
+        {
+            if (StateKind == "needsyou")
+                return Sessions.Any(s => s.Status == SessionStatus.NeedsYou && s.NeedsApproval) ? "prompt" : "needsyou";
+            if (StateKind != "working") return StateKind;
+            var session = Sessions.FirstOrDefault(s => s.Status == SessionStatus.Working);
+            if (session?.IsThinking == true) return "thinking";
+            var tool = session?.CurrentTool;
+            return string.IsNullOrWhiteSpace(tool)
+                || tool.Contains("think", StringComparison.OrdinalIgnoreCase)
+                || tool.Contains("reason", StringComparison.OrdinalIgnoreCase)
+                ? "thinking" : "working";
         }
     }
 
@@ -445,10 +472,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         try
         {
+            var incoming = windows ?? Array.Empty<UsageWindow>();
+            if (UsageMatches(incoming)) return;
+
             Usage.Clear();
-            if (windows is not null)
-                foreach (var w in windows)
-                    Usage.Add(w);
+            foreach (var w in incoming)
+                Usage.Add(w);
         }
         catch (Exception ex)
         {
@@ -456,6 +485,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
         Raise(nameof(Usage));
         Raise(nameof(TightestUsage));
+    }
+
+    private bool UsageMatches(IReadOnlyList<UsageWindow> incoming)
+    {
+        if (Usage.Count != incoming.Count) return false;
+        for (int i = 0; i < incoming.Count; i++)
+        {
+            var a = Usage[i];
+            var b = incoming[i];
+            if (!string.Equals(a.Label, b.Label, StringComparison.Ordinal)
+                || !string.Equals(a.PercentText, b.PercentText, StringComparison.Ordinal)
+                || !string.Equals(a.ResetText, b.ResetText, StringComparison.Ordinal))
+                return false;
+        }
+        return true;
     }
 
     /// <summary>Flashes a confirmation in the notch for a couple of seconds.</summary>
@@ -483,6 +527,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void UpdateSessions(IReadOnlyList<AgentSession> sessions)
     {
+        bool changed = false;
         try
         {
             IReadOnlyList<AgentSession> incoming = sessions ?? Array.Empty<AgentSession>();
@@ -502,17 +547,27 @@ public sealed class MainViewModel : INotifyPropertyChanged
             for (int i = 0; i < incoming.Count; i++)
             {
                 if (i >= Sessions.Count)
+                {
                     Sessions.Add(incoming[i]);
+                    changed = true;
+                }
                 else if (RowKey(Sessions[i], now) != RowKey(incoming[i], now))
+                {
                     Sessions[i] = incoming[i];
+                    changed = true;
+                }
             }
             while (Sessions.Count > incoming.Count)
+            {
                 Sessions.RemoveAt(Sessions.Count - 1);
+                changed = true;
+            }
         }
         catch (Exception ex)
         {
             AppLog.Write("UpdateSessions: " + ex.Message);
         }
+        if (!changed) return;
         RaiseShellChanged();
 
         try
@@ -549,7 +604,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// </summary>
     private static string RowKey(AgentSession s, DateTime now) => string.Join('',
         s.SessionId, s.Agent, (int)s.Status, s.ProjectName, s.Model, s.HostLabel,
-        s.CurrentTool, s.CurrentTarget, s.LastMessage, s.TokensSpent,
+        s.CurrentTool, s.CurrentTarget, s.LastMessage, s.TokensSpent, s.IsThinking, s.NeedsApproval,
+        s.Usage is { Count: > 0 } u ? string.Join(',', u.Select(w => $"{w.Label}:{w.UsedPct}")) : "",
         (long)(now - s.StartedUtc).TotalMinutes);
 
     // ---------------------------------------------------------------- hover
@@ -666,7 +722,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         Raise(nameof(CollapsedParts));
         Raise(nameof(StateKind));
+        Raise(nameof(BuddyState));
         Raise(nameof(LeadAgent));
+        Raise(nameof(LeadProjectName));
+        Raise(nameof(LeadSession));
         Raise(nameof(ShellState));
         Raise(nameof(BlockedOnYou));
         Raise(nameof(Headline));

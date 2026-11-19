@@ -25,13 +25,17 @@
   <ItemGroup>
     <ProjectReference Include="..\AgentNotch.Protocol\AgentNotch.Protocol.csproj" />
     <!-- Build-order only: the helper is a separate exe copied next to the app. -->
-    <ProjectReference Include="..\AgentNotch.HookHelper\AgentNotch.HookHelper.csproj"
-                      ReferenceOutputAssembly="false"
-                      SkipGetTargetFrameworkProperties="true" />
+    <ProjectReference Include="..\AgentNotch.HookHelper\AgentNotch.HookHelper.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="Assets\app.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Resource Include="Assets\minimal-buddy.png" />
+    <Resource Include="Assets\chatgpt.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
   </ItemGroup>
 
   <!-- Co-locate the hook helper under <out>\helper so the installer can register its path. -->
@@ -54,8 +58,7 @@
     <ItemGroup>
       <HelperPubFiles Include="$(HelperOutDir)\**\*.*" Exclude="$(HelperOutDir)\publish\**" />
     </ItemGroup>
-    <Error Condition="!Exists('$(HelperOutDir)\agentnotch-hook.exe')"
-           Text="Hook helper output not found at $(HelperOutDir) — build AgentNotch.HookHelper first." />
+    <Error Condition="!Exists('$(HelperOutDir)\agentnotch-hook.exe')" Text="Hook helper output not found at $(HelperOutDir) — build AgentNotch.HookHelper first." />
     <Copy SourceFiles="@(HelperPubFiles)" DestinationFiles="@(HelperPubFiles->'$(PublishDir)helper\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
 

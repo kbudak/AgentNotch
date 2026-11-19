@@ -45,8 +45,13 @@ internal static class NativeMethods
 
     // ---- Global hotkeys (WM_HOTKEY arrives on the window's message loop) ----
     public const int WM_HOTKEY = 0x0312;
+    public const int WM_DISPLAYCHANGE = 0x007E;
+    public const int WM_DPICHANGED = 0x02E0;
     public const uint MOD_CONTROL = 0x0002;
     public const uint MOD_NOREPEAT = 0x4000;
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern uint RegisterWindowMessage(string lpString);
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -118,12 +123,20 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern int GetWindowTextLength(IntPtr hWnd);
 
-    /// <summary>Apply the overlay ex-style set to an HWND (call once from SourceInitialized).</summary>
+    /// <summary>Apply the overlay ex-style set to an HWND (call from SourceInitialized and recovery paths).</summary>
     public static void MakeOverlay(IntPtr hwnd)
     {
+        if (hwnd == IntPtr.Zero) return;
         long ex = GetWindowLongPtr(hwnd, GWL_EXSTYLE).ToInt64();
         ex |= WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST;
         SetWindowLongPtr(hwnd, GWL_EXSTYLE, new IntPtr(ex));
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+
+    /// <summary>True when the window still carries WS_EX_TOPMOST (can be cleared by DWM/fullscreen transitions).</summary>
+    public static bool HasTopmostStyle(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return false;
+        return (GetWindowLongPtr(hwnd, GWL_EXSTYLE).ToInt64() & WS_EX_TOPMOST) != 0;
     }
 }

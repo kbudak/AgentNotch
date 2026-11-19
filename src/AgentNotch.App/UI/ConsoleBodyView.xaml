@@ -139,35 +139,32 @@
                     <TextBlock FontSize="10" VerticalAlignment="Center"
                                Text="{Binding ShellState, Converter={StaticResource ShellGlyph}}"
                                Foreground="{Binding ShellState, Converter={StaticResource ShellInk}}">
-                        <TextBlock.Triggers>
-                            <EventTrigger RoutedEvent="TextBlock.Loaded">
-                                <BeginStoryboard>
-                                    <!-- 20fps: the window is layered, so every frame is a CPU blit. -->
-                                    <Storyboard Timeline.DesiredFrameRate="20">
-                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                         From="1" To="0.25" Duration="0:0:0.8"
-                                                         AutoReverse="True" RepeatBehavior="Forever"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                        </TextBlock.Triggers>
+                        <TextBlock.Style>
+                            <Style TargetType="{x:Type TextBlock}">
+                                <Style.Triggers>
+                                    <Trigger Property="IsVisible" Value="True">
+                                        <Trigger.EnterActions>
+                                            <BeginStoryboard x:Name="ConsoleHeaderGlyphPulse">
+                                                <!-- 20fps: layered window, only ticks while ConsoleBodyView is actually visible. -->
+                                                <Storyboard Timeline.DesiredFrameRate="20">
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     From="1" To="0.25" Duration="0:0:0.8"
+                                                                     AutoReverse="True" RepeatBehavior="Forever"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.EnterActions>
+                                        <Trigger.ExitActions>
+                                            <StopStoryboard BeginStoryboardName="ConsoleHeaderGlyphPulse"/>
+                                        </Trigger.ExitActions>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
                     </TextBlock>
                     <TextBlock Text="{Binding Headline}" FontSize="11.5" Margin="8,0,0,0" VerticalAlignment="Center"
                                Foreground="{Binding ShellState, Converter={StaticResource ShellInk}}"/>
                 </StackPanel>
 
-                <!-- Only the constraining window lives here, and it reads what is LEFT. -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,12,0" VerticalAlignment="Center"
-                            DataContext="{Binding TightestUsage}"
-                            Visibility="{Binding Converter={StaticResource NullToVisibility}}">
-                    <TextBlock Text="{Binding Label}" FontSize="10.5" VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <TextBlock Text="{Binding UsedPct, Converter={StaticResource UsageRemaining}}"
-                               FontSize="10.5" FontWeight="Bold" Margin="6,0,0,0" VerticalAlignment="Center"
-                               Foreground="{Binding UsedPct, Converter={StaticResource UsageSpecBrush}}"/>
-                    <TextBlock Text="{Binding ResetText}" FontSize="10.5" Margin="6,0,0,0" VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                </StackPanel>
 
                 <!-- 34x28 rail cell. Glyph doubles as state: gear closed, ▴ to come back. -->
                 <Button Grid.Column="2" Width="36" Height="32" Click="OnSettingsClick"
@@ -270,6 +267,13 @@
                                     <Path Grid.Column="0" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center"
                                           Data="{Binding Converter={StaticResource SessionAgentIcon}}"
                                           Fill="{Binding Converter={StaticResource SessionAgentInk}}"/>
+                                    <Rectangle Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center"
+                                               RenderOptions.BitmapScalingMode="HighQuality"
+                                               Fill="{Binding Converter={StaticResource SessionStatusBrush}}">
+                                        <Rectangle.OpacityMask>
+                                            <ImageBrush ImageSource="{Binding Converter={StaticResource AgentPngIcon}}" Stretch="Uniform"/>
+                                        </Rectangle.OpacityMask>
+                                    </Rectangle>
                                     <TextBlock Grid.Column="1" Text="{Binding Converter={StaticResource SessionAgentName}}"
                                                FontSize="11.5" Margin="7,0,0,0" VerticalAlignment="Center"
                                                TextTrimming="CharacterEllipsis"
@@ -281,10 +285,62 @@
                                            TextTrimming="CharacterEllipsis"
                                            Foreground="{DynamicResource TextSubtleBrush}"/>
 
-                                <TextBlock Grid.Column="3" Text="{Binding Converter={StaticResource SessionSubtitle}}"
-                                           FontSize="11" Margin="0,0,12,0" VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"
-                                           Foreground="{Binding Converter={StaticResource SessionActivityInk}}"/>
+                                <Grid Grid.Column="3" Margin="0,0,12,0" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding Converter={StaticResource SessionSubtitle}}"
+                                               FontSize="11" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               Foreground="{Binding Converter={StaticResource SessionActivityInk}}"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                                        <TextBlock Text="{Binding Converter={StaticResource SessionModel}}"
+                                                   FontSize="10" FontWeight="SemiBold" Margin="0,0,6,0"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="{x:Type TextBlock}">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="Text" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <ItemsControl ItemsSource="{Binding Usage}" Focusable="False"
+                                                      Visibility="{Binding Path=DataContext.ShowUsage, RelativeSource={RelativeSource AncestorType=ui:ConsoleBodyView}, Converter={StaticResource BoolToVis}}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal" Margin="6,0,0,0">
+                                                        <TextBlock Text="{Binding Label}" FontSize="10"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding UsedPct, Converter={StaticResource UsageRemaining}}"
+                                                                   FontSize="10" FontWeight="Bold" Margin="3,0,0,0"
+                                                                   Foreground="{Binding UsedPct, Converter={StaticResource UsageSpecBrush}}"
+                                                                   VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding ResetText}" FontSize="9.5" Margin="3,0,0,0"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="{x:Type TextBlock}">
+                                                                    <Style.Triggers>
+                                                                        <Trigger Property="Text" Value="">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        </Trigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Grid>
 
                                 <TextBlock Grid.Column="4" Text="{Binding Converter={StaticResource SessionAge}}"
                                            FontSize="10.5" TextAlignment="Right" VerticalAlignment="Center"
@@ -622,6 +678,8 @@
                                              IsChecked="{Binding IsAtari, Mode=TwoWay}"/>
                                 <RadioButton GroupName="ctheme" Content="console" Style="{StaticResource ConsoleSegment}"
                                              IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=console, Mode=TwoWay}"/>
+                                <RadioButton GroupName="ctheme" Content="minimal" Style="{StaticResource ConsoleSegment}"
+                                             IsChecked="{Binding Theme, Converter={StaticResource EqualsParam}, ConverterParameter=minimal, Mode=TwoWay}"/>
                             </StackPanel>
                         </Grid>
 

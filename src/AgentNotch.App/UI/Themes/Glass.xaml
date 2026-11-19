@@ -81,6 +81,7 @@
     <SolidColorBrush x:Key="AgentCodexBrush" Color="#FFF5F5F7"/>
     <SolidColorBrush x:Key="AgentAntigravityBrush" Color="#FF64D2FF"/>
     <SolidColorBrush x:Key="AgentCursorBrush" Color="#FF30D158"/>
+    <SolidColorBrush x:Key="AgentOpenCodeBrush" Color="#FFBF9BFF"/>
     <SolidColorBrush x:Key="AgentGenericBrush" Color="#FFC7C7CC"/>
 
     <SolidColorBrush x:Key="AccentYouBrush" Color="#FFFF9F0A"/>
@@ -106,6 +107,8 @@
     <Thickness x:Key="PanelBorderThickness">1,0,1,1</Thickness>
     <Visibility x:Key="TiledVisibility">Collapsed</Visibility>
     <Visibility x:Key="BareVisibility">Visible</Visibility>
+    <Visibility x:Key="LeadAgentMarkVisibility">Visible</Visibility>
+    <Visibility x:Key="CollapsedLeadStatusVisibility">Visible</Visibility>
     <Thickness x:Key="CountItemMargin">11,0,0,0</Thickness>
     <FontWeight x:Key="TitleFontWeight">Normal</FontWeight>
 

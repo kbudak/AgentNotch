@@ -426,7 +426,7 @@ public sealed class SessionParsingTests : IDisposable
     public void Dedup_PrefersEditorHostedSession_OverMoreRecentTerminalOne()
     {
         var home = Path.Combine(_dir, "dedup-host");
-        var cwd = Path.Combine(_dir, "repos", "belediyem");
+        var cwd = Path.Combine(_dir, "repos", "demo-app");
         // Terminal session is MORE recent; editor session older.
         WriteRegistry(home, 100, "term", cwd, status: "busy",
             statusUpdatedAtMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());

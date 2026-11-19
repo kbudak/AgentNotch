@@ -19,7 +19,9 @@
     <ui:SessionTitleConverter x:Key="SessionTitle"/>
     <ui:SessionSubtitleConverter x:Key="SessionSubtitle"/>
     <ui:SessionTokensConverter x:Key="SessionTokens"/>
+    <ui:SessionModelConverter x:Key="SessionModel"/>
     <ui:SessionAgentIconConverter x:Key="SessionAgentIcon"/>
+    <ui:AgentPngIconConverter x:Key="AgentPngIcon"/>
     <ui:SessionStatusIconConverter x:Key="SessionStatusIcon"/>
     <ui:SessionStatusBrushConverter x:Key="SessionStatusBrush"/>
     <ui:AgentIconConverter x:Key="AgentIcon"/>

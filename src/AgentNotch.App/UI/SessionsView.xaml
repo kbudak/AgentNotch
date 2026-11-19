@@ -72,14 +72,29 @@
                                           Visibility="{DynamicResource BareVisibility}"
                                           Data="{Binding Converter={StaticResource SessionAgentIcon}}"
                                           Fill="{Binding Converter={StaticResource SessionStatusBrush}}"/>
+                                    <Rectangle Width="26" Height="26" VerticalAlignment="Center"
+                                               RenderOptions.BitmapScalingMode="HighQuality"
+                                               Visibility="{DynamicResource BareVisibility}"
+                                               Fill="{Binding Converter={StaticResource SessionStatusBrush}}">
+                                        <Rectangle.OpacityMask>
+                                            <ImageBrush ImageSource="{Binding Converter={StaticResource AgentPngIcon}}" Stretch="Uniform"/>
+                                        </Rectangle.OpacityMask>
+                                    </Rectangle>
                                     <Border Width="28" Height="28"
                                             Visibility="{DynamicResource TiledVisibility}"
                                             CornerRadius="{DynamicResource ChipCornerRadius}"
                                             BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="2"
                                             Background="{Binding Converter={StaticResource SessionStatusBrush}}">
-                                        <Path Width="15" Height="15" Stretch="Uniform"
-                                              Data="{Binding Converter={StaticResource SessionAgentIcon}}"
-                                              Fill="{DynamicResource TileInkBrush}"/>
+                                        <Grid Width="20" Height="20">
+                                            <Path Width="15" Height="15" Stretch="Uniform"
+                                                  Data="{Binding Converter={StaticResource SessionAgentIcon}}"
+                                                  Fill="{DynamicResource TileInkBrush}"/>
+                                            <Rectangle Fill="{DynamicResource TileInkBrush}" RenderOptions.BitmapScalingMode="HighQuality">
+                                                <Rectangle.OpacityMask>
+                                                    <ImageBrush ImageSource="{Binding Converter={StaticResource AgentPngIcon}}" Stretch="Uniform"/>
+                                                </Rectangle.OpacityMask>
+                                            </Rectangle>
+                                        </Grid>
                                     </Border>
                                 </Grid>
                                 <Grid Width="13" Height="13" Margin="6,0,0,0" VerticalAlignment="Center">
@@ -155,44 +170,92 @@
                                 </TextBlock>
                             </StackPanel>
 
-                            <!-- Where it runs: brand chip + host app chip + age -->
-                            <StackPanel Grid.Column="2" Orientation="Horizontal"
-                                        VerticalAlignment="Center" Margin="8,0,0,0">
-                                <TextBlock Text="{Binding Converter={StaticResource SessionTokens}}"
-                                           FontSize="10" Margin="0,0,2,0"
-                                           FontFamily="{DynamicResource MonoFontFamily}"
-                                           Foreground="{DynamicResource TextTertiaryBrush}"
-                                           VerticalAlignment="Center"/>
-                                <Border>
-                                    <Border.Style>
-                                        <Style TargetType="{x:Type Border}" BasedOn="{StaticResource RowChipStyle}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Converter={StaticResource SessionBrand}}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <TextBlock Text="{Binding Converter={StaticResource SessionBrand}}"
-                                               Style="{StaticResource RowChipTextStyle}"/>
-                                </Border>
-                                <Border>
-                                    <Border.Style>
-                                        <Style TargetType="{x:Type Border}" BasedOn="{StaticResource RowChipStyle}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Converter={StaticResource SessionHost}}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <TextBlock Text="{Binding Converter={StaticResource SessionHost}}"
-                                               Style="{StaticResource RowChipTextStyle}"/>
-                                </Border>
-                                <TextBlock Text="{Binding Converter={StaticResource SessionAge}}"
-                                           FontSize="10" Margin="6,0,0,0"
-                                           Foreground="{DynamicResource TextTertiaryBrush}"
-                                           VerticalAlignment="Center"/>
+                            <!-- Where it runs: model + tokens + brand chip + host app chip + age, plus rate limit windows on line 2 -->
+                            <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Converter={StaticResource SessionModel}}"
+                                               FontSize="10" FontWeight="SemiBold" Margin="0,0,5,0"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="{x:Type TextBlock}">
+                                                <Style.Triggers>
+                                                    <Trigger Property="Text" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding Converter={StaticResource SessionTokens}}"
+                                               FontSize="10" Margin="0,0,4,0"
+                                               FontFamily="{DynamicResource MonoFontFamily}"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"
+                                               VerticalAlignment="Center"/>
+                                    <Border>
+                                        <Border.Style>
+                                            <Style TargetType="{x:Type Border}" BasedOn="{StaticResource RowChipStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Converter={StaticResource SessionBrand}}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding Converter={StaticResource SessionBrand}}"
+                                                   Style="{StaticResource RowChipTextStyle}"/>
+                                    </Border>
+                                    <Border>
+                                        <Border.Style>
+                                            <Style TargetType="{x:Type Border}" BasedOn="{StaticResource RowChipStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Converter={StaticResource SessionHost}}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding Converter={StaticResource SessionHost}}"
+                                                   Style="{StaticResource RowChipTextStyle}"/>
+                                    </Border>
+                                    <TextBlock Text="{Binding Converter={StaticResource SessionAge}}"
+                                               FontSize="10" Margin="6,0,0,0"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <ItemsControl ItemsSource="{Binding Usage}" Focusable="False"
+                                              HorizontalAlignment="Right" Margin="0,2,0,0"
+                                              Visibility="{Binding Path=DataContext.ShowUsage, RelativeSource={RelativeSource AncestorType=ui:SessionsView}, Converter={StaticResource BoolToVis}}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" Margin="6,0,0,0">
+                                                <TextBlock Text="{Binding Label}" FontSize="10" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding PercentText}" FontSize="10" Margin="3,0,0,0"
+                                                           FontFamily="{DynamicResource MonoFontFamily}"
+                                                           Foreground="{Binding UsedPct, Converter={StaticResource UsageSeverityBrush}}"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding ResetText}" FontSize="9.5" Margin="3,0,0,0"
+                                                           FontFamily="{DynamicResource MonoFontFamily}"
+                                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                                           VerticalAlignment="Center">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="{x:Type TextBlock}">
+                                                            <Style.Triggers>
+                                                                <Trigger Property="Text" Value="">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </Trigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
 
                             <!-- Jump glyph (revealed on hover) -->

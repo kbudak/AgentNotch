@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AgentNotch.App.Diagnostics;
+using AgentNotch.App.Usage;
 
 // Lets the test project call the tailBytes overload and inspect the cache.
 // InternalsVisibleTo is AllowMultiple, so other files declaring it too is fine.
@@ -46,8 +47,32 @@ public static class CodexTail
     /// with no lifecycle event, and anything idle beyond <see cref="IdleKeep"/>
     /// are dropped. Never throws.
     /// </summary>
+    private static volatile IReadOnlyList<UsageWindow> _latestUsage = Array.Empty<UsageWindow>();
+    private static DateTime _latestUsageMtimeUtc = DateTime.MinValue;
+
+    /// <summary>Latest known Codex rate-limit windows (5h / 7d), rolled over against <paramref name="nowUtc"/>.</summary>
+    public static IReadOnlyList<UsageWindow> GetLatestUsage(string sessionsDir, DateTime nowUtc)
+    {
+        if (_latestUsage.Count == 0 && Directory.Exists(sessionsDir))
+        {
+            try
+            {
+                foreach (var file in ListRecentFiles(sessionsDir).Take(5))
+                {
+                    _ = CollectOne(file.Path, file.MtimeUtc, file.Size, TailBytes);
+                    if (_latestUsage.Count > 0) break;
+                }
+            }
+            catch { }
+        }
+        return ClaudeUsageClient.RollOver(_latestUsage, nowUtc);
+    }
+
     public static List<AgentSession> Collect(string sessionsDir, DateTime nowUtc)
         => Collect(sessionsDir, nowUtc, TailBytes);
+
+    private static long _lastPruneMs;
+    private const long PruneIntervalMs = 60_000;
 
     /// <summary>Testable overload: <paramref name="tailBytes"/> is the initial tail window.</summary>
     internal static List<AgentSession> Collect(string sessionsDir, DateTime nowUtc, int tailBytes)
@@ -55,10 +80,15 @@ public static class CodexTail
         var sessions = new List<AgentSession>();
         try
         {
-            // Evict cache entries whose rollout file vanished (cleanup, deletion).
-            foreach (var key in Cache.Keys)
+            // Periodically evict cache entries whose rollout file vanished (avoids 300+ File.Exists calls every 2s).
+            long tick = Environment.TickCount64;
+            if (tick - Interlocked.Read(ref _lastPruneMs) >= PruneIntervalMs)
             {
-                if (!File.Exists(key)) Cache.TryRemove(key, out _);
+                Interlocked.Exchange(ref _lastPruneMs, tick);
+                foreach (var key in Cache.Keys)
+                    if (!File.Exists(key)) Cache.TryRemove(key, out _);
+                foreach (var key in ActivityCache.Keys)
+                    if (!File.Exists(key)) ActivityCache.TryRemove(key, out _);
             }
 
             foreach (var file in ListRecentFiles(sessionsDir))
@@ -66,6 +96,9 @@ public static class CodexTail
                 var session = CollectOne(file.Path, file.MtimeUtc, file.Size, tailBytes);
                 if (session is null) continue;
                 if (nowUtc - session.LastActivityUtc > IdleKeep) continue;
+                var usage = session.Usage.Count > 0 ? session.Usage : _latestUsage;
+                if (usage.Count > 0)
+                    session.Usage = ClaudeUsageClient.RollOver(usage, nowUtc);
                 sessions.Add(session);
             }
         }
@@ -110,19 +143,61 @@ public static class CodexTail
     // ---------- discovery ----------
 
     private readonly record struct RolloutFile(string Path, long Size, DateTime MtimeUtc);
+    private sealed record ActivityStamp(DateTime MtimeUtc, long Size, DateTime ActivityUtc);
+    private static readonly ConcurrentDictionary<string, ActivityStamp> ActivityCache =
+        new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The <see cref="MaxFiles"/> newest *.jsonl under root (recursive), by mtime.</summary>
+    // Windows may defer mtime updates until Codex closes its append handle.
+    // Probe only the tail of changed files, and use event timestamps for ranking.
+    private static DateTime ActivityOf(RolloutFile file)
+    {
+        if (ActivityCache.TryGetValue(file.Path, out var cached)
+            && cached.MtimeUtc == file.MtimeUtc && cached.Size == file.Size)
+            return cached.ActivityUtc;
+        var activity = file.MtimeUtc;
+        try
+        {
+            using var stream = new FileStream(file.Path, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            int count = (int)Math.Min(stream.Length, 64 * 1024);
+            var buffer = ArrayPool<byte>.Shared.Rent(Math.Max(1, count));
+            try
+            {
+                stream.Position = stream.Length - count;
+                stream.ReadExactly(buffer, 0, count);
+                activity = LatestTimestamp(TranscriptTail.ParseLines(buffer, 0, count), activity);
+            }
+            finally { ArrayPool<byte>.Shared.Return(buffer); }
+        }
+        catch { /* A racing/incomplete write retains filesystem fallback. */ }
+        ActivityCache[file.Path] = new ActivityStamp(file.MtimeUtc, file.Size, activity);
+        return activity;
+    }
+
+    private static DateTime LatestTimestamp(IEnumerable<JsonElement> events, DateTime fallback)
+    {
+        var latest = fallback;
+        foreach (var ev in events)
+            if (DateTime.TryParse(GetString(ev, "timestamp"), CultureInfo.InvariantCulture,
+                    DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var stamp)
+                && stamp > latest)
+                latest = stamp;
+        return latest;
+    }
+
+    /// <summary>The <see cref="MaxFiles"/> newest *.jsonl under root (recursive), by activity.</summary>
     private static List<RolloutFile> ListRecentFiles(string root)
     {
         var files = new List<RolloutFile>();
         try
         {
-            foreach (var path in Directory.EnumerateFiles(root, "*.jsonl", SearchOption.AllDirectories))
+            var dir = new DirectoryInfo(root);
+            if (!dir.Exists) return files;
+            foreach (var info in dir.EnumerateFiles("*.jsonl", SearchOption.AllDirectories))
             {
                 try
                 {
-                    var info = new FileInfo(path);
-                    if (info.Exists) files.Add(new RolloutFile(path, info.Length, info.LastWriteTimeUtc));
+                    files.Add(new RolloutFile(info.FullName, info.Length, info.LastWriteTimeUtc));
                 }
                 catch
                 {
@@ -135,7 +210,7 @@ public static class CodexTail
             // missing dir / permission race — no Codex sessions then
             return new List<RolloutFile>();
         }
-        return files.OrderByDescending(f => f.MtimeUtc).Take(MaxFiles).ToList();
+        return files.OrderByDescending(ActivityOf).Take(MaxFiles).ToList();
     }
 
     // ---------- tail reading ----------
@@ -204,6 +279,7 @@ public static class CodexTail
         string? source = null, originator = null;
         string? lastMessage = null, lastTool = null, lastTarget = null;
         JsonElement? stateEvent = null;
+        IReadOnlyList<UsageWindow> rateLimits = Array.Empty<UsageWindow>();
         var pending = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
 
         foreach (var ev in events)
@@ -227,9 +303,27 @@ public static class CodexTail
             else if (type == "event_msg")
             {
                 var pt = GetString(p, "type");
-                if (pt == "task_started" || pt == "task_complete") stateEvent = p;
+                if (pt == "task_started" || pt == "task_complete")
+                {
+                    stateEvent = p;
+                    pending.Clear();
+                    lastTool = lastTarget = null;
+                }
                 else if (pt == "agent_message" && GetString(p, "phase") == "final_answer")
                     lastMessage = Keep(GetString(p, "message"), lastMessage);
+                else if (pt == "token_count")
+                {
+                    var parsedLimits = ParseRateLimits(p);
+                    if (parsedLimits.Count > 0)
+                    {
+                        rateLimits = parsedLimits;
+                        if (mtimeUtc >= _latestUsageMtimeUtc)
+                        {
+                            _latestUsageMtimeUtc = mtimeUtc;
+                            _latestUsage = parsedLimits;
+                        }
+                    }
+                }
             }
             else if (type == "response_item")
             {
@@ -270,8 +364,7 @@ public static class CodexTail
             status = SessionStatus.Working;
             foreach (var call in pending.Values)
             {
-                var raw = $"{GetString(call, "name")} {GetString(call, "arguments")} {GetString(call, "input")}";
-                if (NeedsYouCall.IsMatch(raw))
+                if (IsQuestionCall(call) || IsApprovalCall(call))
                 {
                     status = SessionStatus.NeedsYou;
                     break;
@@ -304,6 +397,7 @@ public static class CodexTail
             Agent = "codex",
             Host = vscode ? "vscode" : null,
             Model = PrettyModel(model),
+            Usage = rateLimits,
             Cwd = cwd ?? "",
             ProjectName = string.IsNullOrWhiteSpace(cwd) ? "Codex" : TranscriptTail.ProjectNameOf(cwd),
             Entrypoint = "",
@@ -314,8 +408,62 @@ public static class CodexTail
             LastMessage = summary,
             TokensSpent = 0,
             StartedUtc = StartedFromName(path, mtimeUtc),
-            LastActivityUtc = mtimeUtc,
+            LastActivityUtc = LatestTimestamp(events, mtimeUtc),
+            IsThinking = status == SessionStatus.Working && pending.Count == 0,
+            NeedsApproval = status == SessionStatus.NeedsYou && pending.Values.Any(IsApprovalCall),
         };
+    }
+
+    internal static List<UsageWindow> ParseRateLimits(JsonElement tokenCountPayload)
+    {
+        var list = new List<UsageWindow>(2);
+        try
+        {
+            if (tokenCountPayload.ValueKind != JsonValueKind.Object ||
+                !tokenCountPayload.TryGetProperty("rate_limits", out var rl) ||
+                rl.ValueKind != JsonValueKind.Object)
+                return list;
+
+            if (TryParseLimitBucket(rl, "primary", "5h") is { } primary)
+                list.Add(primary);
+            if (TryParseLimitBucket(rl, "secondary", "7d") is { } secondary)
+                list.Add(secondary);
+        }
+        catch { }
+        return list;
+    }
+
+    private static UsageWindow? TryParseLimitBucket(JsonElement rateLimits, string key, string fallbackLabel)
+    {
+        if (!rateLimits.TryGetProperty(key, out var bucket) || bucket.ValueKind != JsonValueKind.Object)
+            return null;
+        if (!bucket.TryGetProperty("used_percent", out var up) || up.ValueKind != JsonValueKind.Number)
+            return null;
+        double usedPct = up.GetDouble();
+        if (!double.IsFinite(usedPct)) return null;
+
+        string label = fallbackLabel;
+        if (bucket.TryGetProperty("window_minutes", out var wm) && wm.ValueKind == JsonValueKind.Number && wm.TryGetInt32(out int mins))
+        {
+            if (mins == 300) label = "5h";
+            else if (mins == 10080) label = "7d";
+            else if (mins >= 1440 && mins % 1440 == 0) label = $"{mins / 1440}d";
+            else if (mins >= 60 && mins % 60 == 0) label = $"{mins / 60}h";
+        }
+
+        DateTime? resetsUtc = null;
+        if (bucket.TryGetProperty("resets_at", out var ra) && ra.ValueKind == JsonValueKind.Number && ra.TryGetInt64(out long epochSec) && epochSec > 0)
+        {
+            try
+            {
+                resetsUtc = (epochSec < 100_000_000_000L
+                    ? DateTimeOffset.FromUnixTimeSeconds(epochSec)
+                    : DateTimeOffset.FromUnixTimeMilliseconds(epochSec)).UtcDateTime;
+            }
+            catch { }
+        }
+
+        return new UsageWindow(label, Math.Clamp(usedPct, 0, 100), resetsUtc);
     }
 
     private static readonly Regex CmdRegex = new(@"cmd\s*[:=]\s*""([^""]+)""", RegexOptions.Compiled);
@@ -377,10 +525,79 @@ public static class CodexTail
     // ---------- text helpers ----------
 
 
-    /// <summary>A pending call that blocks on the user (approval or question).</summary>
-    private static readonly Regex NeedsYouCall =
-        new("request_user_input|require_escalated|approval",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    // Inspect the actual tool/permission fields, never arbitrary words in a shell
+    // command or patch. Reading a test containing "approval" must not block Buddy.
+    private static bool IsQuestionCall(JsonElement call)
+    {
+        var name = GetString(call, "name") ?? "";
+        if (name.EndsWith("request_user_input", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith("request_user_input_async", StringComparison.OrdinalIgnoreCase))
+            return true;
+        var input = GetString(call, "input") ?? GetString(call, "arguments") ?? "";
+        return name.EndsWith("exec", StringComparison.OrdinalIgnoreCase)
+            && Regex.IsMatch(CodeWithoutStrings(input), @"\btools\.request_user_input(?:_async)?\s*\(");
+    }
+
+    // Code-mode can wrap a question in exec. Ignore string literals and comments:
+    // a patch containing a tool's name is data, not a call to that tool.
+    private static string CodeWithoutStrings(string input)
+    {
+        var code = input.ToCharArray();
+        for (int i = 0; i < code.Length; i++)
+        {
+            char ch = code[i];
+            if (ch == '"' || ch == (char)39 || ch == (char)96)
+            {
+                char quote = ch;
+                code[i] = ' ';
+                while (++i < code.Length)
+                {
+                    ch = code[i];
+                    code[i] = ' ';
+                    if (ch == (char)92 && i + 1 < code.Length) code[++i] = ' ';
+                    else if (ch == quote) break;
+                }
+            }
+            else if (ch == '/' && i + 1 < code.Length && code[i + 1] == '/')
+            {
+                while (i < code.Length && code[i] != '\n') code[i++] = ' ';
+            }
+            else if (ch == '/' && i + 1 < code.Length && code[i + 1] == '*')
+            {
+                code[i++] = ' ';
+                code[i] = ' ';
+                while (++i < code.Length)
+                {
+                    ch = code[i];
+                    code[i] = ' ';
+                    if (ch == '*' && i + 1 < code.Length && code[i + 1] == '/')
+                    {
+                        code[++i] = ' ';
+                        break;
+                    }
+                }
+            }
+        }
+        return new string(code);
+    }
+
+    private static bool IsApprovalCall(JsonElement call)
+    {
+        var name = GetString(call, "name") ?? "";
+        if (name.Equals("request_approval", StringComparison.OrdinalIgnoreCase)) return true;
+        var raw = GetString(call, "arguments") ?? GetString(call, "input");
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+        try
+        {
+            using var document = JsonDocument.Parse(raw);
+            var root = document.RootElement;
+            return root.ValueKind == JsonValueKind.Object
+                && (GetString(root, "sandbox_permissions") == "require_escalated"
+                    || (root.TryGetProperty("require_escalated", out var flag)
+                        && flag.ValueKind == JsonValueKind.True));
+        }
+        catch (JsonException) { return false; }
+    }
 
     private static readonly Regex WhitespaceRun =
         new("\\s+", RegexOptions.Compiled);

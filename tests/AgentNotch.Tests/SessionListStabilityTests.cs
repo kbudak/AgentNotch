@@ -1,4 +1,5 @@
 using AgentNotch.App.Sessions;
+using AgentNotch.App.Usage;
 using AgentNotch.App.ViewModels;
 using Xunit;
 
@@ -29,12 +30,12 @@ public class SessionListStabilityTests
     public void UnchangedSnapshot_KeepsTheSameRowInstances()
     {
         var vm = new MainViewModel();
-        vm.UpdateSessions(new[] { Row("a", "belediyem"), Row("b", "limit-notch-app") });
+        vm.UpdateSessions(new[] { Row("a", "demo-app"), Row("b", "agent-notch") });
         var first = vm.Sessions[0];
         var second = vm.Sessions[1];
 
         // A fresh but identical snapshot — exactly what an idle poll tick delivers.
-        vm.UpdateSessions(new[] { Row("a", "belediyem"), Row("b", "limit-notch-app") });
+        vm.UpdateSessions(new[] { Row("a", "demo-app"), Row("b", "agent-notch") });
 
         Assert.Same(first, vm.Sessions[0]);
         Assert.Same(second, vm.Sessions[1]);
@@ -44,10 +45,10 @@ public class SessionListStabilityTests
     public void ChangedRow_IsReplaced_AndItsNeighbourIsNot()
     {
         var vm = new MainViewModel();
-        vm.UpdateSessions(new[] { Row("a", "belediyem"), Row("b", "limit-notch-app") });
+        vm.UpdateSessions(new[] { Row("a", "demo-app"), Row("b", "agent-notch") });
         var untouched = vm.Sessions[1];
 
-        vm.UpdateSessions(new[] { Row("a", "belediyem", tool: "Bash"), Row("b", "limit-notch-app") });
+        vm.UpdateSessions(new[] { Row("a", "demo-app", tool: "Bash"), Row("b", "agent-notch") });
 
         Assert.Equal("Bash", vm.Sessions[0].CurrentTool);
         Assert.Same(untouched, vm.Sessions[1]);
@@ -57,15 +58,15 @@ public class SessionListStabilityTests
     public void WhileExpanded_RowsKeepTheirVisiblePosition()
     {
         var vm = new MainViewModel();
-        vm.UpdateSessions(new[] { Row("a", "belediyem"), Row("b", "limit-notch-app") });
+        vm.UpdateSessions(new[] { Row("a", "demo-app"), Row("b", "agent-notch") });
         vm.SetHover(true); // panel open — the user is aiming at a row
         Assert.True(vm.IsExpanded);
 
         // The watcher now ranks "b" first (it just became NeedsYou).
-        vm.UpdateSessions(new[] { Row("b", "limit-notch-app", SessionStatus.NeedsYou), Row("a", "belediyem") });
+        vm.UpdateSessions(new[] { Row("b", "agent-notch", SessionStatus.NeedsYou), Row("a", "demo-app") });
 
-        Assert.Equal("belediyem", vm.Sessions[0].ProjectName);
-        Assert.Equal("limit-notch-app", vm.Sessions[1].ProjectName);
+        Assert.Equal("demo-app", vm.Sessions[0].ProjectName);
+        Assert.Equal("agent-notch", vm.Sessions[1].ProjectName);
         Assert.Equal(SessionStatus.NeedsYou, vm.Sessions[1].Status); // content still refreshed
     }
 
@@ -73,12 +74,12 @@ public class SessionListStabilityTests
     public void WhileCollapsed_TheWatchersOrderWins()
     {
         var vm = new MainViewModel();
-        vm.UpdateSessions(new[] { Row("a", "belediyem"), Row("b", "limit-notch-app") });
+        vm.UpdateSessions(new[] { Row("a", "demo-app"), Row("b", "agent-notch") });
         Assert.False(vm.IsExpanded);
 
-        vm.UpdateSessions(new[] { Row("b", "limit-notch-app", SessionStatus.NeedsYou), Row("a", "belediyem") });
+        vm.UpdateSessions(new[] { Row("b", "agent-notch", SessionStatus.NeedsYou), Row("a", "demo-app") });
 
-        Assert.Equal("limit-notch-app", vm.Sessions[0].ProjectName);
+        Assert.Equal("agent-notch", vm.Sessions[0].ProjectName);
     }
 
     [Fact]
@@ -91,5 +92,36 @@ public class SessionListStabilityTests
 
         Assert.Single(vm.Sessions);
         Assert.Equal("one", vm.Sessions[0].ProjectName);
+    }
+
+    [Fact]
+    public void UnchangedSnapshot_DoesNotRaisePropertyChanged()
+    {
+        var vm = new MainViewModel();
+        vm.UpdateSessions(new[] { Row("a", "demo-app") });
+
+        int notifications = 0;
+        vm.PropertyChanged += (_, _) => notifications++;
+
+        vm.UpdateSessions(new[] { Row("a", "demo-app") });
+
+        Assert.Equal(0, notifications);
+    }
+
+    [Fact]
+    public void UnchangedUsage_DoesNotRebuildOrRaisePropertyChanged()
+    {
+        var vm = new MainViewModel();
+        var reset = DateTime.UtcNow.AddHours(2);
+        vm.UpdateUsage(new[] { new UsageWindow("5h", 25, reset) });
+        var original = vm.Usage[0];
+
+        int notifications = 0;
+        vm.PropertyChanged += (_, _) => notifications++;
+
+        vm.UpdateUsage(new[] { new UsageWindow("5h", 25, reset) });
+
+        Assert.Same(original, vm.Usage[0]);
+        Assert.Equal(0, notifications);
     }
 }

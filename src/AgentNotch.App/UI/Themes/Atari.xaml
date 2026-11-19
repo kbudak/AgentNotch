@@ -113,6 +113,7 @@
     <SolidColorBrush x:Key="AgentCodexBrush" Color="#FF141414"/>
     <SolidColorBrush x:Key="AgentAntigravityBrush" Color="#FF2F6BFF"/>
     <SolidColorBrush x:Key="AgentCursorBrush" Color="#FFD6336C"/>
+    <SolidColorBrush x:Key="AgentOpenCodeBrush" Color="#FF7C3AED"/>
     <SolidColorBrush x:Key="AgentGenericBrush" Color="#FF8E8E93"/>
 
     <!-- Reserved: only ever means "blocked on you". -->
@@ -143,6 +144,8 @@
     <!-- Agent marks and counts sit on state-coloured tiles instead of being tinted. -->
     <Visibility x:Key="TiledVisibility">Visible</Visibility>
     <Visibility x:Key="BareVisibility">Collapsed</Visibility>
+    <Visibility x:Key="LeadAgentMarkVisibility">Visible</Visibility>
+    <Visibility x:Key="CollapsedLeadStatusVisibility">Visible</Visibility>
     <Thickness x:Key="CountItemMargin">6,0,0,0</Thickness>
     <FontWeight x:Key="TitleFontWeight">Bold</FontWeight>
 

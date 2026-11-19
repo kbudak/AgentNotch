@@ -3,8 +3,10 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using AgentNotch.App.Diagnostics;
 using AgentNotch.App.Interop;
+using AgentNotch.App.Jump;
 using AgentNotch.App.ViewModels;
 using Microsoft.Win32;
 
@@ -28,6 +30,7 @@ public partial class OverlayWindow
     // capsule; the console is a status LINE that fits its own text and opens to the
     // handoff's 812px panel, which needs a wider surface to sit in.
     private const double IslandCollapsedWidth = 248; // matches OverlayWindow.xaml NotchPanel.Width
+    private const double MinimalCollapsedWidth = 156;
     private const double IslandExpandedWidth = 576;  // 560 content + 8+8 panel padding
     private const double ConsoleExpandedWidth = 700; // 700 content, no panel padding
     private const double IslandWindowWidth = 640;
@@ -42,8 +45,9 @@ public partial class OverlayWindow
     private const double MaxWindowHeight = 800;
     // What the surface needs on top of the curtain: the 32px shadow gutter, plus
     // (island only) the quota/gear header row and the panel's own padding.
-    private double WindowChrome => IsConsole ? 44 : 104;
+    private double WindowChrome => IsConsole ? 44 : IsMinimal ? 184 : 104;
     private const double IslandCollapsedHeight = 108; // pill (34) + room for the drop shadow
+    private const double MinimalCollapsedHeight = 88;
     private const double ConsoleCollapsedHeight = 80; // the line is only 26 tall
 
     private MainViewModel? _vm;
@@ -51,8 +55,18 @@ public partial class OverlayWindow
     private bool _opening;               // suppress content-driven re-targeting mid-open
     private double _consoleLineWidth = 240; // the collapsed line's natural width, for a smooth close
     private IntPtr _hwnd;
+    private HwndSource? _hwndSource;
+    private uint _taskbarCreatedMsg;
+    private readonly DispatcherTimer _healthTimer;
+
+    /// <summary>Only set true by App.OnExit — blocks accidental Alt+F4 / WM_CLOSE from stranding the app invisible.</summary>
+    public bool AllowClose { get; set; }
+
+    /// <summary>Fired when explorer.exe restarts so the tray icon can be re-registered.</summary>
+    public event Action? TaskbarRecreated;
 
     private bool IsConsole => ThemeManager.Normalize(_vm?.Theme) == ThemeManager.Console;
+    private bool IsMinimal => ThemeManager.Normalize(_vm?.Theme) == ThemeManager.Minimal;
     private double ExpandedPanelWidth => IsConsole ? ConsoleExpandedWidth : IslandExpandedWidth;
 
     /// <summary>
@@ -60,9 +74,9 @@ public partial class OverlayWindow
     /// is "as wide as its own text and marks", which no animation target can know
     /// ahead of time — NaN hands that width back to layout.
     /// </summary>
-    private double CollapsedPanelWidth => IsConsole ? double.NaN : IslandCollapsedWidth;
+    private double CollapsedPanelWidth => IsConsole ? double.NaN : IsMinimal ? MinimalCollapsedWidth : IslandCollapsedWidth;
 
-    private double CollapsedWindowHeight => IsConsole ? ConsoleCollapsedHeight : IslandCollapsedHeight;
+    private double CollapsedWindowHeight => IsConsole ? ConsoleCollapsedHeight : IsMinimal ? MinimalCollapsedHeight : IslandCollapsedHeight;
 
     public OverlayWindow()
     {
@@ -84,11 +98,43 @@ public partial class OverlayWindow
         };
 
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+        SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        SystemEvents.SessionSwitch += OnSessionSwitch;
+        StateChanged += OnStateChanged;
+
+        // Lightweight self-healing check: DWM restarts, fullscreen games/videos, Win+D,
+        // or monitor sleep/wake can strip WS_EX_TOPMOST or hide the window without firing
+        // DisplaySettingsChanged. Does nothing unless state actually drifted.
+        _healthTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(10),
+        };
+        _healthTimer.Tick += (_, _) => VerifyOverlayHealth();
+        _healthTimer.Start();
+
         Closed += (_, _) =>
         {
+            _healthTimer.Stop();
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+            SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+            SystemEvents.SessionSwitch -= OnSessionSwitch;
+            StateChanged -= OnStateChanged;
+            try { _hwndSource?.RemoveHook(WndProc); } catch { }
+            _hwndSource = null;
             if (_vm is not null) _vm.PropertyChanged -= OnVmPropertyChanged;
         };
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (!AllowClose)
+        {
+            e.Cancel = true;
+            AppLog.Write("overlay: blocked unexpected window close");
+            EnsureVisibleAndTopmost("blocked-close");
+            return;
+        }
+        base.OnClosing(e);
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -98,6 +144,9 @@ public partial class OverlayWindow
         {
             Focusable = false;
             _hwnd = new WindowInteropHelper(this).Handle;
+            _taskbarCreatedMsg = NativeMethods.RegisterWindowMessage("TaskbarCreated");
+            _hwndSource = HwndSource.FromHwnd(_hwnd);
+            _hwndSource?.AddHook(WndProc);
             NativeMethods.MakeOverlay(_hwnd);
         }
         catch (Exception ex)
@@ -105,6 +154,96 @@ public partial class OverlayWindow
             AppLog.Write("overlay MakeOverlay: " + ex.Message);
         }
         Recenter();
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == NativeMethods.WM_DISPLAYCHANGE || msg == NativeMethods.WM_DPICHANGED)
+        {
+            ScheduleRecovery("display-change");
+        }
+        else if (_taskbarCreatedMsg != 0 && (uint)msg == _taskbarCreatedMsg)
+        {
+            ScheduleRecovery("taskbar-recreated");
+            try { TaskbarRecreated?.Invoke(); } catch { }
+        }
+        return IntPtr.Zero;
+    }
+
+    /// <summary>Brings the notch back if hidden, minimized, off-screen, or knocked out of topmost Z-order.</summary>
+    public void EnsureVisibleAndTopmost(string? reason = null)
+    {
+        try
+        {
+            if (AllowClose) return;
+            if (WindowState != WindowState.Normal)
+                WindowState = WindowState.Normal;
+            if (!IsVisible)
+                Show();
+            if (Opacity < 1)
+                Opacity = 1;
+            Topmost = true;
+            Recenter();
+            if (_hwnd != IntPtr.Zero)
+                NativeMethods.MakeOverlay(_hwnd);
+            if (!string.IsNullOrEmpty(reason))
+                AppLog.Write($"overlay: restored ({reason})");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("overlay restore failed: " + ex.Message);
+        }
+    }
+
+    private void VerifyOverlayHealth()
+    {
+        try
+        {
+            if (AllowClose || !IsLoaded) return;
+            bool drifted = !IsVisible
+                           || WindowState != WindowState.Normal
+                           || !double.IsFinite(Left) || !double.IsFinite(Top)
+                           || (_hwnd != IntPtr.Zero && (!NativeMethods.IsWindowVisible(_hwnd) || !NativeMethods.HasTopmostStyle(_hwnd)));
+            if (drifted)
+                EnsureVisibleAndTopmost("health-check");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("overlay health check: " + ex.Message);
+        }
+    }
+
+    private void OnStateChanged(object? sender, EventArgs e)
+    {
+        if (!AllowClose && WindowState != WindowState.Normal)
+            EnsureVisibleAndTopmost("state-changed");
+    }
+
+    private void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == PowerModes.Resume)
+            ScheduleRecovery("power-resume");
+    }
+
+    private void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)
+    {
+        if (e.Reason is SessionSwitchReason.SessionUnlock
+            or SessionSwitchReason.ConsoleConnect
+            or SessionSwitchReason.RemoteConnect)
+            ScheduleRecovery("session-" + e.Reason);
+    }
+
+    private void ScheduleRecovery(string reason)
+    {
+        try
+        {
+            if (AllowClose) return;
+            Dispatcher.BeginInvoke(DispatcherPriority.Normal, () => EnsureVisibleAndTopmost(reason));
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("overlay schedule recovery: " + ex.Message);
+        }
     }
 
     // ------------------------------------------------------------ view-model
@@ -126,7 +265,8 @@ public partial class OverlayWindow
             Recenter();
         else if (e.PropertyName == nameof(MainViewModel.Theme))
             ApplyThemeGeometry();
-
+        else if (e.PropertyName == nameof(MainViewModel.ActivePrompt) && _vm?.ActivePrompt is not null)
+            EnsureVisibleAndTopmost("prompt-arrived");
     }
 
     /// <summary>
@@ -147,7 +287,9 @@ public partial class OverlayWindow
                 {
                     RevealHost.BeginAnimation(HeightProperty, null);
                     RevealHost.Height = ContentHeight();
+                    Height = Math.Min(MaxWindowHeight, ContentHeight() + WindowChrome);
                 }
+                else Height = CollapsedWindowHeight;
             }
             Recenter();
         }
@@ -189,6 +331,13 @@ public partial class OverlayWindow
     // -------------------------------------------------------------- settings
 
     private void OnSettingsClick(object sender, RoutedEventArgs e) => _vm?.ToggleSettings();
+
+    private void OnBuddyClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (!_open || _vm?.LeadSession is not { } session) return;
+        try { TerminalJump.FocusSession(session); }
+        catch (Exception ex) { AppLog.Write("buddy jump: " + ex.Message); }
+    }
 
     // ------------------------------------------------------------- animation
 
@@ -264,7 +413,8 @@ public partial class OverlayWindow
     private double ContentHeight()
     {
         ExpandedContent.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        return Math.Ceiling(ExpandedContent.DesiredSize.Height);
+        double h = ExpandedContent.DesiredSize.Height;
+        return double.IsFinite(h) && h > 0 ? Math.Ceiling(h) : 0;
     }
 
     private static void Animate(FrameworkElement target, DependencyProperty property,
@@ -282,8 +432,7 @@ public partial class OverlayWindow
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e)
     {
-        try { Dispatcher.BeginInvoke(Recenter); }
-        catch (Exception ex) { AppLog.Write("overlay display change: " + ex.Message); }
+        ScheduleRecovery("display-settings-changed");
     }
 
     private void Recenter()
@@ -291,6 +440,7 @@ public partial class OverlayWindow
         try
         {
             double screenWidth = SystemParameters.PrimaryScreenWidth;
+            if (!double.IsFinite(screenWidth) || screenWidth < 200) return;
             // The panel is centred inside the fixed-width window, so aligning the
             // window's centre to a fraction of the screen places the pill there.
             double frac = _vm?.Position switch { "left" => 0.20, "right" => 0.80, _ => 0.50 };

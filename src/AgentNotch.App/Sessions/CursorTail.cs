@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AgentNotch.App.Diagnostics;
+using AgentNotch.App.Usage;
 
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("AgentNotch.Tests")]
 
@@ -151,6 +152,8 @@ public static class CursorTail
                         Agent = parent.Agent,
                         Host = parent.Host,
                         HostLabel = parent.HostLabel,
+                        Model = parent.Model ?? CursorUsageClient.LatestModel ?? "Composer",
+                        Usage = parent.Usage.Count > 0 ? parent.Usage : CursorUsageClient.LatestUsage,
                         Cwd = string.IsNullOrEmpty(parent.Cwd) ? child.Cwd : parent.Cwd,
                         ProjectName = parent.ProjectName,
                         Entrypoint = parent.Entrypoint,
@@ -592,6 +595,8 @@ public static class CursorTail
             Agent = "cursor",
             Host = "cursor",
             HostLabel = "Cursor",
+            Model = CursorUsageClient.LatestModel ?? "Composer",
+            Usage = CursorUsageClient.LatestUsage,
             Cwd = cwd,
             ProjectName = projectName,
             Entrypoint = "",

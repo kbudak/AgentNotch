@@ -1,3 +1,5 @@
+using AgentNotch.App.Usage;
+
 namespace AgentNotch.App.Sessions;
 
 /// <summary>Coarse state of a live agent session.</summary>
@@ -23,7 +25,7 @@ public sealed class AgentSession
 {
     public string SessionId { get; set; } = "";
 
-    /// <summary>Which agent produced this session: "claude" | "codex" | "antigravity" | "cursor".</summary>
+    /// <summary>Which agent produced this session: "claude" | "codex" | "antigravity" | "cursor" | "opencode".</summary>
     public string Agent { get; set; } = "claude";
 
     /// <summary>
@@ -35,6 +37,12 @@ public sealed class AgentSession
 
     /// <summary>Model name when the source reports one (e.g. "GPT-5.2", "Gemini").</summary>
     public string? Model { get; set; }
+
+    /// <summary>
+    /// Rate-limit windows for this session's agent/model (e.g. "5h 14%", "7d 2%").
+    /// Empty when unavailable.
+    /// </summary>
+    public IReadOnlyList<UsageWindow> Usage { get; set; } = Array.Empty<UsageWindow>();
 
     /// <summary>
     /// Where the session actually runs, spelled for humans: "Cursor", "VS Code",
@@ -58,6 +66,10 @@ public sealed class AgentSession
     public int Pid { get; set; }
 
     public SessionStatus Status { get; set; }
+    /// <summary>Live tool calls have returned and the agent is reasoning/streaming.</summary>
+    public bool IsThinking { get; set; }
+    /// <summary>A pending execution permission, rather than a question.</summary>
+    public bool NeedsApproval { get; set; }
 
     /// <summary>Tool the agent is running or blocked on (e.g. "Bash", "Edit"); null when none applies.</summary>
     public string? CurrentTool { get; set; }

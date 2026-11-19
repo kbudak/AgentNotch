@@ -24,12 +24,32 @@ public class ThemeTests
         return Path.Combine(dir!.FullName, "src", "AgentNotch.App", "UI");
     }
 
-    private static HashSet<string> KeysOf(string xamlPath) =>
-        XDocument.Load(xamlPath).Root!.Elements()
+    private static HashSet<string> KeysOf(string xamlPath, HashSet<string>? visited = null)
+    {
+        // Minimal inherits the base Island token dictionary, so inspect nested
+        // ResourceDictionary Source entries as well as keys written in this file.
+        // This keeps the test aligned with WPF's actual resource lookup rules.
+        visited ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var fullPath = Path.GetFullPath(xamlPath);
+        if (!visited.Add(fullPath)) return new HashSet<string>(StringComparer.Ordinal);
+
+        var document = XDocument.Load(fullPath);
+        var keys = document.Descendants()
             .Select(e => (string?)e.Attribute(Ns + "Key"))
             .Where(k => k is not null)
             .Select(k => k!)
             .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var source in document.Descendants()
+                     .Where(e => e.Name.LocalName == "ResourceDictionary")
+                     .Select(e => (string?)e.Attribute("Source"))
+                     .Where(s => !string.IsNullOrWhiteSpace(s)))
+        {
+            var inherited = KeysOf(Path.Combine(Path.GetDirectoryName(fullPath)!, source!), visited);
+            keys.UnionWith(inherited);
+        }
+        return keys;
+    }
 
     /// <summary>Every selectable theme, as (id, its declared keys). Adding a theme to
     /// <see cref="ThemeManager.All"/> without shipping its palette fails here.</summary>
@@ -106,6 +126,8 @@ public class ThemeTests
     [InlineData("CONSOLE", ThemeManager.Console)]
     [InlineData("glass", ThemeManager.Glass)]
     [InlineData(" GLASS ", ThemeManager.Glass)]
+    [InlineData("minimal", ThemeManager.Minimal)]
+    [InlineData(" MINIMAL ", ThemeManager.Minimal)]
     [InlineData("atari", ThemeManager.Atari)]
     [InlineData(" Atari ", ThemeManager.Atari)]
     [InlineData("atari-dark", ThemeManager.AtariDark)]

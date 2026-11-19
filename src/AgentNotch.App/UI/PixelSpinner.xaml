@@ -31,27 +31,23 @@
         </Canvas>
     </Viewbox>
 
-    <UserControl.Triggers>
-        <EventTrigger RoutedEvent="UserControl.Loaded">
-            <BeginStoryboard>
-                <!-- 30fps, not the default 60: the window is layered (AllowsTransparency),
-                     so every frame is rasterized on the CPU. A 0.9s fade looks identical
-                     at half the frames and costs half the compositing. -->
-                <Storyboard Timeline.DesiredFrameRate="30">
-                    <DoubleAnimation Storyboard.TargetName="d0"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.000"  RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="d1"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.075"  RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="d2"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.150"  RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="d3"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.225"  RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="d4"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.300"  RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="d5"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.375"  RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="d6"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.450"  RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="d7"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.525"  RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="d8"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.600"  RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="d9"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.675"  RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="d10" Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.750"  RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="d11" Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.825"  RepeatBehavior="Forever"/>
-                </Storyboard>
-            </BeginStoryboard>
-        </EventTrigger>
-    </UserControl.Triggers>
+    <UserControl.Resources>
+        <!-- 30fps, not the default 60: the window is layered (AllowsTransparency),
+             so every frame is rasterized on the CPU. Started/stopped in code-behind
+             only while IsLoaded && IsVisible so collapsed spinners cost 0% CPU. -->
+        <Storyboard x:Key="SpinStoryboard" Timeline.DesiredFrameRate="30">
+            <DoubleAnimation Storyboard.TargetName="d0"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.000"  RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="d1"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.075"  RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="d2"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.150"  RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="d3"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.225"  RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="d4"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.300"  RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="d5"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.375"  RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="d6"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.450"  RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="d7"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.525"  RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="d8"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.600"  RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="d9"  Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.675"  RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="d10" Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.750"  RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="d11" Storyboard.TargetProperty="Opacity" From="1" To="0.13" Duration="0:0:0.9" BeginTime="0:0:0.825"  RepeatBehavior="Forever"/>
+        </Storyboard>
+    </UserControl.Resources>
 </UserControl>

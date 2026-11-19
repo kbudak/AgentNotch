@@ -70,6 +70,7 @@ first and wait*, and only two of the four offer an event for that.
 | **Cursor** (native `AskQuestion`) | transcript tail (`CursorTail`) | ⬜ shown as a row; answer in Cursor |
 | **Codex** | rollout tail (`CodexTail`) | ⬜ shown as a row; answer in Codex |
 | **Antigravity** | `language_server` RPC (`ask_question` step) | ⬜ shown as a row; answer in Antigravity |
+| **OpenCode** | session store read (`OpenCodeStore`) | ⬜ shown as a row; answer in OpenCode |
 
 A ⬜ row is not a gap in *detection* — the question text is parsed out and shown
 on the row, and the pill goes amber. It is a gap in *answering*, and it is not
@@ -84,7 +85,9 @@ closeable from this side:
   AOT would cut the spawn to ~5 ms and change this trade — it needs a
   `JsonSerializerContext` for the protocol types plus the C++ build tools.
 - **Codex and Antigravity** expose no approval/question callback at all. They are
-  read-only by construction.
+  read-only by construction. **OpenCode** is read-only for the same reason: it
+  keeps no hook to wait on, so its rows show status but the prompt is answered in
+  its own terminal.
 
 `PromptViewModel` nevertheless parses **both** question dialects, because the
 agents agree on structure and disagree on every field name — Claude Code writes
@@ -257,6 +260,7 @@ Shape says **which agent**, colour says **what state**:
 | ✿ six-lobed knot | Codex |
 | ✦ sparkle | Antigravity (Gemini) |
 | ⬢ cube | Cursor agent |
+| ▸ prompt | OpenCode |
 
 Every mark is drawn in the same 24x24 box but only ever rendered at **11-17px**,
 which is the whole design constraint. The Codex knot and the Cursor cube were both
@@ -371,4 +375,9 @@ phase and would require signing + Program Files).
   - **Cursor / VS Code / Antigravity as hosts** — Claude Code sessions running
     inside an editor are labeled with their host ("claude · cursor — web") via
     parent-process detection, and jump focuses that editor's window.
+  - **OpenCode** — reads the CLI's own SQLite store
+    (`%USERPROFILE%\.local\share\opencode\opencode.db`, `OpenCodeStore`): working /
+    needs-you / finished from the latest turn, plus current tool and target, model
+    and token spend. Read-only (OpenCode exposes no hook to answer a prompt from),
+    gated on a running `opencode` process.
 - [ ] Phase 6 — `uiAccess` signing, sounds, settings UI

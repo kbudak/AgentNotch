@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using AgentNotch.App.Diagnostics;
+using AgentNotch.App.Usage;
 using Timer = System.Threading.Timer;
 
 namespace AgentNotch.App.Sessions;
@@ -35,16 +36,25 @@ public sealed class SessionWatcher : IDisposable
     private AntigravityClient? _antigravity;
     private readonly string _codexDir;
     private readonly string _cursorProjectsDir;
+    private readonly string _openCodeDb;
     // Non-claude sources and process probing are disabled when a test injects
     // its own claudeHome — unit tests must stay hermetic.
     private readonly bool _multiSource;
     private DateTime _lastEmitUtc = DateTime.MinValue;
     private bool _emitScheduled;
+    private bool _emitting;
+    private bool _emitPending;
+    private int _polling;
     private bool _started;
     private bool _disposed;
     private volatile IReadOnlyList<AgentSession> _cursorLatest = Array.Empty<AgentSession>();
+    private volatile IReadOnlyList<AgentSession> _codexLatest = Array.Empty<AgentSession>();
+    private volatile bool _codexInitialized;
+    private volatile IReadOnlyList<AgentSession> _openCodeLatest = Array.Empty<AgentSession>();
     private volatile IReadOnlyList<AgentSession> _lastClaude = Array.Empty<AgentSession>();
     private string _cursorSig = "";
+    private string _codexSig = "";
+    private string _openCodeSig = "";
 
     /// <summary>Fresh snapshot after any change. Any thread; emissions are ≥1s apart.</summary>
     public event Action<IReadOnlyList<AgentSession>>? SessionsChanged;
@@ -59,6 +69,7 @@ public sealed class SessionWatcher : IDisposable
         _codexDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "sessions");
         _cursorProjectsDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cursor", "projects");
+        _openCodeDb = OpenCodeStore.DefaultDbPath;
         _emitTimer = new Timer(_ => Emit(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
     }
 
@@ -98,16 +109,23 @@ public sealed class SessionWatcher : IDisposable
 
     private void PollTick()
     {
+        if (_disposed || Interlocked.Exchange(ref _polling, 1) == 1) return;
         try
         {
             TryAttachWatchers(); // dirs may appear after startup; watchers may have errored
             _antigravity?.RefreshIfDue(); // non-blocking; result lands in Latest for the next Emit
             RefreshCursorFast(); // must not wait on Claude file IO — that can stall for minutes
+            RefreshCodexFast(); // reasoning/tool transitions must not wait on Claude's full snapshot
+            RefreshOpenCodeFast(); // OpenCode reads its own SQLite store; keep it off the Claude path
             Kick();
         }
         catch (Exception ex)
         {
             AppLog.Write("SessionWatcher: poll tick failed: " + ex);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _polling, 0);
         }
     }
 
@@ -140,6 +158,79 @@ public sealed class SessionWatcher : IDisposable
         }
     }
 
+    private void RefreshCodexFast()
+    {
+        if (!_multiSource) return;
+        try
+        {
+            var now = DateTime.UtcNow;
+            var codex = CollectCodex(now);
+            _codexLatest = codex;
+            _codexInitialized = true;
+            var sig = string.Join("|", codex.Select(s =>
+                $"{s.SessionId}:{s.Status}:{s.IsThinking}:{s.NeedsApproval}:{s.CurrentTool}:{s.CurrentTarget}:{s.LastMessage}"));
+            if (sig == _codexSig) return;
+            _codexSig = sig;
+            Publish(MergeSources(_lastClaude, now));
+        }
+        catch (Exception ex) { AppLog.Write("SessionWatcher: codex fast refresh: " + ex.Message); }
+    }
+
+    private IReadOnlyList<AgentSession> CollectCodex(DateTime now)
+    {
+        // Same gate the Electron collector used: closing Codex must clear its rows.
+        if (!Interop.ProcessTree.AnyRunning("codex", "chatgpt", "codex-code-mode-host", "OpenAI.Codex", "Codex Desktop", "ChatGPT Desktop"))
+            return Array.Empty<AgentSession>();
+
+        var codex = CodexTail.Collect(_codexDir, now);
+        // A task and its reviewer sub-agents share a cwd and each get their own
+        // rollout; collapse them to one row (the most recently active) so a
+        // single running task doesn't sprout phantom duplicates.
+        codex = codex
+            .GroupBy(s => string.IsNullOrEmpty(s.Cwd) ? s.SessionId : s.Cwd,
+                     StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(s => s.LastActivityUtc).First())
+            .ToList();
+        // A rollout only says "vscode" (some VS Code fork). Pin down the real
+        // editor by walking the running Codex process up to its host window
+        // app — the Codex extension is a child of Cursor.exe / Code.exe.
+        var codexHost = Interop.ProcessTree.HostOfRunningProcess("codex", "chatgpt", "OpenAI.Codex");
+        var codexLabel = Interop.ProcessTree.HostLabelOfRunningProcess("codex", "chatgpt", "OpenAI.Codex");
+        foreach (var session in codex)
+        {
+            if (session.Host == "vscode" && codexHost is not null) session.Host = codexHost;
+            session.HostLabel ??= codexLabel ?? "Codex Desktop";
+        }
+        return codex;
+    }
+
+    /// <summary>
+    /// OpenCode keeps its live session state in a SQLite store, so it has to be read
+    /// rather than tailed. Like Cursor and Codex it gets its own fast path: the read
+    /// is cheap and must not wait on Claude's full ~\.claude walk, and closing
+    /// OpenCode must clear its rows at once (gated on the process, same as the others).
+    /// </summary>
+    private void RefreshOpenCodeFast()
+    {
+        if (!_multiSource) return;
+        try
+        {
+            var opencode = OpenCodeRunning() && File.Exists(_openCodeDb)
+                ? OpenCodeStore.Collect(_openCodeDb, DateTime.UtcNow)
+                : (IReadOnlyList<AgentSession>)Array.Empty<AgentSession>();
+            _openCodeLatest = opencode;
+            var sig = string.Join("|", opencode.Select(s =>
+                $"{s.SessionId}:{s.Status}:{s.IsThinking}:{s.CurrentTool}:{s.CurrentTarget}:{s.LastMessage}"));
+            if (sig == _openCodeSig) return;
+            _openCodeSig = sig;
+            Publish(MergeSources(_lastClaude, DateTime.UtcNow));
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("SessionWatcher: opencode fast refresh: " + ex.Message);
+        }
+    }
+
     private void Publish(IReadOnlyList<AgentSession> snapshot)
     {
         try { SessionsChanged?.Invoke(snapshot); }
@@ -149,12 +240,18 @@ public sealed class SessionWatcher : IDisposable
         }
     }
 
-    /// <summary>Request a rebuild; coalesces bursts and keeps emissions ≥1s apart.</summary>
+    /// <summary>Request a rebuild; coalesces bursts and keeps emissions ≥1s apart without piling up threads.</summary>
     private void Kick()
     {
         lock (_gate)
         {
-            if (_disposed || !_started || _emitScheduled) return;
+            if (_disposed || !_started) return;
+            if (_emitting)
+            {
+                _emitPending = true;
+                return;
+            }
+            if (_emitScheduled) return;
             var elapsed = DateTime.UtcNow - _lastEmitUtc;
             var delay = elapsed >= MinEmitInterval ? TimeSpan.Zero : MinEmitInterval - elapsed;
             _emitScheduled = true;
@@ -169,10 +266,17 @@ public sealed class SessionWatcher : IDisposable
         {
             if (_disposed) return;
             _emitScheduled = false;
+            if (_emitting)
+            {
+                _emitPending = true;
+                return;
+            }
+            _emitting = true;
+            _emitPending = false;
             _lastEmitUtc = DateTime.UtcNow;
         }
 
-        IReadOnlyList<AgentSession> snapshot;
+        IReadOnlyList<AgentSession>? snapshot = null;
         try
         {
             var now = DateTime.UtcNow;
@@ -193,10 +297,26 @@ public sealed class SessionWatcher : IDisposable
         catch (Exception ex)
         {
             AppLog.Write("SessionWatcher: snapshot failed: " + ex);
-            return;
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _emitting = false;
+                if (_emitPending && !_disposed && !_emitScheduled)
+                {
+                    _emitPending = false;
+                    _emitScheduled = true;
+                    var elapsed = DateTime.UtcNow - _lastEmitUtc;
+                    var delay = elapsed >= MinEmitInterval ? TimeSpan.Zero : MinEmitInterval - elapsed;
+                    try { _emitTimer.Change(delay, Timeout.InfiniteTimeSpan); }
+                    catch (ObjectDisposedException) { }
+                }
+            }
         }
 
-        Publish(snapshot);
+        if (snapshot is not null)
+            Publish(snapshot);
     }
 
     // ---------- multi-agent merge ----------
@@ -210,9 +330,15 @@ public sealed class SessionWatcher : IDisposable
     private List<AgentSession> MergeSources(IReadOnlyList<AgentSession> claude, DateTime now)
     {
         var merged = new List<AgentSession>(claude);
+        var claudeUsage = ClaudeUsageClient.SharedWindows;
 
         foreach (var session in claude)
         {
+            if (string.IsNullOrEmpty(session.Model))
+                session.Model = "Claude 3.7";
+            if (session.Usage.Count == 0 && claudeUsage.Count > 0)
+                session.Usage = claudeUsage;
+
             if (session.Entrypoint == "claude-desktop")
             {
                 // Not just "Claude" — that would collide with the brand chip and
@@ -233,30 +359,14 @@ public sealed class SessionWatcher : IDisposable
 
         try
         {
-            // Same gate the Electron collector used: closing Codex must clear its rows.
-            if (Interop.ProcessTree.AnyRunning("codex", "chatgpt", "codex-code-mode-host", "OpenAI.Codex", "Codex Desktop", "ChatGPT Desktop"))
+            var codex = _codexLatest;
+            if (!_codexInitialized)
             {
-                var codex = CodexTail.Collect(_codexDir, now);
-                // A task and its reviewer sub-agents share a cwd and each get their own
-                // rollout; collapse them to one row (the most recently active) so a
-                // single running task doesn't sprout phantom duplicates.
-                codex = codex
-                    .GroupBy(s => string.IsNullOrEmpty(s.Cwd) ? s.SessionId : s.Cwd,
-                             StringComparer.OrdinalIgnoreCase)
-                    .Select(g => g.OrderByDescending(s => s.LastActivityUtc).First())
-                    .ToList();
-                // A rollout only says "vscode" (some VS Code fork). Pin down the real
-                // editor by walking the running Codex process up to its host window
-                // app — the Codex extension is a child of Cursor.exe / Code.exe.
-                var codexHost = Interop.ProcessTree.HostOfRunningProcess("codex", "chatgpt", "OpenAI.Codex");
-                var codexLabel = Interop.ProcessTree.HostLabelOfRunningProcess("codex", "chatgpt", "OpenAI.Codex");
-                foreach (var session in codex)
-                {
-                    if (session.Host == "vscode" && codexHost is not null) session.Host = codexHost;
-                    session.HostLabel ??= codexLabel ?? "Codex Desktop";
-                }
-                merged.AddRange(codex);
+                codex = CollectCodex(now);
+                _codexLatest = codex;
+                _codexInitialized = true;
             }
+            if (codex.Count > 0) merged.AddRange(codex);
         }
         catch (Exception ex)
         {
@@ -289,6 +399,22 @@ public sealed class SessionWatcher : IDisposable
             AppLog.Write("SessionWatcher: cursor collect: " + ex.Message);
         }
 
+        try
+        {
+            var opencode = _openCodeLatest;
+            if (opencode.Count == 0 && File.Exists(_openCodeDb) && OpenCodeRunning())
+            {
+                // First full emit before a poll tick, or tests without PollTick.
+                opencode = OpenCodeStore.Collect(_openCodeDb, now);
+                _openCodeLatest = opencode;
+            }
+            if (opencode.Count > 0) merged.AddRange(opencode);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("SessionWatcher: opencode collect: " + ex.Message);
+        }
+
         static int Rank(SessionStatus s) => s switch
         {
             SessionStatus.NeedsYou => 0,
@@ -305,6 +431,10 @@ public sealed class SessionWatcher : IDisposable
     /// <summary>Is a Cursor window (or its headless CLI agent) actually running?</summary>
     private static bool CursorRunning() =>
         Interop.ProcessTree.AnyRunning("Cursor", "cursor-agent");
+
+    /// <summary>Is the OpenCode CLI running? (Its store is only meaningful while it is.)</summary>
+    private static bool OpenCodeRunning() =>
+        Interop.ProcessTree.AnyRunning("opencode", "opencode.exe");
 
     // ---------- file system watchers ----------
 

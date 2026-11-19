@@ -447,4 +447,78 @@ public static class ProcessTree
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr hObject);
+
+    // --------------------------------------------------- GetCommandLine ----
+
+    private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    private const int ProcessCommandLineInformation = 60;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct UNICODE_STRING
+    {
+        public ushort Length;
+        public ushort MaximumLength;
+        public IntPtr Buffer;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint dwDesiredAccess, bool bInheritHandle, uint dwProcessId);
+
+    [DllImport("ntdll.dll")]
+    private static extern int NtQueryInformationProcess(
+        IntPtr processHandle,
+        int processInformationClass,
+        IntPtr processInformation,
+        uint processInformationLength,
+        out uint returnLength);
+
+    /// <summary>
+    /// Reads the command line of a same-user process via ProcessCommandLineInformation (Win8.1+).
+    /// Used to extract --csrf_token from a running language_server.exe when its startup log
+    /// has grown past the tail window. Never throws; returns null on any failure.
+    /// </summary>
+    public static string? GetCommandLine(int pid)
+    {
+        if (pid <= 0) return null;
+        IntPtr hProc = IntPtr.Zero;
+        try
+        {
+            hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, (uint)pid);
+            if (hProc == IntPtr.Zero) return null;
+
+            int headerSize = Marshal.SizeOf<UNICODE_STRING>();
+            _ = NtQueryInformationProcess(hProc, ProcessCommandLineInformation, IntPtr.Zero, 0, out uint needed);
+            if (needed < (uint)headerSize || needed > 64 * 1024) needed = 8192;
+
+            IntPtr buf = Marshal.AllocHGlobal((int)needed);
+            try
+            {
+                int status = NtQueryInformationProcess(hProc, ProcessCommandLineInformation, buf, needed, out _);
+                if (status != 0) return null;
+
+                var ustr = Marshal.PtrToStructure<UNICODE_STRING>(buf);
+                if (ustr.Buffer == IntPtr.Zero || ustr.Length == 0 || (ustr.Length & 1) != 0) return null;
+
+                long bufStart = buf.ToInt64();
+                long strStart = ustr.Buffer.ToInt64();
+                if (strStart < bufStart + headerSize || strStart + ustr.Length > bufStart + needed)
+                    return null;
+
+                return Marshal.PtrToStringUni(ustr.Buffer, ustr.Length / 2);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buf);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("proctree: GetCommandLine failed: " + ex.Message);
+            return null;
+        }
+        finally
+        {
+            if (hProc != IntPtr.Zero) CloseHandle(hProc);
+        }
+    }
 }

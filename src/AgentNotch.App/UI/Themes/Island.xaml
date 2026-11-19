@@ -102,6 +102,7 @@
     <SolidColorBrush x:Key="AgentCodexBrush" Color="#FFF4F4F5"/>
     <SolidColorBrush x:Key="AgentAntigravityBrush" Color="#FF4E8CF7"/>
     <SolidColorBrush x:Key="AgentCursorBrush" Color="#FF6EE7D7"/>
+    <SolidColorBrush x:Key="AgentOpenCodeBrush" Color="#FFA78BFA"/>
     <SolidColorBrush x:Key="AgentGenericBrush" Color="#FF9CA3AF"/>
 
     <!-- Reserved: only ever means "blocked on you". -->
@@ -128,6 +129,8 @@
     <Thickness x:Key="PanelBorderThickness">1,0,1,1</Thickness>
     <Visibility x:Key="TiledVisibility">Collapsed</Visibility>
     <Visibility x:Key="BareVisibility">Visible</Visibility>
+    <Visibility x:Key="LeadAgentMarkVisibility">Visible</Visibility>
+    <Visibility x:Key="CollapsedLeadStatusVisibility">Visible</Visibility>
     <Thickness x:Key="CountItemMargin">11,0,0,0</Thickness>
     <FontWeight x:Key="TitleFontWeight">Normal</FontWeight>
 
