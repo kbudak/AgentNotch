@@ -9,3 +9,18 @@ TestResults/
 .claude/
 .cursor/
 .idea/
+
+# Local secrets, logs, databases, and crash dumps — never commit
+.env
+.env.*
+*.key
+*.pem
+*.pfx
+*.p12
+*.log
+*.db
+*.sqlite
+*.sqlite3
+*.dmp
+*credentials*.json
+*secrets*.json
