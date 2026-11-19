@@ -26,6 +26,21 @@
          click-through and hover-transparent; only the panel is interactive. -->
     <Grid Margin="28,0,28,32" HorizontalAlignment="Center" VerticalAlignment="Top">
 
+        <!-- Atari/AtariDark hard shadow is shifted down-right by (4,4), which would leave
+             a 4px gap between the top of the screen and the shadow on the right edge.
+             This top cap bridges y=0..10 behind NotchPanel so the hard shadow sits flush
+             with the top edge at every DPI without a subpixel seam. -->
+        <Border HorizontalAlignment="Center" VerticalAlignment="Top"
+                Width="{Binding ActualWidth, ElementName=NotchPanel}"
+                Height="10"
+                Background="{DynamicResource PanelShadowCasterBrush}"
+                Visibility="{Binding IsAtari, Converter={StaticResource BoolToVis}}"
+                IsHitTestVisible="False">
+            <Border.RenderTransform>
+                <TranslateTransform X="4" Y="0"/>
+            </Border.RenderTransform>
+        </Border>
+
         <!-- Must match NotchPanel's size. A stretch caster fills the 640px host and
              reads as a second, badly-rounded slab behind the pill. -->
         <Border x:Name="ShadowCaster"
